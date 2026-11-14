@@ -46,13 +46,13 @@ const songEnd = () => Math.max(64, ...S.tracks.flatMap(t => t.clips.map(c => c.s
 /* ---------- audio graph ---------- */
 function buildMaster() {
   [M.out, M.click, M.cue, M.loud].forEach(n => { if (n) try { n.disconnect(); } catch (e) { } });
-  M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = 2048;
+  M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = 2048; M.direct = ctx.createDelay(2); M.direct.connect(M.in);
   M.rec = !isOffline() && ctx.createMediaStreamDestination ? ctx.createMediaStreamDestination() : null;
-  M.out.connect(ctx.destination); M.out.connect(M.an); if (M.rec) M.out.connect(M.rec);
+  M.out.connect(liveOut('main')); M.out.connect(M.an); if (M.rec) M.out.connect(M.rec);
   M.split = ctx.createChannelSplitter(2); M.anL = ctx.createAnalyser(); M.anR = ctx.createAnalyser(); M.anL.fftSize = M.anR.fftSize = 1024; M.out.connect(M.split); M.split.connect(M.anL, 0); M.split.connect(M.anR, 1);
   if (!isOffline() && PITCH_OK) { try { M.loud = new AudioWorkletNode(ctx, 'gw-loud', { numberOfInputs: 1, numberOfOutputs: 0 }); M.out.connect(M.loud); M.loud.port.onmessage = e => (M.loudData = e.data); } catch (e) { M.loud = null; } }
-  M.click = ctx.createGain(); M.click.gain.value = 0.35; if (!isOffline()) M.click.connect(ctx.destination);
-  M.cue = ctx.createGain(); M.cue.gain.value = 0.8; if (!isOffline()) M.cue.connect(ctx.destination);
+  M.click = ctx.createGain(); M.click.gain.value = 0.35; if (!isOffline()) M.click.connect(GP.clickCue ? liveOut('cue') : liveOut('main'));
+  M.cue = ctx.createGain(); M.cue.gain.value = 0.8; if (!isOffline()) M.cue.connect(liveOut('cue'));
 }
 function chain(src, devices, dest) {
   try { src.disconnect(); } catch (e) { }
@@ -74,11 +74,12 @@ const descendants = g => S.tracks.filter(t => ancestors(t).includes(g));
 const depthOf = b => ancestors(b).length;
 const hiddenByFold = b => ancestors(b).some(g => g.fold);
 function routeOut(b) {
-  const r = RT.get(b.id); if (!r || b === S.master) return; const g = groupOf(b), dest = g && RT.get(g.id) ? RT.get(g.id).in : M.in;
-  if (r.outDest === dest) return; if (r.outDest) try { r.mute.disconnect(r.outDest); } catch (e) { } r.mute.connect(dest); r.outDest = dest;
+  const r = RT.get(b.id); if (!r || b === S.master) return; const g = groupOf(b), ext = extParse(b.out), isRet = S.returns.includes(b);
+  const dest = ext ? (IO.native && !isOffline() ? extOutNode(b.out) : null) : g && RT.get(g.id) ? RT.get(g.id).in : isRet ? M.in : (M.direct || M.in);
+  if (r.outDest === dest) return; if (r.outDest) try { r.mute.disconnect(r.outDest); } catch (e) { } if (dest) r.mute.connect(dest); r.outDest = dest;
 }
 function buildBus(b, kind) {
-  const r = { fader: ctx.createGain(), pan: ctx.createStereoPanner(), dly: ctx.createDelay(1), mute: ctx.createGain(), an: ctx.createAnalyser(), pre: ctx.createGain(), preMute: ctx.createGain(), kind };
+  const r = { fader: ctx.createGain(), pan: ctx.createStereoPanner(), dly: ctx.createDelay(2), mute: ctx.createGain(), an: ctx.createAnalyser(), pre: ctx.createGain(), preMute: ctx.createGain(), kind };
   r.an.fftSize = 1024; r.pre.connect(r.fader); r.fader.connect(r.pan); r.pan.connect(r.dly); r.dly.connect(r.mute); r.mute.connect(r.an); r.pre.connect(r.preMute);
   RT.set(b.id, r); routeOut(b);
   r.split = ctx.createChannelSplitter(2); r.anL = ctx.createAnalyser(); r.anR = ctx.createAnalyser(); r.anL.fftSize = r.anR.fftSize = 1024; r.mute.connect(r.split); r.split.connect(r.anL, 0); r.split.connect(r.anR, 1);
@@ -99,7 +100,7 @@ function wireSidechains() {
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
-function rewire(b) { if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
+function rewire(b) { if (NE.on && !isOffline()) { setTimeout(neSyncProject, 0); schedulePDC(); } if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
 const anySolo = () => S.tracks.some(t => t.solo);
 // A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
 const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
@@ -111,7 +112,7 @@ function applyMix(b) {
   if (r.sends) r.sends.forEach((g, i) => { const k = sendKey(i); if (!autoActive(b, k)) sm(g.gain, sendOf(b, i)); });
   const isTrack = S.tracks.includes(b), audible = !b.mute && !ancestors(b).some(g => g.mute) && (!isTrack || !anySolo() || soloPath(b));
   sm(r.mute.gain, audible ? 1 : 0, 0.008); sm(r.preMute.gain, audible ? 1 : 0, 0.008);
-  const off = Math.max(0, ...S.tracks.map(t => -(t.delayMs || 0))) / 1000; sm(r.dly.delayTime, clamp(((isTrack ? b.delayMs || 0 : 0) / 1000) + off, 0, 0.99), 0.02);
+  const off = Math.max(0, ...S.tracks.map(t => -(t.delayMs || 0))) / 1000; sm(r.dly.delayTime, clamp(((isTrack ? b.delayMs || 0 : 0) / 1000) + off + (b._pdc || 0), 0, 1.99), 0.02);
   if (r.mon) sm(r.mon.gain, monitorOn(b) ? 1 : 0, 0.01);
 }
 const applyAllMix = () => allBuses().forEach(applyMix);
@@ -127,6 +128,7 @@ function rebuildAll() {
   S.returns.forEach(r => buildBus(r, 'return'));
   S.tracks.forEach(t => buildBus(t, 'track'));
   S.tracks.forEach(routeOut); connectInputs(); wireSidechains();
+  if (!isOffline() && NE.on) { neSyncProject(); schedulePDC(); }
 }
 function removeBus(b) {
   const r = RT.get(b.id); if (!r) return; if (r.inst) { r.inst.allOff(ctx.currentTime); if (r.inst.dispose) r.inst.dispose(); }
@@ -144,7 +146,7 @@ function autoParams(b) {
   if (S.tracks.includes(b)) S.returns.forEach((ret, i) => out.push({ key: sendKey(i), label: `Send ${RET_LETTERS[i]} (${ret.name})`, min: 0, max: 1, fmt: fPct }));
   if (b.kind === 'midi' && b.inst.type === 'synth') [['cutoff', 'Synth Cutoff', 40, 16000, 'log', fHz], ['res', 'Synth Reso', 0.3, 20, null, v => v.toFixed(1)], ['fenv', 'Synth Env', 0, 8000, null, fHz], ['gain', 'Synth Volume', 0, 1, null, fPct]].forEach(([k, l, a, z, sc, f]) => out.push({ key: 'inst:' + k, label: l, min: a, max: z, scale: sc, fmt: f }));
   if (b.kind === 'midi' && b.inst.type === 'sampler') out.push({ key: 'inst:filter', label: 'Sampler Filter', min: -1, max: 1, fmt: v => v.toFixed(2) });
-  b.devices.forEach(d => (DEVICES[d.type].params || []).filter(p => p.min != null).forEach(p => out.push({ key: `dev:${d.id}:${p.k}`, label: `${DEVICES[d.type].name}: ${p.label}`, min: p.min, max: p.max, scale: p.scale, fmt: p.fmt })));
+  b.devices.forEach(d => devParamDefs(d).filter(p => p.min != null).forEach(p => out.push({ key: `dev:${d.id}:${p.k}`, label: `${DEVICES[d.type].name}: ${p.label}`, min: p.min, max: p.max, scale: p.scale, fmt: p.fmt })));
   b.devices.filter(d => d.type === 'eq').forEach(d => d.p.bands.forEach((band, i) => { out.push({ key: `eqf:${d.id}:${i}`, label: `Prism EQ ${i + 1} Freq`, min: 20, max: 20000, scale: 'log', fmt: fHz }); out.push({ key: `eqg:${d.id}:${i}`, label: `Prism EQ ${i + 1} Gain`, min: -18, max: 18, fmt: fDb }); }));
   return out;
 }
@@ -299,8 +301,9 @@ function scheduleWindow(from, to) {
             const p = base + n.s + k * L; if (p >= to - 1e-9 || p >= end - 1e-9) break; if (p < from - 1e-9 || p < c.start - 1e-9) continue;
             if (n.c != null && n.c < 1 && Math.random() > n.c) continue;
             const dur = Math.min(n.l, end - p, L - n.s);
-            const vel = n.vr ? clamp(n.v + (Math.random() * 2 - 1) * n.vr, 0.01, 1) : n.v; // velocity range: a random spread around the note's velocity
-            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p)), vel, durSec(p, dur) * 0.98, n.rv, n.mpe);
+            const gv = c.groove ? grooveAt(grooveById(c.groove), p) : null; // groove: shift and accent from the groove pool
+            const vel = clamp((n.vr ? n.v + (Math.random() * 2 - 1) * n.vr : n.v) * (gv ? gv.vel : 1), 0.01, 1); // velocity range: a random spread around the note's velocity
+            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p + (gv ? gv.shift : 0))), vel, durSec(p, dur) * 0.98, n.rv, n.mpe);
           }
         }
       }
@@ -394,16 +397,18 @@ async function getInput(deviceId = 'default') {
   const inp = { stream, src }; INPUTS.set(deviceId, inp); connectInputs(); return inp;
 }
 const monitorOn = t => t.kind === 'audio' && (t.monitor === 'in' || (t.monitor === 'auto' && t.arm));
-const internalInput = t => t.input === 'resample' || String(t.input || '').startsWith('track:');
+const internalInput = t => t.input === 'resample' || String(t.input || '').startsWith('track:') || !!extParse(t.input) || (IO.native && (t.input || 'default') === 'default');
 function inputNode(t) {
   if (t.input === 'resample') return M.out;
   if (String(t.input || '').startsWith('track:')) { const r = RT.get(t.input.slice(6)); return r ? r.mute : null; }
+  if (IO.native) { const spec = extParse(t.input) ? t.input : (t.input || 'default') === 'default' ? 'ext:1' : null; return spec && IO.inCh ? extInNode(spec) : null; }
+  if (extParse(t.input)) return null;
   const inp = INPUTS.get(t.input || 'default'); return inp ? inp.src : null;
 }
 function connectInputs() {
   if (isOffline()) return;
   S.tracks.forEach(t => { const r = RT.get(t.id); if (!r || !r.mon) return; if (r.monSrc) { try { r.monSrc.disconnect(r.mon); } catch (e) { } r.monSrc = null; }
-    if (t.kind !== 'audio' || internalInput(t)) return; // internal sources are recorded, not monitored (that would feed back)
+    if (t.kind !== 'audio' || (internalInput(t) && !(IO.native && !String(t.input || '').startsWith('track:') && t.input !== 'resample'))) return; // internal sources are recorded, not monitored (that would feed back)
     const src = inputNode(t); if (src) { src.connect(r.mon); r.monSrc = src; } });
 }
 async function armTrack(t, on) {
@@ -511,17 +516,23 @@ function punchIn(t, c) { clearRange(t, c.start, c.start + c.len); }
 /* ---------- live notes (computer keyboard / MIDI) ---------- */
 const held = new Map();
 function liveTarget() { const t = S.tracks.find(x => x.arm && x.kind === 'midi') || S.tracks.find(x => V.selTracks.has(x.id) && x.kind === 'midi'); return t; }
-function liveNoteOn(key, note, vel = 0.85, t = liveTarget()) {
+function liveNoteOn(key, note, vel = 0.85, t = liveTarget(), ch = 0) {
   if (!t || t.kind !== 'midi') return; if (ctx.state !== 'running') ctx.resume();
   const v = RT.get(t.id).inst.noteOn(note, ctx.currentTime, vel, null);
-  const h = { v, t, note, vel, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
+  const h = { v, t, note, vel, ch, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
   if (T.recording) T.recording.held.set(key, h);
 }
 function liveNoteOff(key, rv) {
   const h = held.get(key); if (!h) return; held.delete(key);
   RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime, rv);
-  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at }); }
+  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); const dur = Math.max(0.01, ctx.currentTime - h.at); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at, mpe: h.pb && h.pb.length ? { pb: [{ t: 0, v: h.pb0 || 0 }, ...h.pb.map(q => ({ t: clamp((q.at - h.at) / dur, 0, 1), v: q.v }))] } : undefined }); }
   if (!R) { CAPTURE.push({ t: h.t.id, p: h.note, t0: h.at, t1: ctx.currentTime, vel: h.vel, rv, pos: h.pos, end: T.playing && h.pos != null ? posAt(ctx.currentTime) : null }); if (CAPTURE.length > 4000) CAPTURE.splice(0, 1000); }
+}
+// Pitch bend: on a member channel (MPE) it bends only that note; on channel 1 it bends everything held.
+function liveBend(ch, x) {
+  const semis = x * (ch === 0 ? (GP.pbRange || 2) : (GP.mpeRange || 48));
+  held.forEach(h => { if (ch !== 0 && h.ch !== ch) return; h.pb = h.pb || []; if (!h.pb.length) h.pb0 = 0; h.pb.push({ at: ctx.currentTime, v: semis });
+    const nodes = (h.v && (h.v.oscs || h.v.srcs)) || []; nodes.forEach(o => { if (!o.detune) return; if (o._b0 == null) o._b0 = o.detune.value; o.detune.setTargetAtTime(o._b0 + semis * 100, ctx.currentTime, 0.005); }); });
 }
 /* Capture MIDI: everything you play while not recording is remembered, so you can turn it into a clip afterwards. */
 const CAPTURE = [];

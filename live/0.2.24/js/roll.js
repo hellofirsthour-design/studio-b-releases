@@ -1,5 +1,5 @@
 /* ============ piano roll / clip editor ============ */
-const LANE_KEY = { vel: 'v', chance: 'c', vr: 'vr', rel: 'rv' };
+const LANE_KEY = { vel: 'v', chance: 'c', vr: 'vr', rel: 'rv', pb: 'pb' };
 const laneVal = (n, lane) => (lane === 'vel' ? n.v : lane === 'chance' ? (n.c == null ? 1 : n.c) : lane === 'vr' ? n.vr || 0 : n.rv == null ? 0.5 : n.rv);
 const roll = {
   det: { tf: true, gn: false }, sel: new Set(), grid: 1, snap: true, draw: false, fold: false, lane: 'vel', zoom: 1, scrollX: 0, scrollY: null, lastLen: 1, clip: null, track: null, clipboard: null,
@@ -43,6 +43,7 @@ const roll = {
           <label class="fld sm"><span>Pulses / steps</span><span class="pair"><input id="gPul" type="number" min="1" max="32" value="5"><input id="gSteps" type="number" min="2" max="32" value="16"></span></label><button data-gn="rhythm">Euclidean rhythm</button>
           <label class="fld sm"><span>Degrees</span><input id="gProg" value="1 6 4 5"></label><button data-gn="stacks">Chord progression</button>
         </div></details>
+        <div class="fld"><span>Groove</span><div class="row tight"><select id="cGroove" class="dd"><option value="">None</option>${[...(S.grooves || []), ...GROOVE_LIB.filter(g => !(S.grooves || []).some(x => x.id === g.id))].map(g => `<option value="${g.id}" ${c.groove === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>${c.groove ? '<button class="btn ghostb tiny" id="cGrooveCommit" title="Write the groove into the notes">Commit</button>' : ''}</div></div>
         <button class="btn ghostb danger" data-ct="clear">Clear notes</button>
       </aside>
       <div class="rollmain">
@@ -51,7 +52,7 @@ const roll = {
           <label class="fld inl"><span>Grid</span><select id="rGrid">${GRIDS.map(([l, v]) => `<option value="${v}" ${v === this.grid ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           <button class="tog ${this.snap ? 'on' : ''}" id="rSnap">Snap</button>
           ${isPitched(t) ? `<button class="tog ${this.fold ? 'on' : ''}" id="rFold">Fold to scale</button>` : ''}
-          <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button><button data-lane="vr" class="${this.lane === 'vr' ? 'on' : ''}" title="Velocity range: a random spread each time the note plays">Vel range</button><button data-lane="rel" class="${this.lane === 'rel' ? 'on' : ''}" title="Release velocity">Release</button></div>
+          <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button><button data-lane="vr" class="${this.lane === 'vr' ? 'on' : ''}" title="Velocity range: a random spread each time the note plays">Vel range</button><button data-lane="rel" class="${this.lane === 'rel' ? 'on' : ''}" title="Release velocity">Release</button><button data-lane="pb" class="${this.lane === 'pb' ? 'on' : ''}" title="Per-note pitch bend (MPE). Draw over a note; double-click to clear it.">Pitch</button></div>
           <button class="tog ${this.preview !== false ? 'on' : ''}" id="rPrev" title="Play notes as you add or move them">Preview</button>
           <span class="spacer"></span><span class="muted hint">Double-click to add · drag edges to resize · Alt-drag copies · Del removes · Ctrl+wheel zooms</span>
         </div>
@@ -88,6 +89,8 @@ const roll = {
       if (!hit) return; e.stopImmediatePropagation(); e.preventDefault(); const ox = this.scrollX; V.editClip = hit.id; this.mount(); this.scrollX = ox; this.draw_(); arr.draw();
     }, true);
     pane.querySelectorAll('details[data-det]').forEach(d => d.addEventListener('toggle', () => (this.det[d.dataset.det] = d.open)));
+    pane.querySelector('#cGroove').onchange = e => { if (e.target.value) applyGroove(e.target.value, [this.clip]); else { pushUndo('Groove'); delete this.clip.groove; this.mount(); } };
+    if (pane.querySelector('#cGrooveCommit')) pane.querySelector('#cGrooveCommit').onclick = () => commitGroove(this.clip);
     pane.querySelector('#cName').onchange = e => { pushUndo(); this.clip.name = e.target.value || 'Clip'; arr.draw(); markDirty(); };
     pane.querySelector('#cLen').onclick = e => { const b = e.target.closest('[data-len]'); if (!b) return; pushUndo(); this.clip.bars = +b.dataset.len * SPB() / 16; arr.draw(); this.mount(); };
     pane.querySelectorAll('[data-mode]').forEach(b => (b.onclick = () => { this.draw = b.dataset.mode === 'draw'; this.mount(); }));
@@ -163,6 +166,7 @@ const roll = {
   laneSet(g, x, y) {
     const v = clamp(1 - (y - (g.h - g.laneH) - 4) / (g.laneH - 8), this.lane === 'vr' ? 0 : 0.02, 1), s = this.xs(g, x), key = LANE_KEY[this.lane];
     const pool = this.sel.size ? [...this.sel] : this.clip.notes;
+    if (this.lane === 'pb') { const semis = Math.round((v * 2 - 1) * 12 * 4) / 4; pool.filter(n => s >= n.s && s <= n.s + n.l).forEach(n => { n.mpe = n.mpe || {}; const pts = n.mpe.pb = (n.mpe.pb || [{ t: 0, v: 0 }]); const t = clamp((s - n.s) / n.l, 0, 1); n.mpe.pb = [...pts.filter(q => Math.abs(q.t - t) > 0.04), { t, v: semis }].sort((a, b) => a.t - b.t); showTip({ clientX: x + this.cv.getBoundingClientRect().left, clientY: y + this.cv.getBoundingClientRect().top }, (semis > 0 ? '+' : '') + semis + ' st'); }); this.draw_(); return; }
     pool.forEach(n => { const a = this.sx(g, n.s); if (Math.abs(a - x) < Math.max(5, g.pps * this.grid / 2)) n[key] = Math.round(v * 100) / 100; });
     this.draw_();
   },
@@ -226,7 +230,10 @@ const roll = {
     if (playing) { const X = this.sx(g, PH); x.fillStyle = V('--accent'); x.beginPath(); x.moveTo(X - 5, 0); x.lineTo(X + 5, 0); x.lineTo(X, 8); x.fill(); }
     // lane
     const ly = g.h - g.laneH; x.fillStyle = V('--panel'); x.fillRect(0, ly, g.w, g.laneH); x.fillStyle = V('--line'); x.fillRect(0, ly, g.w, 1);
-    x.fillStyle = V('--dim'); x.fillText({ vel: 'Velocity', chance: 'Chance', vr: 'Vel range', rel: 'Release' }[this.lane], 6, ly + 14);
+    x.fillStyle = V('--dim'); x.fillText({ vel: 'Velocity', chance: 'Chance', vr: 'Vel range', rel: 'Release', pb: 'Pitch ±12' }[this.lane], 6, ly + 14);
+    if (this.lane === 'pb') { x.save(); x.beginPath(); x.rect(g.keysW, ly, g.gridW, g.laneH); x.clip(); const yv = v => ly + 4 + (1 - (clamp(v, -12, 12) + 12) / 24) * (g.laneH - 8); x.fillStyle = V('--line'); x.fillRect(g.keysW, yv(0), g.gridW, 1);
+      this.clip.notes.forEach(n => { const a = this.sx(g, n.s), w = n.l * g.pps, pts = n.mpe && n.mpe.pb; x.strokeStyle = this.sel.has(n) ? V('--fg') : col; x.lineWidth = 1.5; x.beginPath(); if (!pts || !pts.length) { x.moveTo(a, yv(0)); x.lineTo(a + w, yv(0)); x.globalAlpha = 0.35; } else { x.moveTo(a, yv(pts[0].v)); pts.forEach(q => x.lineTo(a + q.t * w, yv(q.v))); x.lineTo(a + w, yv(pts[pts.length - 1].v)); } x.stroke(); x.globalAlpha = 1; });
+      x.restore(); x.save(); x.beginPath(); x.rect(0, 0, 0, 0); x.clip(); }
     x.save(); x.beginPath(); x.rect(g.keysW, ly, g.gridW, g.laneH); x.clip();
     this.clip.notes.forEach(n => { const a = this.sx(g, n.s), val = laneVal(n, this.lane), hh = (g.laneH - 10) * val; if (this.lane === 'vr' && n.vr) { x.fillStyle = col; x.globalAlpha = 0.3; const vh = (g.laneH - 10); x.fillRect(a - 2, ly + g.laneH - 4 - vh * Math.min(1, n.v + n.vr), 6, vh * (Math.min(1, n.v + n.vr) - Math.max(0, n.v - n.vr))); x.globalAlpha = 1; } x.fillStyle = this.sel.has(n) ? V('--fg') : this.lane === 'vel' ? col : V('--chance'); x.fillRect(a, ly + g.laneH - 4 - hh, 2, hh); x.beginPath(); x.arc(a + 1, ly + g.laneH - 4 - hh, 3, 0, 7); x.fill(); });
     x.restore();

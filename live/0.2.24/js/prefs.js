@@ -194,7 +194,7 @@ function testTone(on) {
   if (PREFS_TONE.osc) { try { PREFS_TONE.g.gain.setTargetAtTime(0, LIVE_CTX.currentTime, 0.02); PREFS_TONE.osc.stop(LIVE_CTX.currentTime + 0.1); } catch (e) { } PREFS_TONE.osc = PREFS_TONE.g = null; }
   if (!on) return; if (LIVE_CTX.state !== 'running') LIVE_CTX.resume();
   const o = LIVE_CTX.createOscillator(), g = LIVE_CTX.createGain(); o.frequency.value = GP.toneHz || 440; g.gain.value = 0; g.gain.setTargetAtTime(dbToGain(GP.toneDb != null ? GP.toneDb : -36), LIVE_CTX.currentTime, 0.02);
-  o.connect(g); g.connect(LIVE_CTX.destination); o.start(); PREFS_TONE.osc = o; PREFS_TONE.g = g;
+  o.connect(g); g.connect(IO.main); o.start(); PREFS_TONE.osc = o; PREFS_TONE.g = g;
 }
 // Busy work on the audio thread: roughly pct% of each render block, to test how close the system is to dropouts.
 let _itersPerMs = 0;

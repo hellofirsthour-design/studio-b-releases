@@ -1,13 +1,13 @@
 {
- "version": "0.2.23",
+ "version": "0.2.24",
  "shell": 2,
- "date": "2026-11-14T19:02:16.001Z",
- "notes": "Native audio engine (C++ Node addon): Core Audio / WASAPI / ALSA / JACK devices via miniaudio with clock-drift correction, shared-memory bridge to the Web Audio mixer, VST3 hosting (SDK, MIT) and Audio Unit hosting, built in CI",
+ "date": "2026-11-14T19:38:16.130Z",
+ "notes": "Native engine in the app: page worker bridge, output/input/plug-in worklets, VST3 and AU plug-in devices and instruments, plug-in editors, crash-safe scanning, delay compensation, external I/O routing, Ableton plug-in linking with saved VST3 state; shell 3",
  "files": [
   {
    "path": "css/base.css",
-   "size": 27712,
-   "sha256": "78d6b0a25790e45239cd41912220dee1eee8344538b7ee8d244c5504c4049609"
+   "size": 27765,
+   "sha256": "aad7c005fc3d58a34307978a6847f8c4c73db1c3495c7115c768c4facfbed14c"
   },
   {
    "path": "css/studio.css",
@@ -16,23 +16,23 @@
   },
   {
    "path": "index.html",
-   "size": 19226,
-   "sha256": "5c405cf9eb564a29872dd29b848b917018231eea059d6ad559fe3116f72b1844"
+   "size": 19301,
+   "sha256": "12bd3775b35762a5c76edaf2d9c9e8aa78aa7b322426e9ad65b9894e02ed32f6"
   },
   {
    "path": "js/arrange.js",
-   "size": 49295,
-   "sha256": "60eb1f7f3b025b67cc201d931fb61d9b1cd63e851b6afed027914d993ea08d8d"
+   "size": 49527,
+   "sha256": "436ecff970ab4c73999b10be122adeffb2a73f807cbdb8116b7188a2c2e2b33e"
   },
   {
    "path": "js/browser.js",
-   "size": 30610,
-   "sha256": "49bc55fbc24815f2fb34f78b44a720b11712d9b4f19b5ca71df011325efa4283"
+   "size": 31981,
+   "sha256": "c3e46ec1a90119da0044068d71b91efaba05b6ca01674f2423b88a14df83ebfd"
   },
   {
    "path": "js/cards.js",
-   "size": 37909,
-   "sha256": "604ee397713ebe18edd2db9e1275bd33e874558145621b96088111323f80948d"
+   "size": 37959,
+   "sha256": "05e29a89dbc9d713075d630683ec4928e73f518757053a5cbc57074033cefb70"
   },
   {
    "path": "js/convert.js",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/core.js",
-   "size": 13762,
-   "sha256": "7f041a753bbb1438cf64421e552c7809e69f96b134807482d150a0c7b3bf6da8"
+   "size": 19324,
+   "sha256": "61e5b094db5cb41c0393e6e48b11db5e9a7c6ff3f7f67d142125897bedbdc0c3"
   },
   {
    "path": "js/devices.js",
@@ -55,9 +55,14 @@
    "sha256": "dcd81f751209424e68a9fce5db19c86d759ffaeac4497e5a8ba8d38dbef12134"
   },
   {
+   "path": "js/engine-worker.js",
+   "size": 854,
+   "sha256": "45ac12d0a1e31e1a2d70db18279fb79095a0e7efa62027726a16af8d7b457958"
+  },
+  {
    "path": "js/engine.js",
-   "size": 50843,
-   "sha256": "a007943ce2e8c504082e37f473312a8dcba9d2d72da674423f5d4474917fcfab"
+   "size": 51609,
+   "sha256": "56f83ec713f1ad43474ff732937b27f45360a29aeba3cae77ad74ddb7fd3eb7a"
   },
   {
    "path": "js/features.js",
@@ -66,8 +71,8 @@
   },
   {
    "path": "js/features2.js",
-   "size": 14532,
-   "sha256": "7503f8ff4dc8c6b0c25883d5b3001493e8d1f8bfca151d3f8c24c4f597300a55"
+   "size": 14554,
+   "sha256": "81a78e88824f3fcc88d4d9dfcc7b7c163664a01c3739c7af398eda4c155ef940"
   },
   {
    "path": "js/files.js",
@@ -91,18 +96,18 @@
   },
   {
    "path": "js/io.js",
-   "size": 44961,
-   "sha256": "d2cb0e14f0cea576bc4e255b89084def97742a85b98909564ab9c6354041b678"
+   "size": 46285,
+   "sha256": "898ee47ae9443bc8da718de51452d6f11e1956198a9643f9d5f455de4b47ad7b"
   },
   {
    "path": "js/main.js",
-   "size": 34588,
-   "sha256": "813b90e1743c0a68c825e770634f152168f6daf7de13abb788db2ee7a82e2696"
+   "size": 34746,
+   "sha256": "f69f79f2b1399399a9f8fdcd681bcb5acab19cad4bd30bd4263513acf51e2f47"
   },
   {
    "path": "js/mapping.js",
-   "size": 7170,
-   "sha256": "62b6842b3cc7e0563620d1a20473eb85f437166c70d557404cdc7d7d224707c7"
+   "size": 7140,
+   "sha256": "1cc82f2a3ab64ba7bfe66ddd02bf6bf120bf6dd2ca436997e08e2d64a39a56b2"
   },
   {
    "path": "js/mixer.js",
@@ -111,18 +116,28 @@
   },
   {
    "path": "js/mods.js",
-   "size": 8066,
-   "sha256": "8abab31841748232bd65735f33385662ccd7a67848063e6aa02f25a28e3bccaa"
+   "size": 8137,
+   "sha256": "166affbfbc7c7e2826b5d430fd0017d00b413d5c889331464d295337dc665cca"
+  },
+  {
+   "path": "js/native.js",
+   "size": 14606,
+   "sha256": "c3bce4f028c0cc863ebec711797c28b454b653f1375f5ec9e8ab2f52e12e642e"
+  },
+  {
+   "path": "js/plugins.js",
+   "size": 8654,
+   "sha256": "a5807150212c1b403902357015cd28384138675c2988d8650d0a2042aee367a2"
   },
   {
    "path": "js/prefs.js",
-   "size": 19870,
-   "sha256": "ac3107ae86156df1c8c21fe724d9fd5418482e17e39d86145d3d3f041bf88811"
+   "size": 19857,
+   "sha256": "be90415929f52e74bda3ab1cef8687f41fad48f427f46726594ab046a8014a63"
   },
   {
    "path": "js/racks.js",
-   "size": 11429,
-   "sha256": "8d5e769d659aa1c62be8b529e639dca195e16aa78e5ed957a221bd494334813b"
+   "size": 11399,
+   "sha256": "7435c929fa100c7f801ff092eb2432051c88508d412b382ac04bc27b2b2bff89"
   },
   {
    "path": "js/roll.js",
@@ -157,7 +172,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "54c480bd3e81c4501d85410eb0e0e044920fcc1da2ef2ed1eb6d3af42d8181e1"
+   "sha256": "c0f88cede75e3a8661c17b2dc542e4d2918244bd89a5165e3e861fd6b05cb19e"
   }
  ]
 }

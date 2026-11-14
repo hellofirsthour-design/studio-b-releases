@@ -49,10 +49,10 @@ const arr = {
     // grid
     for (const B of barLines(p0, p1)) { const spb = B.spb, bt = B.bt, gsb = gs >= SPB() ? gs : gs;
       if (B.bar % 2 === 1) { g.fillStyle = css.barAlt; g.fillRect(this.x(B.p), 0, spb * V.pps, h); }
-      if (V.pps >= 7 && gs > 1) { g.fillStyle = css.gridHair; for (let s = B.p; s < B.p + spb - 1e-6; s += 1) if (Math.abs((s - B.p) % gs) > 1e-6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
-      if (gsb >= spb) { const every = Math.round(gsb / SPB()) || 1; if (B.bar % every === 0) { g.fillStyle = css.gridBar; g.fillRect(Math.round(this.x(B.p)) + 0.5, 0, 1.25, h); } continue; }
-      for (let s = B.p; s < B.p + spb - 1e-6; s += gsb) { const x = Math.round(this.x(s)) + 0.5, isBar = s === B.p, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBar ? css.gridBar : isBeat ? css.gridBeat : css.gridFine; g.fillRect(x, 0, isBar ? 1.25 : 1, h); }
-      if (gsb > bt) { g.fillStyle = css.gridFine; for (let s = B.p + bt; s < B.p + spb - 1e-6; s += bt) if (Math.abs((s - B.p) % gsb) > 1e-6 && bt * V.pps >= 6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
+      if (V.pps >= 7 && gs > 1) { g.fillStyle = css.gridHair; for (let s = B.p; s < B.p + spb - 1e-6; s += 1) if (Math.abs((s - B.p) % gs) > 1e-6) g.fillRect(px(this.x(s)), 0, 1, h); }
+      if (gsb >= spb) { const every = Math.round(gsb / SPB()) || 1; if (B.bar % every === 0) { g.fillStyle = css.gridBar; g.fillRect(px(this.x(B.p)), 0, 1.25, h); } continue; }
+      for (let s = B.p; s < B.p + spb - 1e-6; s += gsb) { const x = px(this.x(s)), isBar = s === B.p, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBar ? css.gridBar : isBeat ? css.gridBeat : css.gridFine; g.fillRect(x, 0, isBar ? 1.25 : 1, h); }
+      if (gsb > bt) { g.fillStyle = css.gridFine; for (let s = B.p + bt; s < B.p + spb - 1e-6; s += bt) if (Math.abs((s - B.p) % gsb) > 1e-6 && bt * V.pps >= 6) g.fillRect(px(this.x(s)), 0, 1, h); }
     }
     // loop region and time selection
     if (S.loop.on) { g.fillStyle = css.loopShade; g.fillRect(this.x(S.loop.start), 0, (S.loop.end - S.loop.start) * V.pps, h); }
@@ -164,7 +164,7 @@ const arr = {
     g.font = '10px ' + css.mono;
     meterMap().slice(1).forEach(m => { const x = this.x(m.p); if (x < -40 || x > w) return; g.fillStyle = css.accent; g.font = 'bold 9px ' + css.mono; g.fillText(`${m.n}/${m.d}`, x + 3, LS + 22); g.font = '10px ' + css.mono; });
     for (const B of barLines(this.pos(0), this.pos(w))) for (let s = B.p; s < B.p + B.spb - 1e-6; s += Math.min(gs, B.spb)) {
-      const x = Math.round(this.x(s)) + 0.5, bar = B.bar, spb = B.spb;
+      const x = px(this.x(s)), bar = B.bar, spb = B.spb;
       if (s === B.p) { g.fillStyle = css.dim; g.fillRect(x, LS, 1, h - LS); if ((bar) % every === 0) { g.fillStyle = css.fg; g.fillText(String(bar + 1), x + 3, LS + 11); } }
       else { const bt = B.bt, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBeat ? css.dim : css.gridBeat; g.fillRect(x, h - (isBeat ? 8 : 5), 1, isBeat ? 8 : 5); if (isBeat && bt * V.pps >= 34) { g.fillStyle = css.dim; g.font = '9px ' + css.mono; g.fillText(`${bar + 1}.${Math.round((s - B.p) / bt) + 1}`, x + 3, LS + 11); g.font = '10px ' + css.mono; } }
     }
@@ -225,7 +225,7 @@ const arr = {
   // warp markers: a yellow handle at the top of the clip body and a faint line down through it
   drawWarp(g, c, y, rh) {
     if (!hasWm(c) || rh < 34) return; const x0 = this.x(c.start), x1 = this.x(c.start + c.len); g.save();
-    c.wm.forEach(m => { const X = Math.round(this.x(c.start + m.x - c.offset)) + 0.5; if (X < x0 || X > x1) return; g.fillStyle = 'rgba(242,193,78,.45)'; g.fillRect(X, y + 14, 1, rh - 14); g.fillStyle = '#f2c14e'; g.beginPath(); g.moveTo(X - 4, y + 14); g.lineTo(X + 4, y + 14); g.lineTo(X, y + 20); g.fill(); });
+    c.wm.forEach(m => { const X = px(this.x(c.start + m.x - c.offset)); if (X < x0 || X > x1) return; g.fillStyle = 'rgba(242,193,78,.45)'; g.fillRect(X, y + 14, 1, rh - 14); g.fillStyle = '#f2c14e'; g.beginPath(); g.moveTo(X - 4, y + 14); g.lineTo(X + 4, y + 14); g.lineTo(X, y + 20); g.fill(); });
     g.restore();
   },
   hitClip(r, x, y) {
@@ -383,7 +383,9 @@ const arr = {
       ];
       items.push({ label: 'Crop', key: 'Ctrl+Shift+J', run: () => cropClips() });
       if (c.type === 'audio') items.push({ label: c.revOf ? 'Un-reverse' : 'Reverse', key: 'R', run: () => reverseClips() });
-      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) });
+      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) }, ...(c.groove ? [{ label: 'Commit groove', run: () => commitGroove(c) }] : []));
+      items.push({ label: 'Extract groove to the pool', run: () => extractGroove(c) });
+      if (c.type === 'audio') items.push('-', ...convertMenu(c));
       items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') });
       if (c.type === 'midi') items.push( { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
       if (c.type === 'audio' && (leftOf(trackOf(c), c) || rightOf(trackOf(c), c))) items.push({ label: 'Crossfade with neighbor', key: 'Ctrl+Alt+F', run: () => createCrossfades() });
@@ -408,6 +410,8 @@ const arr = {
   },
 };
 // Smooth zoom: proportional to the scroll distance, capped per event (mouse wheel notch ≈ 12%).
+// line positions rounded to physical pixels, so grid lines glide evenly on Retina screens as the view scrolls
+const px = v => Math.round(v * (devicePixelRatio || 1)) / (devicePixelRatio || 1);
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // A collapsed track is a thin strip: its clips still show, with their names.
 const rowH = b => (b.collapsed ? 22 : b.h || 40);
@@ -439,11 +443,12 @@ function CSS() {
 function addMarker(t) { pushUndo('Locator'); S.markers.push({ id: uid(), t, name: 'Locator ' + (S.markers.length + 1) }); S.markers.sort((a, b) => a.t - b.t); arr.draw(); }
 function renameMarker(m) { askText('Locator name', m.name, v => { pushUndo(); m.name = v; arr.draw(); }); }
 function renameClip(c) { askText('Clip name', c.name, v => { pushUndo(); c.name = v; arr.draw(); ui.detail(); }); }
-function openClip(c) { V.editClip = c.id; V.selClips = new Set([c.id]); const t = trackOf(c); if (t) V.selTracks = new Set([t.id]); V.detail = 'clip'; ui.detail(); ui.headers(); arr.draw(); }
+function openClip(c) { if ($('#app').classList.contains('nodetail')) setDetailShown(true); V.editClip = c.id; V.selClips = new Set([c.id]); const t = trackOf(c); if (t) V.selTracks = new Set([t.id]); V.detail = 'clip'; ui.detail(); ui.headers(); arr.draw(); }
 async function dropOnTimeline(e, r, at) {
   if (typeof browser !== 'undefined' && browser.stopPreview) browser.stopPreview();
   const dt = e.dataTransfer, track = r && r.kind === 'track' ? r.b : null;
-  const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst');
+  const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst'), sbp = dt.getData('sb/plugin');
+  if (sbp) { const o = JSON.parse(sbp); if (!NE.on) return toast('Turn on the native engine in Settings → Audio to use plug-ins'); return addPlugin(o.ref, o.instrument, track || (r ? r.b : null)); }
   if (sbd) { const b = r ? r.b : null; if (b) { pushUndo('Add device'); b.devices.push(newDevice(sbd)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.all(); } return; }
   if (sbi) { addInstrumentTrack(sbi, track && track.kind === 'midi' ? track : null); return; }
   const files = sbs ? [JSON.parse(sbs)] : [...dt.files].map(f => ({ file: f }));

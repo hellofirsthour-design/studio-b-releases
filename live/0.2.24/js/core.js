@@ -210,6 +210,71 @@ class GWDyn extends AudioWorkletProcessor {
 registerProcessor('gw-dyn', GWDyn);
 class GWBurn extends AudioWorkletProcessor { constructor(){ super(); this.n=0; this.port.onmessage=e=>{ this.n=e.data.n|0; }; } process(){ let x=0; for(let k=0;k<this.n;k++) x+=Math.sin(k); if(x===1.2345) this.port.postMessage(x); return true; } }
 registerProcessor('gw-burn', GWBurn);
+
+// ---- native engine bridge (Studio B 0.3+): rings in a SharedArrayBuffer, see native/src/shared.h ----
+class GWOut extends AudioWorkletProcessor {   // mix and routed tracks -> device outputs
+  constructor(o) { super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.ring = q.ring; this.base = q.header; }
+  process(inputs) {
+    const I = this.I, F = this.F, ch = I[4] || 2, inp = inputs[0] || [], w = I[0] >>> 0, r = Atomics.load(I, 1) >>> 0, mask = this.ring - 1;
+    if (((w - r) >>> 0) + 128 >= this.ring) return true;          // the device is not taking audio: drop
+    for (let i = 0; i < 128; i++) { const o = this.base + ((w + i) & mask) * ch; for (let c = 0; c < ch; c++) F[o + c] = inp[c] ? inp[c][i] : 0; }
+    Atomics.store(I, 0, (w + 128) | 0); return true;
+  }
+}
+registerProcessor('gw-out', GWOut);
+class GWIn extends AudioWorkletProcessor {    // device inputs -> Web Audio
+  constructor(o) { super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.ring = q.ring; this.base = q.header + q.ring * q.maxCh; }
+  process(_, outputs) {
+    const I = this.I, F = this.F, out = outputs[0], ch = I[5] || 1, mask = this.ring - 1; let r = Atomics.load(I, 3) >>> 0; const w = Atomics.load(I, 2) >>> 0; let avail = (w - r) >>> 0;
+    if (avail > 4096) { r = (w - 512) >>> 0; avail = 512; }     // fell behind: jump to recent audio
+    if (avail < 128) { for (const o of out) o.fill(0); return true; }
+    for (let i = 0; i < 128; i++) { const o = this.base + ((r + i) & mask) * ch; for (let c = 0; c < out.length; c++) out[c][i] = c < ch ? F[o + c] : 0; }
+    Atomics.store(I, 3, (r + 128) | 0); return true;
+  }
+}
+registerProcessor('gw-in', GWIn);
+class GWPlug extends AudioWorkletProcessor {  // one plug-in slot: send each block, play back the block from lag blocks ago
+  constructor(o) {
+    super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.b = q.slotBase; this.nb = q.slotBlocks; this.bw = q.blockWords;
+    this.ev = this.b + q.slotHeader; this.evCap = q.evCap; this.bev = q.blockEv; this.pend = [];
+    this.req = this.ev + 4 * q.evCap; this.res = this.req + this.nb * this.bw; this.lag = q.lag; this.offline = q.offline; this.seq = 0;
+    this.qL = []; this.qR = []; this.qS = []; this.dl = new Float32Array(2 * 128 * (this.lag + 1)); this.dp = 0;
+    this.port.onmessage = e => { if (e.data === 'reset') { this.seq = 0; this.qS.length = this.qL.length = this.qR.length = 0; } };
+  }
+  process(inputs, outputs) {
+    const I = this.I, F = this.F, b = this.b, out = outputs[0], inp = inputs[0] || [], L = inp[0], R = inp[1] || inp[0];
+    if (!Atomics.load(I, b + 4)) {   // not loaded yet: pass the audio through, delayed like a loaded plug-in so timing stays put
+      const n = this.dl.length / 2, o = this.dp * 128;
+      for (let i = 0; i < 128; i++) { const j = (o + i) % n, jl = j, jr = n + j; const yl = this.dl[jl], yr = this.dl[jr]; this.dl[jl] = L ? L[i] : 0; this.dl[jr] = R ? R[i] : 0; out[0][i] = yl; if (out[1]) out[1][i] = yr; }
+      this.dp = (this.dp + 1) % (this.lag + 1); return true;
+    }
+    if ((Atomics.load(I, b + 5) | 0) !== (this.offline ? 1 : 0)) { for (const o of out) o.fill(0); return true; }   // an export owns the slot right now
+    const w = Atomics.load(I, b) >>> 0, r = Atomics.load(I, b + 1) >>> 0;
+    if (((w - r) >>> 0) < this.nb) {
+      const at = this.req + (w & (this.nb - 1)) * this.bw, fr = currentFrame;
+      I[at] = fr % 4294967296 | 0; I[at + 1] = Math.floor(fr / 4294967296); I[at + 2] = 128; I[at + 3] = this.seq;
+      for (let i = 0; i < 128; i++) { F[at + 4 + i] = L ? L[i] : 0; F[at + 132 + i] = R ? R[i] : 0; }
+      // MIDI: take everything the page queued, keep it sorted, and pack the events that fall in this block
+      let ew = Atomics.load(I, b + 8) >>> 0, er = Atomics.load(I, b + 9) >>> 0;
+      while (er !== ew) { const e = this.ev + (er & (this.evCap - 1)) * 4; const f = (I[e] >>> 0) + (I[e + 1] >>> 0) * 4294967296, m = I[e + 2]; let k = this.pend.length; while (k && this.pend[k - 1][0] > f) k--; this.pend.splice(k, 0, [f, m]); er = (er + 1) >>> 0; }
+      Atomics.store(I, b + 9, er | 0);
+      let n = 0; const end = fr + 128, eo = at + 260;
+      while (this.pend.length && this.pend[0][0] < end && n < this.bev) { const [f, m] = this.pend.shift(); I[eo + 1 + 2 * n] = Math.max(0, Math.min(127, f - fr)); I[eo + 2 + 2 * n] = m; n++; }
+      I[eo] = n;
+      Atomics.store(I, b, (w + 1) | 0);
+    }
+    const want = this.seq - this.lag; this.seq++;
+    const pull = () => { let rw = Atomics.load(I, b + 2) >>> 0, rr = Atomics.load(I, b + 3) >>> 0;
+      while (rr !== rw) { const at = this.res + (rr & (this.nb - 1)) * this.bw; const s = I[at + 3]; if (s >= want) { this.qS.push(s); this.qL.push(F.slice(at + 4, at + 132)); this.qR.push(F.slice(at + 132, at + 260)); } rr = (rr + 1) >>> 0; Atomics.store(I, b + 3, rr | 0); rw = Atomics.load(I, b + 2) >>> 0; } };
+    pull();
+    if (this.offline && want >= 0) { let n = 0; while (!this.qS.some(s => s >= want) && n++ < 3e7) pull(); }
+    while (this.qS.length && this.qS[0] < want) { this.qS.shift(); this.qL.shift(); this.qR.shift(); }
+    if (want >= 0 && this.qS.length && this.qS[0] === want) { out[0].set(this.qL.shift()); const rr = this.qR.shift(); if (out[1]) out[1].set(rr); this.qS.shift(); }
+    else { for (const o of out) o.fill(0); if (want >= 0) Atomics.add(I, b + 7, 1); }
+    return true;
+  }
+}
+registerProcessor('gw-plug', GWPlug);
 `;
 const WORKLET_DONE = new WeakSet();
 async function loadWorklets(c) {
