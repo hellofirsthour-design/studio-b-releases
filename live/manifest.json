@@ -1,13 +1,13 @@
 {
- "version": "0.2.10",
+ "version": "0.2.11",
  "shell": 2,
- "date": "2026-11-14T17:35:55.439Z",
- "notes": "Routing: up to 12 sends with pre/post, group tracks, track delay, resampling",
+ "date": "2026-11-14T17:43:13.130Z",
+ "notes": "Automation arm and recording, overrides with re-enable, curved segments, shapes, copy/paste, extra automation lanes, clip gain/pan envelopes, looping audio clips, crossfade and fade shapes",
  "files": [
   {
    "path": "css/base.css",
-   "size": 20764,
-   "sha256": "8506c502612fe3d2b7ae11928926e1fd841c82f3988e6b8101b6591ed06b8c6b"
+   "size": 20985,
+   "sha256": "87241f426bee50997900fc45339c69cabbd38fe1966e59a84f5ba737f580cee7"
   },
   {
    "path": "css/studio.css",
@@ -16,13 +16,13 @@
   },
   {
    "path": "index.html",
-   "size": 17171,
-   "sha256": "94b38074fa11ee36b246f323d15ff9f83960d81d0b75fe950b42c65eeae2acb9"
+   "size": 17683,
+   "sha256": "3f9657fbf545d850051810d91981f515666d904075a0d10bea81b4c993e427b8"
   },
   {
    "path": "js/arrange.js",
-   "size": 41373,
-   "sha256": "0f1f167e9f7ff50469b39a47901aec24a92fb4ca46b3d42995169a70c12f0d74"
+   "size": 44004,
+   "sha256": "956a160f8b5c1a6adcd26571d6a9b4992f75aee2203099c75924ecc1a901a02d"
   },
   {
    "path": "js/browser.js",
@@ -31,8 +31,8 @@
   },
   {
    "path": "js/cards.js",
-   "size": 32780,
-   "sha256": "2b2df7552fe719215ce51c62bdbfc2e5d474daa460fdc6dea37442843ef1b08b"
+   "size": 32834,
+   "sha256": "2e763d49bb31389b6b1a7093001510ad082d530bcd80aa319836f6d3a483525a"
   },
   {
    "path": "js/core.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 40451,
-   "sha256": "92a899e6919fc0dbe5ad1ef2ae465e3a4ba43c17727ab6f55a3364a3af39e5d6"
+   "size": 44040,
+   "sha256": "c7ec4199333ca61d0a4a3c2ab7493377495ece5344bad92b043e5abab20fb17a"
   },
   {
    "path": "js/features.js",
@@ -61,8 +61,8 @@
   },
   {
    "path": "js/features2.js",
-   "size": 10079,
-   "sha256": "d31176809d5e35a89bc00c767e1af8fb7968ac87ee24cab37fd3127d6e3c4ff7"
+   "size": 12449,
+   "sha256": "bb9b2f54902f9cf667dcebecb15ba6670ba267e708dae0d0433a722f9e85b1df"
   },
   {
    "path": "js/instruments.js",
@@ -76,13 +76,13 @@
   },
   {
    "path": "js/main.js",
-   "size": 33752,
-   "sha256": "ef912242bfe3a6065f81fd742c9373eab116bddec7b0d0e88d36fb23feb31777"
+   "size": 33989,
+   "sha256": "dc17bea8d948f52bcdcf5ccda3e91e7d750cf51755eb5d1a0b5fe65bf13cfe74"
   },
   {
    "path": "js/mixer.js",
-   "size": 10010,
-   "sha256": "45d88197170ffc8ee78365be74c9482372158544f4797735d68692779243be5c"
+   "size": 10058,
+   "sha256": "09618422f94f0814c4d6f4a536920977e60e6d75e41c3511bfce8419c1ef56d7"
   },
   {
    "path": "js/roll.js",
@@ -96,13 +96,13 @@
   },
   {
    "path": "js/ui.js",
-   "size": 27017,
-   "sha256": "e3f60fc936a7b5c72eb7e065d307ae549cd431fc9d841000fa3976bbd0807d07"
+   "size": 34371,
+   "sha256": "9dbec2119836bebd701f718467836d84cc33d5e27bfdb21479ad7e02ade7aff0"
   },
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "3325cae467c37be552b579c2805b1132bf7d5c1b878d8e1dc19a0fd71fee8289"
+   "sha256": "077d132e4137cf5e6e8a5f98ce1c50a2f9c044d8808dbd97fc76594564e5e0eb"
   }
  ]
 }
