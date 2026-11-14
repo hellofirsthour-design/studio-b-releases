@@ -1,8 +1,8 @@
 {
- "version": "0.2.5",
+ "version": "0.2.6",
  "shell": 2,
- "date": "2026-11-14T16:27:51.450Z",
- "notes": "Live updates: signed app-code updates from the public releases repo",
+ "date": "2026-11-14T16:33:37.858Z",
+ "notes": "CI: build Windows installer under bash; release whichever installers built",
  "files": [
   {
    "path": "css/base.css",
@@ -87,7 +87,7 @@
   {
    "path": "version.json",
    "size": 37,
-   "sha256": "35cddbd6b48d77276f747ae7206c4406615da493f2df8d01e3bd98df57d2278e"
+   "sha256": "dcda4b8cb75e627de17d36d5dce5a1709eaa5b145dc42bba68caaba07cc2717b"
   }
  ]
 }
