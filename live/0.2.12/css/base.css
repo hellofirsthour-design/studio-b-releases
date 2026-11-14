@@ -4,8 +4,8 @@
   --bg:#141318; --panel:#1c1b22; --panel2:#25232c; --raise:#2f2c37; --line:#36323f; --fg:#ece8f2; --dim:#8e889c; --faint:#5c5768;
   --accent:#f2b544; --play:#7fd796; --rec:#ff5d5d; --cue:#56c2d6;
   --lane:#17161c; --laneRow:#1b1a20; --laneBus:#18171d; --laneSel:#22202a;
-  --gridBar:rgba(255,255,255,.17); --gridBeat:rgba(255,255,255,.075); --gridFine:rgba(255,255,255,.035);
-  --loopShade:rgba(242,181,68,.05); --loopOn:#f2b544; --loopOff:#4a4552; --timeSel:rgba(140,170,255,.18); --marker:rgba(255,255,255,.35);
+  --gridBar:rgba(255,255,255,.2); --gridBeat:rgba(255,255,255,.085); --gridFine:rgba(255,255,255,.045); --gridHair:rgba(255,255,255,.022); --barAlt:rgba(255,255,255,.022);
+  --loopShade:rgba(242,181,68,.05); --loopOn:#f2b544; --loopOff:#4a4552; --timeSel:rgba(120,165,255,.34); --timeSelEdge:#9cc0ff; --marker:rgba(255,255,255,.35);
   --env:#ff8a5c; --envIdle:rgba(255,138,92,.45); --insert:#ece8f2; --playhead:#7fd796; --muted:#5d5866;
   --spec:rgba(150,170,255,.16); --roll:#1a1920; --rowblack:#16151b; --rowscale:#23212b; --rowscaleb:#1e1c25;
   --gridf:rgba(255,255,255,.045); --gridm:rgba(255,255,255,.1); --gridb:rgba(255,255,255,.24);
@@ -196,3 +196,42 @@ button{cursor:pointer;background:none;border:0;padding:0}
 #busybar{position:fixed;left:50%;top:60px;transform:translateX(-50%);z-index:78;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* icon toolbar */
+.sic{width:15px;height:15px;fill:none!important;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.sic .f{fill:currentColor;stroke:none}
+#bar{gap:6px;padding:5px 8px} #bar .grp{padding-left:6px;gap:3px}
+#bar .tb.ic{width:28px;min-width:28px;height:26px}
+#bar .num{width:64px} #bar .lcd{min-width:70px;padding:3px 6px}
+.tb.badged{position:relative} .tb .badge{position:absolute;right:1px;bottom:0;font:700 8px var(--mono);color:var(--accent);pointer-events:none}
+#viewBtn.on,#follow.on,#autoBtn.on,#snapBtn.on,#kbBtn.on,#countIn.on{color:var(--accent)}
+
+#bar .lcd{min-width:62px;font-size:12px} #clock{min-width:74px!important;font-size:10.5px!important} #bar .lcd.sm{min-width:50px}
+#scale{max-width:104px} #root{width:46px}
+#mmeter{width:64px}
+@media (max-width:1680px){ #projName{display:none} }
+@media (max-width:1500px){ #beats,#clock{display:none!important} }
+
+/* life: beat pulse on play, hover lift */
+#play.on.pulse{animation:beatpulse .18s ease-out}
+@keyframes beatpulse{0%{box-shadow:0 0 0 0 rgba(127,215,150,.75)}100%{box-shadow:0 0 0 7px rgba(127,215,150,0)}}
+.tb{transition:background .12s,color .12s,transform .08s} .tb:active{transform:scale(.94)}
+.bside,.brow,.hdr{transition:background .12s}
+.knob:hover .kv{filter:brightness(1.25)}
+@media (prefers-reduced-motion:reduce){#play.on.pulse{animation:none}}
+
+/* audio clip editor: the waveform fills the pane instead of overflowing it */
+.aed{grid-template-rows:minmax(0,1fr)} .aedmain{min-height:0} #aedWave{flex:1 1 0;height:0;min-height:80px}
+/* renders block input until they finish */
+body.busy #app{pointer-events:none} body.busy{cursor:progress}
+
+/* groups, routing */
+.hdr{padding-left:calc(var(--depth,0) * 12px)}
+.hdr.group{background:color-mix(in srgb,var(--tc) 10%,var(--panel))}
+.hb.fold{min-width:16px;border:0;background:none;color:var(--fg);font-size:11px}
+.mxrow{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center}
+.mxdly{display:flex;gap:3px;align-items:center;font-size:9px;color:var(--dim)} .mxdly input{width:42px;height:18px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font:10px var(--mono);text-align:right}
+.mxs.track .mxknobs{max-height:120px;overflow:auto}
+
+#autoArm.on{color:var(--rec)} #reAuto.hot{color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset} #reAuto:disabled{opacity:.35}
+.hdr.autolane{background:var(--lane);padding-left:calc(14px + var(--depth,0) * 12px)}

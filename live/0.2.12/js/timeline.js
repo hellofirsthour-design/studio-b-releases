@@ -30,7 +30,7 @@ const nextTempoChange = p => { const c = tempoMap().find(s => s.p > p + 1e-9); r
 const hasTempoChanges = () => tempoMap().length > 1;
 function setSig(num, den) {
   num = clamp(Math.round(num) || 4, 1, 32); den = [1, 2, 4, 8, 16].includes(+den) ? +den : 4;
-  S.sig = [num, den]; markDirty(); ui.all();
+  if (S.sig && S.sig[0] === num && S.sig[1] === den) return; pushUndo('Time signature'); S.sig = [num, den]; markDirty(); ui.all();
 }
 // Grid sizes that line up with the meter: fine divisions that divide a bar, then whole bars.
-function gridCandidates() { const spb = SPB(), fine = [0.25, 0.5, 1, 2, 4, 8].filter(v => v < spb && Math.abs(spb / v - Math.round(spb / v)) < 1e-9); if (!fine.includes(BEAT()) && BEAT() < spb) fine.push(BEAT()); fine.sort((a, b) => a - b); const out = [...fine]; for (let k = spb; k <= spb * 128; k *= 2) out.push(k); return out; }
+function gridCandidates() { if (V.triplet) { const spb = SPB(), base = [1 / 3, 2 / 3, 4 / 3, 8 / 3].filter(v => v < spb); const out = [...base]; for (let k = spb; k <= spb * 128; k *= 2) out.push(k); return out; } const spb = SPB(), fine = [0.25, 0.5, 1, 2, 4, 8].filter(v => v < spb && Math.abs(spb / v - Math.round(spb / v)) < 1e-9); if (!fine.includes(BEAT()) && BEAT() < spb) fine.push(BEAT()); fine.sort((a, b) => a - b); const out = [...fine]; for (let k = spb; k <= spb * 128; k *= 2) out.push(k); return out; }

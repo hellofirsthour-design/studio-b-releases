@@ -30,7 +30,7 @@ async function bounceToNew(t) {
   try {
     const buf = await renderTrack(t); if (!buf) return;
     pushUndo('Bounce'); const sid = addSample(buf, `${t.name} (bounce)`, { recorded: true, path: null });
-    const n = newTrack('audio'); n.name = `${t.name} (bounce)`; n.color = t.color; n.vol = t.vol; n.pan = t.pan; n.sendA = t.sendA; n.sendB = t.sendB;
+    const n = newTrack('audio'); n.name = `${t.name} (bounce)`; n.color = t.color; n.vol = t.vol; n.pan = t.pan; n.sendA = t.sendA; n.sendB = t.sendB; if (t.sends) n.sends = [...t.sends]; n.group = t.group;
     n.clips = [songClip(sid, Math.min(songPos(buf.duration), trackEnd(t) + SPB()), n.name)];
     S.tracks.splice(S.tracks.indexOf(t) + 1, 0, n); buildBus(n, 'track'); t.mute = true; applyMix(t);
     V.selTracks = new Set([n.id]); ui.all(); toast(`Bounced to a new audio track. ${t.name} is switched off.`);

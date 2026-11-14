@@ -176,12 +176,34 @@ class GWLoud extends AudioWorkletProcessor {
   report(){
     const lu=ms=>ms>0? -0.691+10*Math.log10(ms) : -Infinity, mean=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
     const mom=mean(this.blocks.slice(-4)), st=mean(this.blocks), mLU=lu(mom);
-    if(this.blocks.length>=4 && mLU>-70) this.gated.push(mom);
+    if(this.blocks.length>=4 && mLU>-70){ this.gated.push(mom); if(this.gated.length>36000) this.gated.shift(); }
     let I=-Infinity; if(this.gated.length){ const rel=lu(mean(this.gated))-10; const g=this.gated.filter(v=>lu(v)>rel); I=lu(mean(g)); }
     this.port.postMessage({m:mLU,s:lu(st),i:I,peak:this.peak});
   }
 }
 registerProcessor('gw-loud', GWLoud);
+// Dynamics: gate, or a compressor whose detector can listen to a second (sidechain) input.
+class GWDyn extends AudioWorkletProcessor {
+  constructor(){ super(); Object.assign(this,{mode:'gate',thr:-40,ratio:4,att:1,rel:100,hold:10,floor:-60,makeup:0,knee:6,flip:false,sc:false,env:0,g:1,holdN:0,rep:0,gr:0}); this.port.onmessage=e=>Object.assign(this,e.data); }
+  process(inputs, outputs){
+    const inp=inputs[0], sc=inputs[1], out=outputs[0]; if(!out||!out[0]) return true;
+    const n=out[0].length, L=inp&&inp[0], R=inp&&(inp[1]||inp[0]), dL=this.sc&&sc&&sc[0]?sc[0]:L, dR=this.sc&&sc&&sc[0]?(sc[1]||sc[0]):R;
+    const aC=Math.exp(-1/(Math.max(0.05,this.att)*sampleRate/1000)), rC=Math.exp(-1/(Math.max(1,this.rel)*sampleRate/1000)), holdS=this.hold*sampleRate/1000, fl=Math.pow(10,this.floor/20), mk=Math.pow(10,this.makeup/20);
+    let minG=1;
+    for(let i=0;i<n;i++){
+      const lev=dL?Math.max(Math.abs(dL[i]),Math.abs(dR[i])):0;
+      this.env= lev>this.env ? aC*this.env+(1-aC)*lev : rC*this.env+(1-rC)*lev;
+      const db=20*Math.log10(this.env+1e-9); let tg;
+      if(this.mode==='gate'){ let open=db>this.thr; if(this.flip) open=!open; if(open){ this.holdN=holdS; tg=1; } else if(this.holdN>0){ this.holdN--; tg=1; } else tg=fl; }
+      else { const over=db-this.thr, k=this.knee/2; let red=0; if(over>k) red=over*(1-1/this.ratio); else if(over>-k) red=(1-1/this.ratio)*Math.pow(over+k,2)/(4*k||1); tg=Math.pow(10,-red/20)*mk; }
+      const c= tg<this.g ? aC : rC; this.g=c*this.g+(1-c)*tg; if(this.g<minG) minG=this.g;
+      for(let ch=0;ch<out.length;ch++){ const x=inp&&inp[ch]?inp[ch][i]:(L?L[i]:0); out[ch][i]=x*this.g; }
+    }
+    this.rep+=n; if(this.rep>2048){ this.rep=0; this.port.postMessage({gr:-20*Math.log10(Math.max(1e-6,minG/(this.mode==='comp'?mk:1)))}); }
+    return true;
+  }
+}
+registerProcessor('gw-dyn', GWDyn);
 `;
 const WORKLET_DONE = new WeakSet();
 async function loadWorklets(c) {

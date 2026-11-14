@@ -1,8 +1,8 @@
 {
- "version": "0.2.11",
+ "version": "0.2.12",
  "shell": 2,
- "date": "2026-11-14T17:43:13.130Z",
- "notes": "Automation arm and recording, overrides with re-enable, curved segments, shapes, copy/paste, extra automation lanes, clip gain/pan envelopes, looping audio clips, crossfade and fade shapes",
+ "date": "2026-11-14T17:44:15.619Z",
+ "notes": "Scrub and zoom: middle ground between the old loose and the recent tight settings",
  "files": [
   {
    "path": "css/base.css",
@@ -22,7 +22,7 @@
   {
    "path": "js/arrange.js",
    "size": 44004,
-   "sha256": "956a160f8b5c1a6adcd26571d6a9b4992f75aee2203099c75924ecc1a901a02d"
+   "sha256": "d9ea98955d126e8b67d6e1e5a044a7ec65d342f9ca29bef5b92e221ecc6ea704"
   },
   {
    "path": "js/browser.js",
@@ -102,7 +102,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "077d132e4137cf5e6e8a5f98ce1c50a2f9c044d8808dbd97fc76594564e5e0eb"
+   "sha256": "09017b7b18b78c15df6c83ac915cc0210ee9b46172ab3932f09c58a544e9b3c2"
   }
  ]
 }

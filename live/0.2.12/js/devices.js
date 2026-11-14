@@ -53,8 +53,19 @@ class EQDev extends Base {
 
 /* --- Glue Comp --- */
 class CompDev extends Base {
-  constructor(d) { super(d); this.wetDry(); this.c = ctx.createDynamicsCompressor(); this.mk = ctx.createGain(); this.input.connect(this.c); this.c.connect(this.mk); this.mk.connect(this.wet); this.set(); }
-  set() { const p = this.d.p, c = this.c; sm(c.threshold, p.thresh); sm(c.ratio, p.ratio); sm(c.attack, p.attack / 1000); sm(c.release, p.release / 1000); sm(c.knee, p.knee); sm(this.mk.gain, dbToGain(p.makeup)); this.mix(p.mix); }
+  constructor(d) {
+    super(d); this.wetDry(); this.c = ctx.createDynamicsCompressor(); this.mk = ctx.createGain(); this.c.connect(this.mk); this.mk.connect(this.wet);
+    if (PITCH_OK) { this.sc = new AudioWorkletNode(ctx, 'gw-dyn', { numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [2] }); this.sc.port.onmessage = e => (this.scGr = e.data.gr); this.sc.connect(this.wet); }
+    this.path = null; this.set();
+  }
+  get reductionDb() { return this.path === 'sc' ? this.scGr || 0 : -this.c.reduction; }
+  set() {
+    const p = this.d.p, c = this.c, path = p.sc && this.sc ? 'sc' : 'std';
+    if (path !== this.path) { try { this.input.disconnect(this.c); } catch (e) { } if (this.sc) try { this.input.disconnect(this.sc); } catch (e) { } this.input.connect(path === 'sc' ? this.sc : this.c, 0, 0); this.path = path; }
+    sm(c.threshold, p.thresh); sm(c.ratio, p.ratio); sm(c.attack, p.attack / 1000); sm(c.release, p.release / 1000); sm(c.knee, p.knee); sm(this.mk.gain, dbToGain(p.makeup)); this.mix(p.mix);
+    if (this.sc) this.sc.port.postMessage({ mode: 'comp', sc: !!p.sc, thr: p.thresh, ratio: p.ratio, att: p.attack, rel: p.release, knee: p.knee, makeup: p.makeup });
+  }
+  dispose() { super.dispose(); if (this.sc) this.sc.disconnect(); }
 }
 
 /* --- Scorch: multi-style saturation --- */
@@ -198,6 +209,100 @@ class FilterDev extends Base {
 }
 
 /* --- Ceiling: brickwall-style limiter --- */
+
+/* --- Utility: gain, stereo width, mono, phase, pan --- */
+class UtilDev extends Base {
+  constructor(d) {
+    super(d);
+    this.sp = ctx.createChannelSplitter(2); this.mg = ctx.createChannelMerger(2);
+    this.pl = ctx.createGain(); this.pr = ctx.createGain();                 // phase invert per side
+    this.mL = ctx.createGain(); this.mR = ctx.createGain(); this.sL = ctx.createGain(); this.sR = ctx.createGain();
+    this.mid = ctx.createGain(); this.side = ctx.createGain(); this.sideN = ctx.createGain(); this.sideN.gain.value = -1;
+    this.pan = ctx.createStereoPanner(); this.g = ctx.createGain();
+    this.input.connect(this.sp); this.sp.connect(this.pl, 0); this.sp.connect(this.pr, 1);
+    this.pl.connect(this.mL); this.pr.connect(this.mR); this.mL.connect(this.mid); this.mR.connect(this.mid);
+    this.pl.connect(this.sL); this.pr.connect(this.sR); this.sL.connect(this.side); this.sR.connect(this.side);
+    this.mid.connect(this.mg, 0, 0); this.mid.connect(this.mg, 0, 1); this.side.connect(this.mg, 0, 0); this.side.connect(this.sideN); this.sideN.connect(this.mg, 0, 1);
+    this.mg.connect(this.pan); this.pan.connect(this.g); this.g.connect(this.output); this.set();
+  }
+  set() {
+    const p = this.d.p, w = p.mono ? 0 : p.width;
+    sm(this.pl.gain, p.invL ? -1 : 1); sm(this.pr.gain, p.invR ? -1 : 1);
+    sm(this.mL.gain, 0.5); sm(this.mR.gain, 0.5); sm(this.sL.gain, 0.5 * w); sm(this.sR.gain, -0.5 * w);
+    sm(this.pan.pan, p.pan); sm(this.g.gain, p.mute ? 0 : dbToGain(p.gain));
+  }
+}
+/* --- Gate (and the sidechain-capable compressor) run in the dynamics worklet --- */
+class GateDev extends Base {
+  constructor(d) {
+    super(d); this.gr = 0;
+    if (PITCH_OK) { this.node = new AudioWorkletNode(ctx, 'gw-dyn', { numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [2] }); this.node.port.onmessage = e => (this.gr = e.data.gr); this.input.connect(this.node, 0, 0); this.node.connect(this.output); }
+    else this.input.connect(this.output);
+    this.set();
+  }
+  set() { const p = this.d.p; if (this.node) this.node.port.postMessage({ mode: 'gate', thr: p.thresh, att: p.attack, rel: p.release, hold: p.hold, floor: p.range, flip: !!p.flip }); }
+  dispose() { super.dispose(); if (this.node) this.node.disconnect(); }
+}
+/* --- Ensemble: three modulated voices for chorus and doubling --- */
+class ChorusDev extends Base {
+  constructor(d) {
+    super(d); this.wetDry(); this.voices = [];
+    this.fb = ctx.createGain(); this.sum = ctx.createGain(); this.sum.connect(this.wet);
+    for (let i = 0; i < 3; i++) {
+      const dl = ctx.createDelay(0.1), lfo = ctx.createOscillator(), lg = ctx.createGain(), pan = ctx.createStereoPanner();
+      lfo.frequency.value = 1; lfo.connect(lg); lg.connect(dl.delayTime); lfo.start(ctx.currentTime + i * 0.13);
+      this.input.connect(dl); dl.connect(pan); pan.connect(this.sum); dl.connect(this.fb); this.voices.push({ dl, lfo, lg, pan, i });
+    }
+    this.fb.connect(this.voices[0].dl); this.set();
+  }
+  set() {
+    const p = this.d.p;
+    this.voices.forEach(v => { sm(v.dl.delayTime, p.delay / 1000 * (1 + v.i * 0.35)); sm(v.lfo.frequency, p.rate * (1 + v.i * 0.21)); sm(v.lg.gain, p.depth * 0.004); sm(v.pan.pan, (v.i - 1) * p.width); });
+    sm(this.fb.gain, p.fb * 0.8); sm(this.sum.gain, 0.7); this.mix(p.mix);
+  }
+}
+/* --- Phaser / Flanger --- */
+class PhaserDev extends Base {
+  constructor(d) {
+    super(d); this.wetDry();
+    this.aps = Array.from({ length: 6 }, () => { const f = ctx.createBiquadFilter(); f.type = 'allpass'; return f; });
+    this.fl = ctx.createDelay(0.05); this.fb = ctx.createGain(); this.post = ctx.createGain();
+    this.lfo = ctx.createOscillator(); this.lfoA = ctx.createGain(); this.lfoD = ctx.createGain(); this.lfo.connect(this.lfoA); this.lfo.connect(this.lfoD);
+    this.aps.forEach(f => this.lfoA.connect(f.detune)); this.lfoD.connect(this.fl.delayTime); this.lfo.start();
+    this.post.connect(this.wet); this.post.connect(this.fb); this.mode = null; this.set();
+  }
+  route(mode) {
+    if (mode === this.mode) return; this.mode = mode;
+    [this.input, this.fb, this.fl, ...this.aps].forEach(n => { try { n.disconnect(); } catch (e) { } });
+    this.input.connect(this.dry);
+    if (mode === 'flanger') { this.input.connect(this.fl); this.fb.connect(this.fl); this.fl.connect(this.post); }
+    else { let prev = this.input; this.fb.connect(this.aps[0]); this.aps.forEach(f => { prev.connect(f); prev = f; }); prev.connect(this.post); }
+  }
+  set() {
+    const p = this.d.p; this.route(p.mode);
+    this.aps.forEach((f, i) => { sm(f.frequency, p.freq * (1 + i * 0.6)); sm(f.Q, 0.7); });
+    sm(this.fl.delayTime, p.delay / 1000); sm(this.lfo.frequency, p.sync ? 1 / divSec(p.div) : p.rate);
+    sm(this.lfoA.gain, p.depth * 1800); sm(this.lfoD.gain, p.depth * p.delay / 1000 * 0.9);
+    sm(this.fb.gain, clamp(p.fb, -0.95, 0.95)); this.mix(p.mix);
+  }
+  onTempo() { if (this.d.p.sync) this.set(); }
+}
+/* --- Auto Pan / Tremolo --- */
+class PanDev extends Base {
+  constructor(d) {
+    super(d); this.pan = ctx.createStereoPanner(); this.amp = ctx.createGain();
+    this.input.connect(this.pan); this.pan.connect(this.amp); this.amp.connect(this.output);
+    this.lfo = ctx.createOscillator(); this.lp = ctx.createGain(); this.la = ctx.createGain(); this.lfo.connect(this.lp); this.lfo.connect(this.la);
+    this.lp.connect(this.pan.pan); this.la.connect(this.amp.gain); this.lfo.start(); this.set();
+  }
+  set() {
+    const p = this.d.p; this.lfo.type = p.shape; sm(this.lfo.frequency, p.sync ? 1 / divSec(p.div) : p.rate);
+    const pan = p.mode === 'pan', a = p.amount;
+    sm(this.lp.gain, pan ? a : 0); sm(this.la.gain, pan ? 0 : a / 2); sm(this.amp.gain, pan ? 1 : 1 - a / 2);
+  }
+  onTempo() { if (this.d.p.sync) this.set(); }
+}
+
 /* --- Plug-in placeholder: keeps an imported VST/AU in the chain by name; passes audio through. --- */
 class PlugDev extends Base { constructor(d) { super(d); this.input.connect(this.output); } set() { } }
 class LimitDev extends Base {
@@ -262,6 +367,21 @@ const DEVICES = {
   tune: { name: 'Truepitch', blurb: 'Pitch correction', cls: TuneDev, wide: true,
     def: () => ({ mode: 'correct', follow: true, root: 9, scale: 'minor', speed: 20, semis: 0, fine: 0, mix: 1 }),
     params: [SEL('mode', 'Mode', ['correct', 'robot', 'shift']), TOG('follow', 'Use song key'), SEL('root', 'Key', PC.map((n, i) => [i, n])), SEL('scale', 'Scale', Object.keys(SCALES)), K('speed', 'Retune', 0, 400, { fmt: v => Math.round(v) + 'ms' }), K('semis', 'Shift', -12, 12, { step: 1, fmt: v => (v > 0 ? '+' : '') + Math.round(v) + ' st' }), K('fine', 'Fine', -100, 100, { fmt: v => Math.round(v) + 'c' }), K('mix', 'Mix', 0, 1, { fmt: fPct })] },
+  utility: { name: 'Utility', blurb: 'Gain, width, mono', cls: UtilDev,
+    def: () => ({ gain: 0, width: 1, mono: false, invL: false, invR: false, pan: 0, mute: false }),
+    params: [K('gain', 'Gain', -36, 24, { fmt: fDb }), K('width', 'Width', 0, 2, { fmt: fPct }), TOG('mono', 'Mono'), K('pan', 'Pan', -1, 1, { fmt: v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R') }), TOG('invL', 'Phase L'), TOG('invR', 'Phase R'), TOG('mute', 'Mute')] },
+  gate: { name: 'Gate', blurb: 'Noise gate', cls: GateDev,
+    def: () => ({ thresh: -40, attack: 0.5, hold: 30, release: 120, range: -60, flip: false }),
+    params: [K('thresh', 'Thresh', -80, 0, { fmt: fDb }), K('attack', 'Attack', 0.05, 50, { scale: 'log', fmt: fMs }), K('hold', 'Hold', 0, 500, { fmt: fMs }), K('release', 'Release', 5, 2000, { scale: 'log', fmt: fMs }), K('range', 'Floor', -80, 0, { fmt: fDb }), TOG('flip', 'Flip')] },
+  chorus: { name: 'Ensemble', blurb: 'Chorus', cls: ChorusDev,
+    def: () => ({ rate: 0.8, depth: 0.5, delay: 12, fb: 0, width: 0.8, mix: 0.5 }),
+    params: [K('rate', 'Rate', 0.05, 8, { scale: 'log', fmt: v => v.toFixed(2) + 'Hz' }), K('depth', 'Depth', 0, 1, { fmt: fPct }), K('delay', 'Delay', 2, 40, { fmt: fMs }), K('fb', 'Feedback', 0, 0.9, { fmt: fPct }), K('width', 'Width', 0, 1, { fmt: fPct }), K('mix', 'Mix', 0, 1, { fmt: fPct })] },
+  phaser: { name: 'Phase Flange', blurb: 'Phaser / flanger', cls: PhaserDev,
+    def: () => ({ mode: 'phaser', freq: 600, delay: 3, rate: 0.4, sync: false, div: '1/1', depth: 0.6, fb: 0.4, mix: 0.5 }),
+    params: [SEL('mode', 'Mode', ['phaser', 'flanger']), K('freq', 'Center', 100, 6000, { scale: 'log', fmt: fHz }), K('delay', 'Delay', 0.5, 15, { fmt: fMs }), TOG('sync', 'Sync'), SEL('div', 'Rate', DIV_OPTS), K('rate', 'Rate Hz', 0.02, 10, { scale: 'log', fmt: v => v.toFixed(2) + 'Hz' }), K('depth', 'Depth', 0, 1, { fmt: fPct }), K('fb', 'Feedback', -0.95, 0.95, { fmt: fPct }), K('mix', 'Mix', 0, 1, { fmt: fPct })] },
+  autopan: { name: 'Auto Pan', blurb: 'Pan / tremolo', cls: PanDev,
+    def: () => ({ mode: 'pan', shape: 'sine', sync: true, div: '1/4', rate: 2, amount: 0.6 }),
+    params: [SEL('mode', 'Mode', ['pan', 'tremolo']), SEL('shape', 'Shape', ['sine', 'triangle', 'square', 'sawtooth']), TOG('sync', 'Sync'), SEL('div', 'Rate', DIV_OPTS), K('rate', 'Rate Hz', 0.05, 20, { scale: 'log', fmt: v => v.toFixed(2) + 'Hz' }), K('amount', 'Amount', 0, 1, { fmt: fPct })] },
   plugin: { name: 'Plug-in', blurb: 'Not loaded', cls: PlugDev, hidden: true, def: () => ({ name: 'Plug-in', format: 'VST', role: 'effect' }), params: [] },
   limit: { name: 'Ceiling', blurb: 'Limiter', cls: LimitDev,
     def: () => ({ gain: 0, ceiling: -0.5, release: 80 }),

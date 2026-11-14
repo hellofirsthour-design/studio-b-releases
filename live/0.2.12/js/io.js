@@ -65,11 +65,12 @@ function encodeWav(buf, bits = 24, normalize = false) {
 /* ---------- offline render (faster than real time) ---------- */
 // Offline render of the song (or one bus with `only`) between two positions. `prefader` leaves out that track's fader, pan and sends.
 async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = null, prefader = false } = {}) {
-  if (T.playing) stop();
+  if (T.busy) throw new Error('Another render is running');
+  if (T.playing) stop(); if (T.recording) finishRecording(); T.busy = true; document.body.classList.add('busy');
   const secs = durSec(from, to - from) + tail;
   // stretched audio for every warped clip at every tempo it plays at
   const tempos = [...new Set(tempoMap().map(x => x.bpm))], jobs = [];
-  S.tracks.forEach(t => [...t.clips, ...(t.takes || []).flatMap(l => l.clips)].forEach(c => { if (c.type === 'audio' && c.warp && !c.timebase && SAMPLES.get(c.sampleId)) tempos.forEach(bpm => { const r = (c.srcBpm / bpm) * Math.pow(2, c.semis / 12); if (Math.abs(r - 1) > 0.002) jobs.push(requestWarp(c.sampleId, r)); }); }));
+  S.tracks.forEach(t => [...t.clips, ...(t.takes || []).flatMap(l => l.clips)].forEach(c => { if (c.type === 'audio' && c.warp && !c.timebase && SAMPLES.get(c.sampleId)) tempos.forEach(bpm => { const r = (c.srcBpm / bpm) * clipPitch(c); if (Math.abs(r - 1) > 0.002) jobs.push(requestWarp(c.sampleId, r)); }); }));
   await Promise.all(jobs);
   const off = new OfflineAudioContext(2, Math.max(1, Math.ceil(secs * sr)), sr);
   const live = ctx; setCtx(off); await loadWorklets(off);
@@ -86,15 +87,18 @@ async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = 
     }
     return await off.startRendering();
   } finally {
-    S.loop.on = loopWas; T.render = null; T.playing = false; T.srcs = []; setCtx(live); Object.assign(T, saved); buildMaster(); rebuildAll(); applyAllMix();
+    S.loop.on = loopWas; T.render = null; T.playing = false; T.srcs = []; setCtx(live); Object.assign(T, saved); buildMaster(); rebuildAll(); applyAllMix(); T.busy = false; document.body.classList.remove('busy');
   }
 }
 // Silence everything except one bus. For a return, tracks still feed its send but not the main output.
 function isolateForRender(id, prefader) {
-  const ob = busById(id), isRet = S.returns.includes(ob);
-  [...S.tracks, ...S.returns].forEach(b => { const r = RT.get(b.id); if (!r || b === ob) return; if (isRet && S.tracks.includes(b)) { try { r.mute.disconnect(M.in); } catch (e) { } } else r.mute.gain.value = 0; });
+  const ob = busById(id), isRet = S.returns.includes(ob), inside = ob && ob.kind === 'group' ? new Set(descendants(ob)) : new Set();
+  [...S.tracks, ...S.returns].forEach(b => { const r = RT.get(b.id); if (!r || b === ob || inside.has(b)) return; if (isRet && S.tracks.includes(b)) { try { r.mute.disconnect(r.outDest || M.in); } catch (e) { } } else { r.mute.gain.value = 0; r.preMute.gain.value = 0; } });
   const r = RT.get(id);
-  if (r) { r.mute.gain.value = 1; if (r.sA) { r.sA.gain.value = 0; r.sB.gain.value = 0; } if (prefader) { r.fader.gain.value = 1; r.pan.pan.value = 0; } }
+  if (r) {
+    r.mute.gain.value = 1; (r.sends || []).forEach(g => (g.gain.value = 0)); if (prefader) { r.fader.gain.value = 1; r.pan.pan.value = 0; }
+    if (groupOf(ob)) { try { r.mute.disconnect(r.outDest); } catch (e) { } r.mute.connect(M.in); r.outDest = M.in; } // a track stem is taken before its group
+  }
   chain(M.in, [], M.out); M.out.gain.value = 1;
 }
 async function exportAudio(opts) {
@@ -110,6 +114,10 @@ const slug = s => (s || 'studio-b').replace(/[^\w\- ]+/g, '').trim() || 'Studio 
 const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 
 /* ---------- project save / open ---------- */
+function usedSampleIds() {
+  const used = new Set(); S.tracks.forEach(t => { t.clips.forEach(c => c.sampleId && used.add(c.sampleId)); (t.takes || []).forEach(l => l.clips.forEach(c => c.sampleId && used.add(c.sampleId))); if (t.frozen) used.add(t.frozen.sid); if (t.inst) { if (t.inst.sampleId) used.add(t.inst.sampleId); (t.inst.pads || []).forEach(p => p.sampleId && used.add(p.sampleId)); } });
+  return used;
+}
 function serialise(forPath) {
   const P = deep({ ...S, view: { pps: V.pps, scrollX: V.scrollX, insert: V.insert } });
   const used = new Set(); S.tracks.forEach(t => { t.clips.forEach(c => c.sampleId && used.add(c.sampleId)); (t.takes || []).forEach(l => l.clips.forEach(c => c.sampleId && used.add(c.sampleId))); if (t.frozen) used.add(t.frozen.sid); if (t.inst) { if (t.inst.sampleId) used.add(t.inst.sampleId); (t.inst.pads || []).forEach(p => p.sampleId && used.add(p.sampleId)); } });
@@ -120,9 +128,10 @@ const b64 = ab => { const u8 = new Uint8Array(ab); let s = ''; for (let i = 0; i
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
 // Recorded takes have no file yet: write them next to the project as WAV before saving.
 async function writeRecordings(projPath) {
-  if (!IS_DESKTOP) { for (const s of SAMPLES.values()) if (!s.path && !s.bytes) s.bytes = encodeWav(s.buf, 24); return; }
+  if (!IS_DESKTOP) { const used = usedSampleIds(); for (const [id, s] of SAMPLES) if (used.has(id) && !s.path && !s.bytes) s.bytes = encodeWav(s.buf, 24); return; }
   const dir = joinPath(dirname(projPath), 'Samples');
-  for (const [id, s] of SAMPLES) if (!s.path) { const p = joinPath(joinPath(dir, 'Recorded'), `${slug(s.name)}-${id.slice(0, 5)}.wav`); await NATIVE.write(p, encodeWav(s.buf, 24)); s.path = p; s.recorded = false; }
+  const used = usedSampleIds();
+  for (const [id, s] of SAMPLES) if (!s.path && used.has(id)) { const p = joinPath(joinPath(dir, 'Recorded'), `${slug(s.name)}-${id.slice(0, 5)}.wav`); await NATIVE.write(p, encodeWav(s.buf, 24)); s.path = p; s.recorded = false; }
 }
 async function saveProject(as) {
   try {
@@ -131,7 +140,7 @@ async function saveProject(as) {
     if (as || !p || !/\.sbproj$/i.test(p)) { p = await NATIVE.saveDialog('sbproj', joinPath((await NATIVE.paths()).music, `${slug(S.name)}.sbproj`)); if (!p) return false; S.path = p; S.name = basename(p).replace(/\.sbproj$/i, ''); }
     await writeRecordings(p);
     await NATIVE.write(p, JSON.stringify(serialise(), null, 1));
-    V.dirty = false; ui.title(); toast('Saved ' + basename(p)); return true;
+    V.dirty = false; ui.title(); toast('Saved ' + basename(p)); clearAutosave(); return true;
   } catch (e) { console.error(e); toast('Saving failed: ' + e.message); return false; }
 }
 window.SB_save = () => saveProject(false);
@@ -165,7 +174,7 @@ async function loadProjectObj(P, sourcePath) {
 async function openProjectDialog() { const [f] = await pickFile('project', '.sbproj,.als,.json'); if (f) await openProjectFile(f); }
 async function openProjectFile(f) {
   try {
-    if (/\.als$/i.test(f.name)) { const P = await importALS(f); await loadProjectObj(P, null); S.name = f.name.replace(/\.als$/i, ''); ui.title(); V.dirty = true; toast(P._report, 7000); return; }
+    if (/\.als$/i.test(f.name)) { const P = await importALS(f); const rep = P._report; delete P._report; await loadProjectObj(P, null); S.name = f.name.replace(/\.als$/i, ''); ui.title(); V.dirty = true; toast(rep, 7000); return; }
     const P = JSON.parse(new TextDecoder().decode(f.data)); if (!P.tracks) throw new Error('This is not a Studio B project.');
     await loadProjectObj(P, f.path); toast('Opened ' + (P.name || f.name));
   } catch (err) { console.error(err); toast('That file could not be opened. ' + (err.message || '')); }
@@ -360,9 +369,15 @@ async function importALS(file) {
     c.fadeIn = num(ce, 'Fades > FadeInLength') * B; c.fadeOut = num(ce, 'Fades > FadeOutLength') * B;
     return c;
   };
+  const GIDS = {};
   for (const el of tracksEl ? Array.from(tracksEl.children) : []) {
     const tag = el.tagName; if (tag !== 'MidiTrack' && tag !== 'AudioTrack' && tag !== 'GroupTrack') continue;
-    if (tag === 'GroupTrack') continue;
+    if (tag === 'GroupTrack') {
+      const nameEl = el.querySelector(':scope > Name'); const g = { id: uid(), kind: 'group', name: (nameEl && (val(nameEl, 'UserName') || val(nameEl, 'EffectiveName'))) || 'Group', color: COLORS[num(el, ':scope > Color', 0) % COLORS.length], vol: 0.79, pan: 0, mute: false, solo: false, arm: false, sendA: 0, sendB: 0, h: 44, devices: [], clips: [], auto: {}, autoShow: 'vol' };
+      const gm = el.querySelector(':scope > DeviceChain > Mixer'); if (gm) { const v = gm.querySelector(':scope > Volume'); if (v) g.vol = clamp(gainToFader(num(v, 'Manual', 1)), 0, 1); const sp = gm.querySelector(':scope > Speaker'); if (sp) g.mute = val(sp, 'Manual') === 'false'; }
+      const ch = readLiveChain(el.querySelector(':scope > DeviceChain > DeviceChain > Devices')); g.devices = ch.devices; report.fx.push(...ch.mapped);
+      g.group = GIDS[num(el, ':scope > TrackGroupId', -1)] || null; GIDS[el.getAttribute('Id')] = g.id; P.tracks.push(g); continue;
+    }
     const nameEl = el.querySelector(':scope > Name'); const name = (nameEl && (val(nameEl, 'UserName') || val(nameEl, 'EffectiveName'))) || (tag === 'MidiTrack' ? 'MIDI' : 'Audio');
     const kind = tag === 'AudioTrack' ? 'audio' : 'midi';
     const topDevs = el.querySelector(':scope > DeviceChain > DeviceChain > Devices');
@@ -383,7 +398,8 @@ async function importALS(file) {
     });
     // sends A and B
     const sends = mix ? [...mix.querySelectorAll(':scope > Sends > TrackSendHolder')] : [];
-    if (sends[0]) t.sendA = clamp(num(sends[0], 'Send > Manual', 0), 0, 1); if (sends[1]) t.sendB = clamp(num(sends[1], 'Send > Manual', 0), 0, 1);
+    sends.slice(0, 12).forEach((sh, i) => setSend(t, i, clamp(num(sh, 'Send > Manual', 0), 0, 1)));
+    t.group = GIDS[num(el, ':scope > TrackGroupId', -1)] || null;
     let noteMap = null; // raw MIDI note -> instrument note
     if (smpEl) {
       const sm = await readSampler(smpEl);
@@ -461,7 +477,7 @@ async function importALS(file) {
       const ch = readLiveChain(el.querySelector(':scope > DeviceChain > DeviceChain > Devices')); report.fx.push(...ch.mapped); ch.unmapped.forEach(u => report.fxMissing.add(u));
       ch.plugins.forEach(d => { const info = plugInfo(d); ch.devices.push(newDevice('plugin', { ...info, role: 'effect' })); report.unfrozenPlugins.push(`${info.name} on ${nm}`); });
       const r = newBusLike(nm, ch.devices); const vm = el.querySelector(':scope > DeviceChain > Mixer > Volume'); if (vm) r.vol = clamp(gainToFader(num(vm, 'Manual', 1)), 0, 1); return r; });
-    report.returns = rets.length;
+    report.returns = rets.length; P.returns = P.returns.slice(0, 12);
   }
   if (mt) { const ch = readLiveChain(mt.querySelector(':scope > DeviceChain > DeviceChain > Devices')); P.master.devices = ch.devices; report.fx.push(...ch.mapped); ch.unmapped.forEach(u => report.fxMissing.add(u)); }
   // master volume automation
