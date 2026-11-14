@@ -92,19 +92,23 @@ async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = 
 }
 // Silence everything except one bus. For a return, tracks still feed its send but not the main output.
 function isolateForRender(id, prefader) {
-  const ob = busById(id), isRet = S.returns.includes(ob);
-  [...S.tracks, ...S.returns].forEach(b => { const r = RT.get(b.id); if (!r || b === ob) return; if (isRet && S.tracks.includes(b)) { try { r.mute.disconnect(M.in); } catch (e) { } } else r.mute.gain.value = 0; });
+  const ob = busById(id), isRet = S.returns.includes(ob), inside = ob && ob.kind === 'group' ? new Set(descendants(ob)) : new Set();
+  [...S.tracks, ...S.returns].forEach(b => { const r = RT.get(b.id); if (!r || b === ob || inside.has(b)) return; if (isRet && S.tracks.includes(b)) { try { r.mute.disconnect(r.outDest || M.in); } catch (e) { } } else { r.mute.gain.value = 0; r.preMute.gain.value = 0; } });
   const r = RT.get(id);
-  if (r) { r.mute.gain.value = 1; if (r.sA) { r.sA.gain.value = 0; r.sB.gain.value = 0; } if (prefader) { r.fader.gain.value = 1; r.pan.pan.value = 0; } }
+  if (r) {
+    r.mute.gain.value = 1; (r.sends || []).forEach(g => (g.gain.value = 0)); if (prefader) { r.fader.gain.value = 1; r.pan.pan.value = 0; }
+    if (groupOf(ob)) { try { r.mute.disconnect(r.outDest); } catch (e) { } r.mute.connect(M.in); r.outDest = M.in; } // a track stem is taken before its group
+  }
   chain(M.in, [], M.out); M.out.gain.value = 1;
 }
 async function exportAudio(opts) {
   const a = opts.range === 'loop' ? S.loop.start : opts.range === 'sel' && V.time ? V.time.a : 0;
   const b = opts.range === 'loop' ? S.loop.end : opts.range === 'sel' && V.time ? V.time.b : songEnd();
   const bar = $('#exportProg'); if (bar) bar.hidden = false;
-  const buf = await renderRange(a, b, { sr: opts.sr, tail: opts.tail, onProgress: p => { if (bar) bar.firstElementChild.style.width = Math.round(p * 100) + '%'; } });
-  if (bar) bar.hidden = true;
-  const p = await saveBytes('wav', `${slug(S.name)}.wav`, encodeWav(buf, opts.bits, opts.normalize));
+  const sr = exportSr(opts), buf = await renderRange(a, b, { sr, tail: opts.loop ? Math.max(opts.tail, 2) : opts.tail, onProgress: p => { if (bar) bar.firstElementChild.style.width = Math.round(p * 100) + '%'; } });
+  if (bar) bar.hidden = true; showBusy('Encoding…');
+  const enc = await encodeAudio(buf, { ...opts, loopLen: opts.loop ? loopSamples(a, b, sr) : 0 }); showBusy(null);
+  const p = await saveBytes(enc.ext, `${slug(S.name)}.${enc.ext}`, enc.data);
   if (p) toast(IS_DESKTOP ? `Exported ${basename(p)} (${fmtTime(buf.duration)})` : 'Export ready');
 }
 const slug = s => (s || 'studio-b').replace(/[^\w\- ]+/g, '').trim() || 'Studio B';
@@ -366,9 +370,15 @@ async function importALS(file) {
     c.fadeIn = num(ce, 'Fades > FadeInLength') * B; c.fadeOut = num(ce, 'Fades > FadeOutLength') * B;
     return c;
   };
+  const GIDS = {};
   for (const el of tracksEl ? Array.from(tracksEl.children) : []) {
     const tag = el.tagName; if (tag !== 'MidiTrack' && tag !== 'AudioTrack' && tag !== 'GroupTrack') continue;
-    if (tag === 'GroupTrack') continue;
+    if (tag === 'GroupTrack') {
+      const nameEl = el.querySelector(':scope > Name'); const g = { id: uid(), kind: 'group', name: (nameEl && (val(nameEl, 'UserName') || val(nameEl, 'EffectiveName'))) || 'Group', color: COLORS[num(el, ':scope > Color', 0) % COLORS.length], vol: 0.79, pan: 0, mute: false, solo: false, arm: false, sendA: 0, sendB: 0, h: 44, devices: [], clips: [], auto: {}, autoShow: 'vol' };
+      const gm = el.querySelector(':scope > DeviceChain > Mixer'); if (gm) { const v = gm.querySelector(':scope > Volume'); if (v) g.vol = clamp(gainToFader(num(v, 'Manual', 1)), 0, 1); const sp = gm.querySelector(':scope > Speaker'); if (sp) g.mute = val(sp, 'Manual') === 'false'; }
+      const ch = readLiveChain(el.querySelector(':scope > DeviceChain > DeviceChain > Devices')); g.devices = ch.devices; report.fx.push(...ch.mapped);
+      g.group = GIDS[num(el, ':scope > TrackGroupId', -1)] || null; GIDS[el.getAttribute('Id')] = g.id; P.tracks.push(g); continue;
+    }
     const nameEl = el.querySelector(':scope > Name'); const name = (nameEl && (val(nameEl, 'UserName') || val(nameEl, 'EffectiveName'))) || (tag === 'MidiTrack' ? 'MIDI' : 'Audio');
     const kind = tag === 'AudioTrack' ? 'audio' : 'midi';
     const topDevs = el.querySelector(':scope > DeviceChain > DeviceChain > Devices');
@@ -389,7 +399,8 @@ async function importALS(file) {
     });
     // sends A and B
     const sends = mix ? [...mix.querySelectorAll(':scope > Sends > TrackSendHolder')] : [];
-    if (sends[0]) t.sendA = clamp(num(sends[0], 'Send > Manual', 0), 0, 1); if (sends[1]) t.sendB = clamp(num(sends[1], 'Send > Manual', 0), 0, 1);
+    sends.slice(0, 12).forEach((sh, i) => setSend(t, i, clamp(num(sh, 'Send > Manual', 0), 0, 1)));
+    t.group = GIDS[num(el, ':scope > TrackGroupId', -1)] || null;
     let noteMap = null; // raw MIDI note -> instrument note
     if (smpEl) {
       const sm = await readSampler(smpEl);
@@ -467,7 +478,7 @@ async function importALS(file) {
       const ch = readLiveChain(el.querySelector(':scope > DeviceChain > DeviceChain > Devices')); report.fx.push(...ch.mapped); ch.unmapped.forEach(u => report.fxMissing.add(u));
       ch.plugins.forEach(d => { const info = plugInfo(d); ch.devices.push(newDevice('plugin', { ...info, role: 'effect' })); report.unfrozenPlugins.push(`${info.name} on ${nm}`); });
       const r = newBusLike(nm, ch.devices); const vm = el.querySelector(':scope > DeviceChain > Mixer > Volume'); if (vm) r.vol = clamp(gainToFader(num(vm, 'Manual', 1)), 0, 1); return r; });
-    report.returns = rets.length;
+    report.returns = rets.length; P.returns = P.returns.slice(0, 12);
   }
   if (mt) { const ch = readLiveChain(mt.querySelector(':scope > DeviceChain > DeviceChain > Devices')); P.master.devices = ch.devices; report.fx.push(...ch.mapped); ch.unmapped.forEach(u => report.fxMissing.add(u)); }
   // master volume automation

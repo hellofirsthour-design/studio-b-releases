@@ -1,8 +1,11 @@
 /* ============ piano roll / clip editor ============ */
+const LANE_KEY = { vel: 'v', chance: 'c', vr: 'vr', rel: 'rv' };
+const laneVal = (n, lane) => (lane === 'vel' ? n.v : lane === 'chance' ? (n.c == null ? 1 : n.c) : lane === 'vr' ? n.vr || 0 : n.rv == null ? 0.5 : n.rv);
 const roll = {
   det: { tf: true, gn: false }, sel: new Set(), grid: 1, snap: true, draw: false, fold: false, lane: 'vel', zoom: 1, scrollX: 0, scrollY: null, lastLen: 1, clip: null, track: null, clipboard: null,
   ctx() { const c = V.editClip && clipById(V.editClip); if (!c || c.type !== 'midi') return null; const t = trackOf(c); return t ? { t, c } : null; },
-  ph() { if (!T.playing || !this.clip) return null; const c = this.clip, p = nowPos(); if (p < c.start || p >= c.start + c.len) return null; const L = c.bars * 16; return ((p - c.start + c.offset) % L + L) % L; },
+  multiInfo() { const cs = S.tracks.flatMap(t => t.clips).filter(k => k.type === 'midi' && V.selClips.has(k.id)); if (cs.length < 2 || !cs.includes(this.clip)) return null; return { clips: cs, a: Math.min(...cs.map(k => k.start)), b: Math.max(...cs.map(k => k.start + k.len)) }; },
+  ph() { if (!T.playing || !this.clip) return null; const c = this.clip, p = nowPos(); if (this.M) return p >= this.M.a && p < this.M.b ? p - c.start + c.offset : null; if (p < c.start || p >= c.start + c.len) return null; const L = c.bars * 16; return ((p - c.start + c.offset) % L + L) % L; },
   rows(t) {
     if (t.inst.type === 'drums') return t.inst.pads.map((_, i) => i).reverse();
     if (t.inst.type === 'sampler' && t.inst.mode !== 'keys') { const n = Math.min(64, Math.max(16, t.inst.cues.length)); return Array.from({ length: n }, (_, i) => n - 1 - i); }
@@ -19,7 +22,7 @@ const roll = {
       const b = $('#mkclip'); if (b) b.onclick = () => cmd('newClip');
       this.clip = null; return;
     }
-    const { t, c } = cc; if (this.clip !== c) { this.sel.clear(); this.scrollY = null; this.scrollX = 0; this.zoom = 1; }
+    const { t, c } = cc; if (this.clip !== c) { this.sel.clear(); if (!(this.clip && V.selClips.has(this.clip.id) && V.selClips.has(c.id))) { this.scrollY = null; this.scrollX = 0; this.zoom = 1; } }
     this.clip = c; this.track = t; if (t.inst.type === 'drums' && this._lastKind !== 'drums') this.draw = true; this._lastKind = t.inst.type;
     pane.innerHTML = `<div class="clipwrap">
       <aside class="clipside">
@@ -48,7 +51,7 @@ const roll = {
           <label class="fld inl"><span>Grid</span><select id="rGrid">${GRIDS.map(([l, v]) => `<option value="${v}" ${v === this.grid ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           <button class="tog ${this.snap ? 'on' : ''}" id="rSnap">Snap</button>
           ${t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? `<button class="tog ${this.fold ? 'on' : ''}" id="rFold">Fold to scale</button>` : ''}
-          <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button></div>
+          <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button><button data-lane="vr" class="${this.lane === 'vr' ? 'on' : ''}" title="Velocity range: a random spread each time the note plays">Vel range</button><button data-lane="rel" class="${this.lane === 'rel' ? 'on' : ''}" title="Release velocity">Release</button></div>
           <button class="tog ${this.preview !== false ? 'on' : ''}" id="rPrev" title="Play notes as you add or move them">Preview</button>
           <span class="spacer"></span><span class="muted hint">Double-click to add · drag edges to resize · Alt-drag copies · Del removes · Ctrl+wheel zooms</span>
         </div>
@@ -59,15 +62,15 @@ const roll = {
   // geometry
   geo() {
     const w = this.cv.clientWidth, h = this.cv.clientHeight, t = this.track, rows = this.rows(t);
-    const keysW = 64, rulerH = 20, laneH = 64, gridW = Math.max(50, w - keysW), len = this.clip.bars * 16;
+    const keysW = 64, rulerH = 20, laneH = 64, gridW = Math.max(50, w - keysW), M = this.multiInfo(), len = M ? M.b - M.a : this.clip.bars * 16; this.off = M ? this.clip.start - this.clip.offset - M.a : 0; this.M = M;
     const pps = gridW / len * this.zoom, rowH = t.inst.type === 'drums' ? clamp((h - rulerH - laneH) / rows.length, 16, 30) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp((h - rulerH - laneH) / 16, 11, 22) : 13;
     const gridH = h - rulerH - laneH, maxY = Math.max(0, rows.length * rowH - gridH);
     if (this.scrollY == null) { const ps = this.clip.notes.map(n => rows.indexOf(n.p)).filter(i => i >= 0); const mid = ps.length ? (Math.min(...ps) + Math.max(...ps)) / 2 : rows.indexOf(60); this.scrollY = mid >= 0 ? mid * rowH - gridH / 2 : 0; }
     this.scrollY = clamp(this.scrollY, 0, maxY); this.scrollX = clamp(this.scrollX, 0, Math.max(0, len * pps - gridW));
     return { w, h, keysW, rulerH, laneH, gridW, gridH, len, pps, rowH, rows };
   },
-  sx(g, s) { return g.keysW + s * g.pps - this.scrollX; },
-  xs(g, x) { return (x - g.keysW + this.scrollX) / g.pps; },
+  sx(g, s) { return g.keysW + (s + (this.off || 0)) * g.pps - this.scrollX; },
+  xs(g, x) { return (x - g.keysW + this.scrollX) / g.pps - (this.off || 0); },
   ry(g, i) { return g.rulerH + i * g.rowH - this.scrollY; },
   yr(g, y) { return Math.floor((y - g.rulerH + this.scrollY) / g.rowH); },
   snapS(s, force) { if (!this.snap && !force) return Math.max(0, s); return Math.max(0, Math.floor(s / this.grid + 1e-6) * this.grid); },
@@ -78,6 +81,12 @@ const roll = {
   },
   bind() {
     const cv = this.cv, pane = $('#pane-clip');
+    cv.addEventListener('pointerdown', e => { // multi-clip: clicking another selected clip's note focuses that clip
+      if (!this.M) return; const g = this.geo(), r = cv.getBoundingClientRect(), X = e.clientX - r.left, Y = e.clientY - r.top; if (Y < g.rulerH || Y > g.h - g.laneH || this.noteAt(g, X, Y)) return;
+      const ri = this.yr(g, Y), p = g.rows[ri];
+      const hit = this.M.clips.find(k => k !== this.clip && flattenMidi(k).some(n => { if (n.p !== p) return false; const a = this.sx(g, k.start - this.clip.start + this.clip.offset + n.s); return X >= a && X <= a + Math.max(3, n.l * g.pps); }));
+      if (!hit) return; e.stopImmediatePropagation(); e.preventDefault(); const ox = this.scrollX; V.editClip = hit.id; this.mount(); this.scrollX = ox; this.draw_(); arr.draw();
+    }, true);
     pane.querySelectorAll('details[data-det]').forEach(d => d.addEventListener('toggle', () => (this.det[d.dataset.det] = d.open)));
     pane.querySelector('#cName').onchange = e => { pushUndo(); this.clip.name = e.target.value || 'Clip'; arr.draw(); markDirty(); };
     pane.querySelector('#cLen').onclick = e => { const b = e.target.closest('[data-len]'); if (!b) return; pushUndo(); this.clip.bars = +b.dataset.len * SPB() / 16; arr.draw(); this.mount(); };
@@ -152,7 +161,7 @@ const roll = {
   },
   sideCount() { const f = $$('.clipside .fld > span').find(x => x.textContent.startsWith('Notes')); if (f) f.textContent = 'Notes · ' + (this.sel.size ? this.sel.size + ' selected' : 'all ' + this.clip.notes.length); },
   laneSet(g, x, y) {
-    const v = clamp(1 - (y - (g.h - g.laneH) - 4) / (g.laneH - 8), 0.02, 1), s = this.xs(g, x), key = this.lane === 'vel' ? 'v' : 'c';
+    const v = clamp(1 - (y - (g.h - g.laneH) - 4) / (g.laneH - 8), this.lane === 'vr' ? 0 : 0.02, 1), s = this.xs(g, x), key = LANE_KEY[this.lane];
     const pool = this.sel.size ? [...this.sel] : this.clip.notes;
     pool.forEach(n => { const a = this.sx(g, n.s); if (Math.abs(a - x) < Math.max(5, g.pps * this.grid / 2)) n[key] = Math.round(v * 100) / 100; });
     this.draw_();
@@ -177,11 +186,15 @@ const roll = {
       x.fillStyle = V('--gridf'); x.fillRect(g.keysW, y + g.rowH - 1, g.gridW, pitched && p % 12 === 0 ? 1.5 : 0.6);
     });
     // alternate bar shading, then grid lines
-    { const spb = SPB(); x.fillStyle = 'rgba(255,255,255,.022)'; for (let bs = 0; bs < g.len; bs += spb) if (Math.round(bs / spb) % 2 === 1) x.fillRect(this.sx(g, bs), g.rulerH, spb * g.pps, g.gridH); }
-    for (let s = 0; s <= g.len + 1e-6; s += this.grid) {
+    const o0 = -(this.off || 0);
+    { const spb = SPB(); x.fillStyle = 'rgba(255,255,255,.022)'; for (let bs = o0; bs < g.len + o0; bs += spb) if (Math.round(bs / spb) % 2 === 1) x.fillRect(this.sx(g, bs), g.rulerH, spb * g.pps, g.gridH); }
+    for (let s = o0; s <= g.len + o0 + 1e-6; s += this.grid) {
       const X = Math.round(this.sx(g, s)) + 0.5; if (X < g.keysW || X > g.w) continue;
       x.fillStyle = Math.abs(s % SPB()) < 1e-6 ? V('--gridb') : Math.abs(s % BEAT()) < 1e-6 ? V('--gridm') : V('--gridf'); x.fillRect(X, g.rulerH, 1, g.gridH);
     }
+    // multi-clip editing: the other selected clips show as outlined notes; click one to edit that clip
+    if (this.M) { this.M.clips.forEach(k => { const d = k.start - this.clip.start + this.clip.offset, kx0 = this.sx(g, k.start - this.clip.start + this.clip.offset - 0) ; x.fillStyle = k === this.clip ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.18)'; x.fillRect(this.sx(g, d), g.rulerH, k.len * g.pps, g.gridH); if (k === this.clip) return;
+      const kt = trackOf(k); flattenMidi(k).forEach(n => { const ri = g.rows.indexOf(n.p); if (ri < 0) return; const a = this.sx(g, d + n.s), y = this.ry(g, ri); x.strokeStyle = kt ? kt.color : col; x.globalAlpha = 0.75; x.lineWidth = 1; x.strokeRect(a + 1, y + 1.5, Math.max(3, n.l * g.pps - 2), g.rowH - 3); x.globalAlpha = 1; }); }); }
     // notes
     this.clip.notes.forEach(n => {
       const ri = g.rows.indexOf(n.p); if (ri < 0) return; const a = this.sx(g, n.s), y = this.ry(g, ri), w = Math.max(3, n.l * g.pps - 1);
@@ -209,13 +222,13 @@ const roll = {
     x.restore();
     // ruler
     x.fillStyle = V('--panel'); x.fillRect(0, 0, g.w, g.rulerH); x.fillStyle = V('--dim'); x.font = '10px ' + V('--mono');
-    { const spb = SPB(), bt = BEAT(), L = this.clip.bars * 16; for (let st = 0; st < L - 1e-6; st += bt) { const b = Math.floor(st / spb), q = Math.round((st % spb) / bt); const X = this.sx(g, st); if (X < g.keysW - 1 || X > g.w) continue; x.fillRect(X, q ? 14 : 6, 1, q ? 6 : 14); if (!q) x.fillText(String(b + 1), X + 4, 13); else if (g.pps * bt > 34) x.fillText(`${b + 1}.${q + 1}`, X + 3, 13); } }
+    { const spb = SPB(), bt = BEAT(), L = this.M ? g.len + o0 : this.clip.bars * 16, base = this.M ? this.M.a : 0; for (let st = this.M ? o0 : 0; st < L - 1e-6; st += bt) { const sg = this.M ? st - o0 : st, b = Math.floor(((this.M ? base : 0) + sg) / spb), q = Math.round((((this.M ? base : 0) + sg) % spb) / bt); const X = this.sx(g, st); if (X < g.keysW - 1 || X > g.w) continue; x.fillRect(X, q ? 14 : 6, 1, q ? 6 : 14); if (!q) x.fillText(String(b + 1), X + 4, 13); else if (g.pps * bt > 34) x.fillText(`${b + 1}.${q + 1}`, X + 3, 13); } }
     if (playing) { const X = this.sx(g, PH); x.fillStyle = V('--accent'); x.beginPath(); x.moveTo(X - 5, 0); x.lineTo(X + 5, 0); x.lineTo(X, 8); x.fill(); }
     // lane
     const ly = g.h - g.laneH; x.fillStyle = V('--panel'); x.fillRect(0, ly, g.w, g.laneH); x.fillStyle = V('--line'); x.fillRect(0, ly, g.w, 1);
-    x.fillStyle = V('--dim'); x.fillText(this.lane === 'vel' ? 'Velocity' : 'Chance', 6, ly + 14);
+    x.fillStyle = V('--dim'); x.fillText({ vel: 'Velocity', chance: 'Chance', vr: 'Vel range', rel: 'Release' }[this.lane], 6, ly + 14);
     x.save(); x.beginPath(); x.rect(g.keysW, ly, g.gridW, g.laneH); x.clip();
-    this.clip.notes.forEach(n => { const a = this.sx(g, n.s), val = this.lane === 'vel' ? n.v : (n.c == null ? 1 : n.c), hh = (g.laneH - 10) * val; x.fillStyle = this.sel.has(n) ? V('--fg') : this.lane === 'vel' ? col : V('--chance'); x.fillRect(a, ly + g.laneH - 4 - hh, 2, hh); x.beginPath(); x.arc(a + 1, ly + g.laneH - 4 - hh, 3, 0, 7); x.fill(); });
+    this.clip.notes.forEach(n => { const a = this.sx(g, n.s), val = laneVal(n, this.lane), hh = (g.laneH - 10) * val; if (this.lane === 'vr' && n.vr) { x.fillStyle = col; x.globalAlpha = 0.3; const vh = (g.laneH - 10); x.fillRect(a - 2, ly + g.laneH - 4 - vh * Math.min(1, n.v + n.vr), 6, vh * (Math.min(1, n.v + n.vr) - Math.max(0, n.v - n.vr))); x.globalAlpha = 1; } x.fillStyle = this.sel.has(n) ? V('--fg') : this.lane === 'vel' ? col : V('--chance'); x.fillRect(a, ly + g.laneH - 4 - hh, 2, hh); x.beginPath(); x.arc(a + 1, ly + g.laneH - 4 - hh, 3, 0, 7); x.fill(); });
     x.restore();
   },
 };

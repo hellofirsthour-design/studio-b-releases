@@ -1,13 +1,13 @@
 {
- "version": "0.2.13",
+ "version": "0.2.14",
  "shell": 2,
- "date": "2026-11-14T17:49:32.779Z",
- "notes": "Export to AIFF, FLAC and MP3 with dither and render-as-loop; MIDI file import and export; consolidate audio; bounce a selection to a new track; templates and a default set",
+ "date": "2026-11-14T17:57:27.453Z",
+ "notes": "MIDI overdub, MIDI takes, Capture MIDI, release velocity and velocity range lanes, multi-clip editing; drag tracks to reorder and into groups; browser search shows a folder tree; preview stops on folder change and drop, with tempo sync, volume and file info",
  "files": [
   {
    "path": "css/base.css",
-   "size": 20985,
-   "sha256": "87241f426bee50997900fc45339c69cabbd38fe1966e59a84f5ba737f580cee7"
+   "size": 21582,
+   "sha256": "dbb9d810da1b628307839105cae371ec0932a97a183c6aed10f2a1d3afb4d7ce"
   },
   {
    "path": "css/studio.css",
@@ -16,18 +16,18 @@
   },
   {
    "path": "index.html",
-   "size": 18719,
-   "sha256": "935fc0b49bfc3aff0f6f3a13580e4cdb974f85b2e55c59916a22b7c9bd50421e"
+   "size": 19626,
+   "sha256": "4c33e669b0a43f6d1dbc5edbb71f18799c8205e9008a048b3bfa839bc848fafe"
   },
   {
    "path": "js/arrange.js",
-   "size": 44459,
-   "sha256": "289797c17d2b9e0e48fe102b9766b32ea843bbef1ed92997662c3f96a004d657"
+   "size": 44543,
+   "sha256": "a017a35e8391dfca58df981881816433195e5bcb642378a7836feac6c15829e7"
   },
   {
    "path": "js/browser.js",
-   "size": 24142,
-   "sha256": "b59e7abb0733e3c1f6251ef66286edde593170a40953c810f4b70f5ad815eee7"
+   "size": 29007,
+   "sha256": "6fcde07e8929ef9f8a1837016c382379f9380af462e31e28f05350f99139e543"
   },
   {
    "path": "js/cards.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 44040,
-   "sha256": "c7ec4199333ca61d0a4a3c2ab7493377495ece5344bad92b043e5abab20fb17a"
+   "size": 48729,
+   "sha256": "e50d9b565dd7ce7122b8670e1bdcd71ab8f76b1113b78666c508b1a2d4dfd073"
   },
   {
    "path": "js/features.js",
@@ -61,8 +61,8 @@
   },
   {
    "path": "js/features2.js",
-   "size": 12449,
-   "sha256": "bb9b2f54902f9cf667dcebecb15ba6670ba267e708dae0d0433a722f9e85b1df"
+   "size": 14366,
+   "sha256": "50ea7a43ba0a59a65e621345165f4c7f02b9349f3de2f80e91fe83b912752c9e"
   },
   {
    "path": "js/files.js",
@@ -71,8 +71,8 @@
   },
   {
    "path": "js/instruments.js",
-   "size": 14496,
-   "sha256": "ef8001dc625b30d1f1bd89f4108581e32fff4c6192890217e4d902299a793708"
+   "size": 14654,
+   "sha256": "deced1e336c0160d4574d9009f5b0895a8f6a702b884ef0e7c92224950933ac8"
   },
   {
    "path": "js/io.js",
@@ -81,8 +81,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 35631,
-   "sha256": "2b4396bf6afdaf4e88375f95e3af78dc1e973f2fd5f6613994d94ae078197c89"
+   "size": 36142,
+   "sha256": "fc74bf27ff5d6c60c695b054a06d6521d016a66a7457b597a409fbf839bbd074"
   },
   {
    "path": "js/mixer.js",
@@ -91,8 +91,8 @@
   },
   {
    "path": "js/roll.js",
-   "size": 31507,
-   "sha256": "57db12eaff3c4254a0c5ab977c0fe3f5c1e426829b87608a41bcce75c0d8b6dc"
+   "size": 34618,
+   "sha256": "b0ef547c3b9805ed33272a33d70a0ef5de73fd03e31bc11fe371d388e56a5f70"
   },
   {
    "path": "js/timeline.js",
@@ -101,8 +101,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 34371,
-   "sha256": "9dbec2119836bebd701f718467836d84cc33d5e27bfdb21479ad7e02ade7aff0"
+   "size": 36359,
+   "sha256": "ca0c4e9c915a8501880e41d1b50907ed285ff9dc11dd568676d6e637c2f14a75"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -117,7 +117,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "c765aff46bee1498a2904621b18e0d3ad57888d8894f7240339a7a08c975587d"
+   "sha256": "e8069f3711123d14854a3a36a3b59924824b777cd1681d030fdfefc8fcde2525"
   }
  ]
 }

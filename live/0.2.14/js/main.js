@@ -47,7 +47,11 @@ function selectedClips() { return S.tracks.flatMap(t => t.clips.filter(c => V.se
 function cmd(name) {
   if (T.busy) return;
   switch (name) {
-    case 'new': return confirmLeave(() => loadProjectObj(emptyProject()));
+    case 'new': return confirmLeave(() => newProject());
+    case 'importMidi': return importMidiDialog();
+    case 'capture': return captureMidi();
+    case 'exportMidi': return exportMidiClip();
+    case 'bounceSel': return bounceSelection();
     case 'open': return confirmLeave(openProjectDialog);
     case 'save': return saveProject(false);
     case 'saveAs': return saveProject(true);
@@ -60,7 +64,7 @@ function cmd(name) {
     case 'redo': return redo();
     case 'newAudio': return addTrack('audio');
     case 'newMidi': return addInstrumentTrack('synth', null);
-    case 'newReturn': { pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + 'ABCDEFGHIJKL'[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast('Added a return. Tracks send to A and B in this version.'); return; }
+    case 'newReturn': { if (S.returns.length >= 12) return toast('Studio B supports up to 12 returns'); pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + RET_LETTERS[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast(`Added return ${RET_LETTERS[S.returns.length - 1]}. Every track has a send to it (Mixer view).`); return; }
     case 'addMarker': return addMarker(nowPos());
     case 'toggleBrowser': V.browser = !V.browser; ui.transport(); arr.draw(); return;
     case 'toggleDetail': V.detail = V.detail === 'clip' ? 'devices' : V.detail === 'devices' ? 'clip' : 'clip'; ui.detail(); return;
@@ -116,7 +120,9 @@ function cmd(name) {
       if (!n) { UNDO.pop(); toast('Place the insert marker inside a clip to split it'); } arr.draw(); return;
     }
     case 'consolidate': {
-      const sc = selectedClips().filter(x => x.c.type === 'midi'); if (sc.length < 1) return toast('Select MIDI clips on one track to consolidate');
+      if (!V.selClips.size && V.time && V.time.b > V.time.a) { const t = S.tracks.find(x => V.time.tracks.has(x.id) && x.kind === 'audio'); if (t) return consolidateAudio(t, V.time.a, V.time.b); }
+      const au = selectedClips().filter(x => x.c.type === 'audio'); if (au.length) { const t = au[0].t; if (au.some(x => x.t !== t)) return toast('Consolidate works on clips from one track'); const a = V.time && V.time.b > V.time.a ? V.time.a : Math.min(...au.map(x => x.c.start)), b = V.time && V.time.b > V.time.a ? V.time.b : Math.max(...au.map(x => x.c.start + x.c.len)); return consolidateAudio(t, a, b, au[0].c.name); }
+      const sc = selectedClips().filter(x => x.c.type === 'midi'); if (sc.length < 1) return toast('Select clips on one track (or a time range) to consolidate');
       const t = sc[0].t; if (sc.some(x => x.t !== t)) return toast('Consolidate works on clips from one track');
       pushUndo('Consolidate'); const a = Math.min(...sc.map(x => x.c.start)), b = Math.max(...sc.map(x => x.c.start + x.c.len));
       const notes = sc.flatMap(x => flattenMidi(x.c).map(n => ({ ...n, s: n.s + x.c.start - a })));
@@ -161,6 +167,7 @@ function bindKeys() {
       if (e.shiftKey && k === 'd') { e.preventDefault(); return V.time ? duplicateTime(V.time.a, V.time.b) : cmd('duplicate'); }
       if (e.shiftKey && k === 'j') { e.preventDefault(); return cropClips(); }
       if (e.altKey && k === 'z') { e.preventDefault(); return showUndoHistory(); }
+      if (k === 'g') { e.preventDefault(); return e.shiftKey ? ungroupTrack() : groupTracks(); }
       if (k === '3') { e.preventDefault(); V.triplet = !V.triplet; arr.draw(); return toast(V.triplet ? 'Triplet grid' : 'Straight grid'); }
       const map = { z: e.shiftKey ? 'redo' : 'undo', y: 'redo', s: e.shiftKey ? 'saveAs' : 'save', o: 'open', n: 'new', c: 'copy', x: 'cut', v: 'paste', d: 'duplicate', e: 'split', j: 'consolidate', u: 'quantize', l: 'loopSel', a: 'selectAll', r: 'rename', t: e.shiftKey ? 'newMidi' : 'newAudio', i: 'importAudio', m: e.shiftKey ? 'newClip' : null, '=': 'zoomIn', '+': 'zoomIn', '-': 'zoomOut', ',': 'prefs' };
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
@@ -192,12 +199,13 @@ function bindKeys() {
     if (k === '+' || k === '=') return zoomBy(1.25);
     if (k === '-') return zoomBy(1 / 1.25);
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const g = arr.gridStep(), d = e.key === 'ArrowLeft' ? -g : g; const sc = selectedClips(); if (sc.length) { pushUndo('Nudge'); const lo = Math.min(...sc.map(x => x.c.start)); const dd = Math.max(d, -lo); sc.forEach(x => (x.c.start += dd)); settleClips(sc); } else seek(Math.max(0, V.insert + d)); arr.draw(); e.preventDefault(); return; }
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && e.altKey) { nudgeTrack(e.key === 'ArrowUp' ? -1 : 1); e.preventDefault(); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { const i = S.tracks.findIndex(t => V.selTracks.has(t.id)), j = clamp(i + (e.key === 'ArrowUp' ? -1 : 1), 0, S.tracks.length - 1); if (S.tracks[j]) { V.selTracks = new Set([S.tracks[j].id]); ui.headers(); ui.detail(); } e.preventDefault(); return; }
   });
   document.addEventListener('keyup', e => liveNoteOff(e.key.toLowerCase()));
   window.addEventListener('blur', () => [...held.keys()].forEach(liveNoteOff));
   if (navigator.requestMIDIAccess) navigator.requestMIDIAccess().then(acc => {
-    const hook = inp => (inp.onmidimessage = m => { const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n); });
+    const hook = inp => (inp.onmidimessage = m => { const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n, c === 0x80 ? v / 127 : undefined); });
     acc.inputs.forEach(hook); acc.onstatechange = () => acc.inputs.forEach(hook);
   }).catch(() => { });
 }
@@ -207,12 +215,16 @@ const taps = [];
 function bindBar() {
   $('#play').onclick = () => togglePlay();
   $('#stop').onclick = () => { if (T.playing) stop(); else seek(0); };
+  $('#capture').onclick = () => captureMidi();
+  $('#midiOd').onclick = () => { V.midiOd = !V.midiOd; ui.transport(); toast(V.midiOd ? 'MIDI overdub on: recording adds notes to the clips already there' : 'MIDI overdub off: recording replaces, and keeps takes'); };
   $('#rec').onclick = () => { T.rec = !T.rec; if (T.rec && T.playing) startRecording(nowPos()); if (!T.rec && T.recording) finishRecording(); ui.transport(); };
   $('#metro').onclick = () => { S.metro = !S.metro; ui.transport(); };
   $('#loopBtn').onclick = () => { S.loop.on = !S.loop.on; ui.transport(); arr.draw(); };
   $('#follow').onclick = () => cmd('toggleFollow');
   $('#autoBtn').onclick = () => cmd('toggleAuto');
   $('#snapBtn').onclick = () => { V.snap = !V.snap; ui.transport(); };
+  $('#autoArm').onclick = () => { V.autoArm = !V.autoArm; ui.transport(); toast(V.autoArm ? 'Automation Arm on: move controls while playing to record them' : 'Automation Arm off'); };
+  $('#reAuto').onclick = () => reenableAutomation();
   $('#kbBtn').onclick = () => { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); };
   $('#bpm').onchange = e => setBpm(+e.target.value || S.bpm);
   $('#sig').onchange = e => { const m = String(e.target.value).match(/(\d+)\s*\/\s*(\d+)/); if (m) setSig(+m[1], +m[2]); else ui.transport(); };
@@ -225,7 +237,7 @@ function bindBar() {
   $('#root').onchange = e => { S.root = +e.target.value; markDirty(); DEV_RT.forEach(d => d instanceof TuneDev && d.set()); ui.detail(); };
   $('#scale').onchange = e => { S.scale = e.target.value; markDirty(); DEV_RT.forEach(d => d instanceof TuneDev && d.set()); ui.detail(); };
   $('#mclip').onclick = () => METER.forEach(m => (m.clip = false));
-  $('#saveBtn').onclick = () => cmd('save'); $('#openBtn').onclick = () => cmd('open'); $('#exportBtn').onclick = () => cmd('export'); $('#helpBtn').onclick = () => cmd('help');
+  $('#saveBtn').onclick = () => cmd('save'); $('#openBtn').onclick = () => cmd('open'); $('#fileBtn').onclick = e => templateMenu(e); $('#exportBtn').onclick = () => cmd('export'); $('#helpBtn').onclick = () => cmd('help');
   $('#prefsBtn').onclick = () => cmd('prefs'); $('#browserBtn').onclick = () => cmd('toggleBrowser');
   $$('#dtabs [data-d]').forEach(b => (b.onclick = () => { V.detail = b.dataset.d; ui.detail(); }));
   $('#viewBtn').onclick = () => cmd('toggleMixer');
@@ -243,9 +255,12 @@ function bindBar() {
 function showExport() {
   const d = $('#export'); d.hidden = false;
   $('#exRange').innerHTML = `<option value="song">Whole song (1.1.1 to ${barsBeats(songEnd())})</option><option value="loop" ${S.loop.on ? 'selected' : ''}>Loop brace (${barsBeats(S.loop.start)} to ${barsBeats(S.loop.end)})</option>${V.time ? `<option value="sel">Time selection</option>` : ''}`;
+  try { const m = JSON.parse(localStorage.getItem('sb-export') || '{}'); if (m.format) $('#exFmt').value = m.format; if (m.kbps) $('#exKbps').value = m.kbps; if (m.dither != null) $('#exDither').checked = m.dither; if (m.bits) $('#exBits').value = m.bits; if (m.sr) $('#exSr').value = m.sr; } catch (e) { }
+  const fmtUi = () => { const mp3 = $('#exFmt').value === 'mp3'; $('#exKbpsF').hidden = !mp3; $('#exBitsF').hidden = mp3; $('#exDitherF').hidden = mp3 || $('#exBits').value === '32'; }; $('#exFmt').onchange = fmtUi; $('#exBits').onchange = fmtUi; fmtUi();
   $('#exWhat').onchange = () => ($('#exStemOpts').hidden = $('#exWhat').value === 'mix'); $('#exStemOpts').hidden = $('#exWhat').value === 'mix'; $('#exProgText').textContent = '';
   $('#exGo').onclick = async () => {
-    const o = { range: $('#exRange').value, sr: +$('#exSr').value, bits: +$('#exBits').value, normalize: $('#exNorm').checked, tail: +$('#exTail').value }, what = $('#exWhat').value;
+    const o = { range: $('#exRange').value, sr: +$('#exSr').value, bits: +$('#exBits').value, normalize: $('#exNorm').checked, tail: +$('#exTail').value, format: $('#exFmt').value, kbps: +$('#exKbps').value, dither: $('#exDither').checked, loop: $('#exLoop').checked }, what = $('#exWhat').value;
+    try { localStorage.setItem('sb-export', JSON.stringify({ format: o.format, kbps: o.kbps, dither: o.dither, bits: o.bits, sr: o.sr })); } catch (e) { }
     $('#exGo').disabled = true;
     try { if (what === 'mix') await exportAudio(o); else await exportStems({ ...o, onlySelected: what === 'stemsSel', returns: $('#exReturns').checked, main: $('#exReturns').checked }); d.hidden = true; }
     catch (e) { console.error(e); toast('Export failed: ' + e.message); } finally { showBusy(null); }

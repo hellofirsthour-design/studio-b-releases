@@ -224,3 +224,24 @@ button{cursor:pointer;background:none;border:0;padding:0}
 .aed{grid-template-rows:minmax(0,1fr)} .aedmain{min-height:0} #aedWave{flex:1 1 0;height:0;min-height:80px}
 /* renders block input until they finish */
 body.busy #app{pointer-events:none} body.busy{cursor:progress}
+
+/* groups, routing */
+.hdr{padding-left:calc(var(--depth,0) * 12px)}
+.hdr.group{background:color-mix(in srgb,var(--tc) 10%,var(--panel))}
+.hb.fold{min-width:16px;border:0;background:none;color:var(--fg);font-size:11px}
+.mxrow{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center}
+.mxdly{display:flex;gap:3px;align-items:center;font-size:9px;color:var(--dim)} .mxdly input{width:42px;height:18px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font:10px var(--mono);text-align:right}
+.mxs.track .mxknobs{max-height:120px;overflow:auto}
+
+#autoArm.on{color:var(--rec)} #reAuto.hot{color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset} #reAuto:disabled{opacity:.35}
+.hdr.autolane{background:var(--lane);padding-left:calc(14px + var(--depth,0) * 12px)}
+
+#midiOd.on{color:var(--rec)} #capture.hot{color:var(--accent)}
+
+#bsync.on{color:var(--cue);border-color:var(--cue)} #bvol{width:80px;margin-left:auto} .binfo{padding:0 8px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:14px;font-size:11px}
+
+.hdrdrop{position:absolute;left:0;right:0;height:2px;background:var(--accent);z-index:5;pointer-events:none;box-shadow:0 0 6px var(--accent)}
+.hdrdrop.into{background:color-mix(in srgb,var(--accent) 18%,transparent);border:1px solid var(--accent);box-shadow:none}
+.hdr.dragging{opacity:.55}
+
+.brow.dir.hit b{color:var(--accent)}

@@ -91,7 +91,7 @@ function deviceCard(o, d, i) {
   else {
     if (d.type === 'comp' || d.type === 'limit' || d.type === 'gate') grMeter(body, r);
     if (d.type === 'comp') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
-    body.appendChild(paramGrid(def.params, d.p, changed));
+    body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }));
   }
   return c;
 }
