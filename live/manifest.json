@@ -1,13 +1,13 @@
 {
- "version": "0.2.19",
+ "version": "0.2.20",
  "shell": 2,
- "date": "2026-11-14T18:34:34.871Z",
- "notes": "New instruments: Facet (FM), Morph (wavetable), Tine (electric piano), String (plucked physical model), Zones (multisampler with key and velocity zones, root from file names); per-note pitch bend playback (MPE)",
+ "date": "2026-11-14T18:40:03.266Z",
+ "notes": "Groove pool (swing library, extract, apply, commit, global amount), convert audio to MIDI (drums, melody, harmony), stem separation, MPE pitch-bend lane and MPE input recording; docs: large items done",
  "files": [
   {
    "path": "css/base.css",
-   "size": 26972,
-   "sha256": "eae91a98847d1906c5001a272cbc77f8bd99f23991b9eee750c6c36f6178e359"
+   "size": 27141,
+   "sha256": "71fea91b68caa5e89431cb558dbe278862156771ba4724b48da11bb2c57abb44"
   },
   {
    "path": "css/studio.css",
@@ -16,23 +16,28 @@
   },
   {
    "path": "index.html",
-   "size": 19018,
-   "sha256": "10152d372b0118f51057ff26c21f1c23b0700d81ff6f54d44298472b8e47fbad"
+   "size": 19093,
+   "sha256": "34ef4c85f0f810d28a6d8f2b36e359a09f4e74a05e01407b515557d5556775b6"
   },
   {
    "path": "js/arrange.js",
-   "size": 48884,
-   "sha256": "242c59f24bc1574d8833328a65645cd00c1c812a4c9a182941164aa35b90bb7f"
+   "size": 49117,
+   "sha256": "e2c179fd472d55eb58fd5053723a57d011228d0d7b920a9e486ea886d5d1a97d"
   },
   {
    "path": "js/browser.js",
-   "size": 29782,
-   "sha256": "9840d483bd8ee1a0e37bd5b0811bedf484b9a1bc703efa236abb765aa9cf056f"
+   "size": 30610,
+   "sha256": "49bc55fbc24815f2fb34f78b44a720b11712d9b4f19b5ca71df011325efa4283"
   },
   {
    "path": "js/cards.js",
    "size": 37909,
    "sha256": "604ee397713ebe18edd2db9e1275bd33e874558145621b96088111323f80948d"
+  },
+  {
+   "path": "js/convert.js",
+   "size": 13238,
+   "sha256": "b18fcf3b2ab5aff0a1baf0a02e60ea662f6aa359545bc05d17a3f9b5f1fddd64"
   },
   {
    "path": "js/core.js",
@@ -51,8 +56,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 49883,
-   "sha256": "4b68529c5086821160782d4a2173ffc38192a870a1c3050bbb15648fa33c9068"
+   "size": 50843,
+   "sha256": "a007943ce2e8c504082e37f473312a8dcba9d2d72da674423f5d4474917fcfab"
   },
   {
    "path": "js/features.js",
@@ -68,6 +73,11 @@
    "path": "js/files.js",
    "size": 20946,
    "sha256": "fbe1ad5cdf29f671b8884291aa6d3d56217e96b4b19f5066464a9620cdebe8a2"
+  },
+  {
+   "path": "js/groove.js",
+   "size": 4649,
+   "sha256": "5580c4a41dc3b70824f31485626fc1f70de697a7207b15e0f213b015dfa8d16d"
   },
   {
    "path": "js/instruments.js",
@@ -86,8 +96,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 33714,
-   "sha256": "59cd3aa8b7d19489c3bbc2d5ac0df567d606e6dd64692cd0e5102c3e7508a849"
+   "size": 33797,
+   "sha256": "9b35d3e32cde6f850976a56247331a3510cd53571220a2c93d2fe03c3526261f"
   },
   {
    "path": "js/mapping.js",
@@ -116,8 +126,8 @@
   },
   {
    "path": "js/roll.js",
-   "size": 34328,
-   "sha256": "6fe3fab282287b277de4b75826892d03c910fb4b87162b4e02a19a8ca5f3f57f"
+   "size": 36625,
+   "sha256": "a996fd38d1847122cfdf4df23a1d8731247a4118324ea30d65b30f03a10e2924"
   },
   {
    "path": "js/timeline.js",
@@ -147,7 +157,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "5fa35d1ca032e7c69815b2cdde4bb43a8517cf0ff7cfdf2afcf15a56e871b5ed"
+   "sha256": "cac0d0fa9e03e7777c888f5e9549a22a2bb0c1a64639af7b74a2285aaf0d76b9"
   }
  ]
 }

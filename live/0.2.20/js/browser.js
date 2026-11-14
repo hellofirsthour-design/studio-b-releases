@@ -20,7 +20,7 @@ const ICON = {
   phones: '<path d="M3 10V8a5 5 0 0 1 10 0v2"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/>',
 };
 const ico = (k, cls = '') => `<svg class="bico ${cls}" viewBox="0 0 16 16" aria-hidden="true">${ICON[k] || ICON.file}</svg>`;
-const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat']], ['Dynamics', ['comp', 'gate', 'limit']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility']]];
+const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat']], ['Dynamics', ['comp', 'gate', 'limit']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
 const SOUND_FOLDERS = [['Bass', ['Sub Bass', 'Reese']], ['Keys', ['Keys']], ['Lead', ['Saw Lead']], ['Pad', ['Warm Pad']], ['Pluck', ['Pluck']]];
 const DEFAULT_COLLECTIONS = [['Favorites', '#ff5d5d'], ['Orange', '#ff9a3c'], ['Yellow', '#f2d544'], ['Green', '#6fdc8c'], ['Blue', '#4ea3ff'], ['Purple', '#b18cff'], ['Gray', '#a7a3b8']];
 const DRUM_WORDS = /kick|snare|clap|hat|hh|perc|tom|rim|cymbal|crash|ride|808|shaker|snap|drum|bd|sd/i;
@@ -111,7 +111,7 @@ const browser = {
       if (IS_DESKTOP) { const hits = this.q ? this.searchHits(f => DRUM_WORDS.test(f.path)) : this.roots().flatMap(r => (this.index.get(r.path) || []).filter(f => DRUM_WORDS.test(f.name))).slice(0, 300); this.roots().forEach(r => this.ensureIndex(r.path)); h += this.staticFolderOpen('Drum samples in your folders', hits.map(f => this.fileItem(f))); }
     } else if (sel === 'instruments') {
       title = 'Instruments';
-      h = [this.instItem('synth', 'Contour', 'Synth'), this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Sampler')].filter(o => m(o.name)).map(o => this.row(o)).join('');
+      h = [this.instItem('synth', 'Contour', 'Synth'), this.instItem('fm', 'Facet', 'FM synth'), this.instItem('wave', 'Morph', 'Wavetable synth'), this.instItem('epiano', 'Tine', 'Electric piano'), this.instItem('pluck', 'String', 'Plucked string model'), this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Sampler'), this.instItem('multi', 'Zones', 'Multisampler')].filter(o => m(o.name)).map(o => this.row(o)).join('');
     } else if (sel === 'fx') {
       title = 'Audio Effects';
       h = q ? Object.keys(DEVICES).filter(k => !DEVICES[k].hidden && m(DEVICES[k].name + ' ' + DEVICES[k].blurb)).map(k => this.row(this.fxItem(k))).join('')
@@ -133,7 +133,8 @@ const browser = {
       h = this.staticFolderOpen('In this project', ps);
       if (q && IS_DESKTOP) h += this.roots().map(r => { const id = 'sqroot:' + r.path, t = this.searchTree(r.path, audio, r.name); if (/No matches/.test(t)) return ''; if (!this.expanded.has('closed:' + id)) this.expanded.add(id); return this.row({ dir: true, id, name: r.name }, 0) + (this.expanded.has(id) ? t.replace(/padding-left:(\d+)px/g, (m, v) => `padding-left:${+v + 14}px`) : ''); }).join('') || '<div class="brow dim">No matches in your folders</div>';
       else h += this.roots().map(r => this.folderRows(r.path, r.name, r.path, 0, audio)).join('') + (!IS_DESKTOP ? this.webPlaces(audio) : '');
-    } else if (sel === 'grooves') { title = 'Grooves'; h = this.empty('Grooves are coming', 'Swing and groove templates (extract, apply, commit) are planned. The piano roll’s Humanize and Quantize cover timing for now.'); }
+    } else if (sel === 'grooves') { title = 'Grooves'; const gi = g => ({ name: g.name, meta: g.cycle >= 16 ? '1 bar' : g.cycle + ' steps', act: 'groove', val: g.id, key: 'groove:' + g.id, icon: 'grooves', title: 'Click to apply to the selected clips' });
+      h = `<div class="grvamt"><span>Global amount</span><input type="range" min="0" max="1.3" step="0.01" value="${S.grooveAmt != null ? S.grooveAmt : 1}" id="grvAmt" aria-label="Global groove amount"><b>${Math.round((S.grooveAmt != null ? S.grooveAmt : 1) * 100)}%</b></div>` + this.staticFolderOpen('Groove pool (this project)', (S.grooves || []).filter(g => m(g.name)).map(gi)) + this.staticFolderOpen('Swing and feel', GROOVE_LIB.filter(g => m(g.name)).map(gi)); }
     else if (sel === 'templates') { title = 'Templates'; h = (this.tpls || []).filter(t => m(t.name)).map(t => `<div class="brow" data-act="tpl" data-name="${esc(t.name)}" title="Click to start a new project from this template">${ico('set')}<b>${esc(t.name)}</b></div>`).join('') || this.empty('No templates yet', 'Set up a project the way you like, then use the ☰ menu in the toolbar: <b>Save as template</b> or <b>Save as default set</b>.'); listTemplates().then(ts => { const n = ts.map(t => t.name).join(); if (n !== (this.tpls || []).map(t => t.name).join()) { this.tpls = ts; this.renderList(); } }); }
     else if (sel === 'project') {
       title = 'Current Project'; const ps = this.projectSamples().filter(o => m(o.name));
@@ -148,6 +149,7 @@ const browser = {
     }
     $('#bcolhead').innerHTML = `<span>${esc(title || 'Name')}</span><button class="bsort" data-act="sort" aria-label="Sort">${this.sortDesc ? '▼' : '▲'}</button>`;
     $('#blist').innerHTML = h;
+    if ($('#grvAmt')) { $('#grvAmt').oninput = e => { S.grooveAmt = +e.target.value; e.target.nextElementSibling.textContent = Math.round(S.grooveAmt * 100) + '%'; markDirty(); }; $('#grvAmt').onkeydown = e => e.stopPropagation(); }
   },
   staticFolderOpen(name, items) { const id = 'open:' + name; if (!this.expanded.has('closed:' + id)) this.expanded.add(id); return this.staticFolder(id, name, items); },
   /* Search results as a tree: folders whose name matches show closed (open them to browse everything inside),
@@ -184,7 +186,7 @@ const browser = {
   fromKey(k) {
     const [kind, ...rest] = k.split(':'); const v = rest.join(':');
     if (kind === 'fx' && DEVICES[v]) return this.fxItem(v);
-    if (kind === 'inst') return this.instItem(v, v.startsWith('synth:') ? v.slice(6) : { synth: 'Contour', drums: 'Kit', sampler: 'Cutline' }[v] || v, 'Instrument');
+    if (kind === 'inst') return this.instItem(v, v.startsWith('synth:') ? v.slice(6) : INST_NAMES[v] || v, 'Instrument');
     if (kind === 'file') return this.fileItem({ name: basename(v), path: v });
     if (kind === 'sid' && SAMPLES.has(v)) return this.projectSamples().find(o => o.sid === v) || null;
     return null;
@@ -204,6 +206,7 @@ const browser = {
       this.renderList(); return;
     }
     if (act === 'addPlace') return this.addPlace();
+    if (act === 'groove') return applyGroove(a.dataset.val || (a.dataset.key || '').slice(7));
     if (act === 'tpl') { const t = (this.tpls || []).find(x => x.name === a.dataset.name); if (t) confirmLeave(() => newFromTemplate(t)); return; }
     if (act === 'prev') { $$('.brow.sel', $('#blist')).forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) this.previewItem(a); return; }
     if (act === 'openSet') { if (e.detail === 2) confirmLeave(() => openPath(a.dataset.path)); return; }

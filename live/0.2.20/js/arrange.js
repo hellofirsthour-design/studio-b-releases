@@ -4,10 +4,10 @@ const arr = {
   dirty: true,
   layout() {
     let y = 0; const rows = [];
-    S.tracks.forEach(b => { if (hiddenByFold(b)) return; rows.push({ b, kind: 'track', y, h: b.h }); y += b.h + 1; if (b.showTakes && b.takes && b.takes.length) b.takes.forEach(lane => { rows.push({ b, kind: 'take', lane, y, h: 30 }); y += 31; }); (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; }); });
+    S.tracks.forEach(b => { if (hiddenByFold(b)) return; const bh = rowH(b); rows.push({ b, kind: 'track', y, h: bh }); y += bh + 1; if (b.collapsed) return; if (b.showTakes && b.takes && b.takes.length) b.takes.forEach(lane => { rows.push({ b, kind: 'take', lane, y, h: 30 }); y += 31; }); (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; }); });
     const lanesOf = b => (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; });
-    y += 10; S.returns.forEach(b => { rows.push({ b, kind: 'return', y, h: b.h || 40 }); y += (b.h || 40) + 1; lanesOf(b); });
-    rows.push({ b: S.master, kind: 'master', y, h: S.master.h || 40 }); y += (S.master.h || 40) + 1; lanesOf(S.master);
+    y += 10; S.returns.forEach(b => { rows.push({ b, kind: 'return', y, h: rowH(b) }); y += rowH(b) + 1; if (!b.collapsed) lanesOf(b); });
+    rows.push({ b: S.master, kind: 'master', y, h: rowH(S.master) }); y += rowH(S.master) + 1; if (!S.master.collapsed) lanesOf(S.master);
     this.rows = rows; this.totalH = y + 80; return rows;
   },
   rowAt(y) { y += V.scrollY; return this.rows.find(r => y >= r.y && y < r.y + r.h + 1) || null; },
@@ -69,7 +69,7 @@ const arr = {
       }
       if (r.kind !== 'track') return;
       if (r.b.kind === 'group') { const ms = descendants(r.b).filter(t => t.kind !== 'group'), lh = Math.max(2, (r.h - 6) / Math.max(1, ms.length)); ms.forEach((t, i) => t.clips.forEach(c => { const x0 = this.x(c.start), cw = c.len * V.pps; if (x0 > w || x0 + cw < 0) return; g.fillStyle = c.muted ? css.muted : t.color; g.globalAlpha = 0.7; g.fillRect(x0, y + 3 + i * lh, cw, Math.max(1.5, lh - 1)); g.globalAlpha = 1; })); return; }
-      r.b.clips.forEach(c => { const x = this.x(c.start), cw = c.len * V.pps; if (x > w || x + cw < 0) return; this.drawClip(g, r.b, c, x, y, cw, r.h, css); });
+      r.b.clips.forEach(c => { const x = this.x(c.start), cw = c.len * V.pps; if (x > w || x + cw < 0) return; this.drawClip(g, r.b, c, x, y, cw, r.h, css); this.drawWarp(g, c, y, r.h); });
       r.b.clips.forEach(c => { const xi = xfInfo(r.b, c); if (!xi) return; const x0 = this.x(c.start - xi.ext), x1 = this.x(c.start - xi.ext + xi.fade), yb = y + r.h - 2, yt = y + (r.h >= 34 ? 16 : 2);
         g.strokeStyle = css.fg; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, yt); g.lineTo(x1, yb); g.moveTo(x0, yb); g.lineTo(x1, yt); g.stroke(); g.fillStyle = css.fg; g.fillRect(this.x(c.start) - 3, yb - 5, 6, 6); });
       if (r.b.frozen) { g.fillStyle = 'rgba(150,200,255,.13)'; g.fillRect(0, y, w, r.h); g.fillStyle = 'rgba(190,220,255,.8)'; g.font = '600 10px ' + css.ui; g.fillText('Frozen', 6, y + r.h - 6); }
@@ -210,7 +210,7 @@ const arr = {
       rc.onpointermove = ev => {
         const dx = ev.clientX - x0, dy = ev.clientY - y0;
         if (!mode && Math.hypot(dx, dy) > 5) mode = Math.abs(dy) > Math.abs(dx) * 1.3 ? 'zoom' : 'scroll';
-        if (mode === 'zoom') { V.pps = clamp(pps0 * Math.exp(dy * 0.0085), 0.08, 120); V.scrollX = Math.max(0, anchor - x / V.pps); }
+        if (mode === 'zoom') { zoomSmooth(pps0 * Math.exp(dy * 0.0095 * (GP.zoomSpeed || 1)), anchor, x); return; }
         if (mode === 'scroll') V.scrollX = Math.max(0, anchor - (ev.clientX - b.left) / V.pps);
         this.draw();
       };
@@ -222,6 +222,12 @@ const arr = {
   },
 
   /* ---------- lane interaction ---------- */
+  // warp markers: a yellow handle at the top of the clip body and a faint line down through it
+  drawWarp(g, c, y, rh) {
+    if (!hasWm(c) || rh < 34) return; const x0 = this.x(c.start), x1 = this.x(c.start + c.len); g.save();
+    c.wm.forEach(m => { const X = Math.round(this.x(c.start + m.x - c.offset)) + 0.5; if (X < x0 || X > x1) return; g.fillStyle = 'rgba(242,193,78,.45)'; g.fillRect(X, y + 14, 1, rh - 14); g.fillStyle = '#f2c14e'; g.beginPath(); g.moveTo(X - 4, y + 14); g.lineTo(X + 4, y + 14); g.lineTo(X, y + 20); g.fill(); });
+    g.restore();
+  },
   hitClip(r, x, y) {
     if (!r || r.kind !== 'track') return null; const yy = y + V.scrollY - r.y;
     for (let i = r.b.clips.length - 1; i >= 0; i--) {
@@ -229,6 +235,7 @@ const arr = {
       let zone = 'body'; const edge = Math.min(6, cw / 4);
       if (c.type === 'audio' && V.selClips.has(c.id) && yy < 10 && r.h >= 34) { if (Math.abs(x - (cx + c.fadeIn * V.pps)) < 6) zone = 'fadeIn'; else if (Math.abs(x - (cx + cw - c.fadeOut * V.pps)) < 6) zone = 'fadeOut'; }
       if (c.type === 'audio' && yy > r.h - 9 && leftOf(r.b, c) && Math.abs(x - cx) < Math.max(6, xfHalf(r.b, c) * V.pps)) zone = 'xf';
+      if (hasWm(c) && r.h >= 34 && yy >= 13 && yy <= 24) { const m = c.wm.find(q => Math.abs(this.x(c.start + q.x - c.offset) - x) < 5); if (m) return { c, zone: 'wm', m }; }
       if (zone === 'body') { if (x < cx + edge) zone = 'left'; else if (x > cx + cw - edge) zone = 'right'; else if (yy > (r.h >= 34 ? 15 : r.h / 2)) zone = 'range'; }
       return { c, zone };
     }
@@ -238,7 +245,7 @@ const arr = {
     const cv = this.lanes;
     cv.addEventListener('wheel', e => {
       e.preventDefault(); const b = cv.getBoundingClientRect(), x = e.clientX - b.left;
-      if (e.ctrlKey || e.metaKey) { const p = this.pos(x); V.pps = clamp(V.pps * zoomFactor(e), 0.08, 120); V.scrollX = Math.max(0, p - x / V.pps); }
+      if (e.ctrlKey || e.metaKey) { const z = ZOOM.t, p = z ? z.pos + (x - z.x) / z.pps : this.pos(x); zoomSmooth((z ? z.pps : V.pps) * zoomFactor(e), p, x); return; }
       else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) V.scrollX = Math.max(0, V.scrollX + (e.deltaX || e.deltaY) / V.pps);
       else if (e.altKey) { const r = this.rowAt(e.clientY - b.top); if (r) { r.b.h = clamp(r.b.h - Math.sign(e.deltaY) * 8, 22, 300); ui.headers(); } }
       else V.scrollY = Math.max(0, V.scrollY + e.deltaY);
@@ -248,7 +255,7 @@ const arr = {
     cv.addEventListener('pointerleave', () => { if (this.hoverClip) { this.hoverClip = null; this.draw(); } });
     cv.addEventListener('pointermove', e => { if (this.drag) return; { const bb = cv.getBoundingClientRect(), rr = this.rowAt(e.clientY - bb.top), hh = this.hitClip(rr, e.clientX - bb.left, e.clientY - bb.top), id = hh ? hh.c.id : null; if (id !== this.hoverClip) { this.hoverClip = id; this.draw(); } } const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y);
       if (V.autoMode || (r && r.kind === 'auto')) { cv.style.cursor = this.envHit(r, x, y) ? 'grab' : e.altKey ? 'ns-resize' : 'crosshair'; return; }
-      const h = this.hitClip(r, x, y); cv.style.cursor = !h || h.zone === 'range' ? 'text' : h.zone === 'left' || h.zone === 'right' || h.zone === 'xf' ? 'ew-resize' : h.zone.startsWith('fade') ? 'col-resize' : 'grab'; });
+      const h = this.hitClip(r, x, y); cv.style.cursor = h && h.zone === 'wm' ? 'col-resize' : !h || h.zone === 'range' ? 'text' : h.zone === 'left' || h.zone === 'right' || h.zone === 'xf' ? 'ew-resize' : h.zone.startsWith('fade') ? 'col-resize' : 'grab'; });
     cv.addEventListener('dblclick', e => {
       const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y); if (!r || V.autoMode) return;
       const h = this.hitClip(r, x, y);
@@ -333,6 +340,7 @@ const arr = {
           sel.forEach(s => { let d = snapD(dx); d = Math.min(d, s.o.len - 0.25); if (s.c.type === 'audio') d = Math.max(d, -s.o.offset); s.c.start = Math.max(0, s.o.start + d); const real = s.c.start - s.o.start; s.c.len = s.o.len - real; s.c.offset = s.o.offset + real; if (s.c.type === 'midi' && s.c.offset < 0) s.c.offset = ((s.c.offset % (s.c.bars * 16)) + s.c.bars * 16) % (s.c.bars * 16); });
           showTip(ev, barsBeats(sel[0].c.start));
         } else if (hit.zone === 'xf') { c.xf = Math.max(0, Math.min(2 * Math.abs(this.pos(ev.clientX - b.left) - c.start), c.len, (leftOf(trackOf(c), c) || c).len)); showTip(ev, 'Crossfade ' + barsBeatsLen(c.xf)); }
+        else if (hit.zone === 'wm') { const m = hit.m, i = c.wm.indexOf(m), lo = i > 0 ? c.wm[i - 1].x + 0.05 : -Infinity, hi = i < c.wm.length - 1 ? c.wm[i + 1].x - 0.05 : Infinity; m.x = clamp((ev.altKey ? this.pos(ev.clientX - b.left) : this.snap(this.pos(ev.clientX - b.left))) - c.start + c.offset, lo, hi); showTip(ev, 'Warp ' + barsBeats(c.start + m.x - c.offset)); }
         else if (hit.zone === 'fadeIn') { c.fadeIn = clamp((ev.clientX - b.left - this.x(c.start)) / V.pps, 0, c.len - c.fadeOut); }
         else if (hit.zone === 'fadeOut') { c.fadeOut = clamp((this.x(c.start + c.len) - (ev.clientX - b.left)) / V.pps, 0, c.len - c.fadeIn); }
         this.draw();
@@ -375,11 +383,14 @@ const arr = {
       ];
       items.push({ label: 'Crop', key: 'Ctrl+Shift+J', run: () => cropClips() });
       if (c.type === 'audio') items.push({ label: c.revOf ? 'Un-reverse' : 'Reverse', key: 'R', run: () => reverseClips() });
-      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) });
+      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) }, ...(c.groove ? [{ label: 'Commit groove', run: () => commitGroove(c) }] : []));
+      items.push({ label: 'Extract groove to the pool', run: () => extractGroove(c) });
+      if (c.type === 'audio') items.push('-', ...convertMenu(c));
       items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') });
       if (c.type === 'midi') items.push( { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
       if (c.type === 'audio' && (leftOf(trackOf(c), c) || rightOf(trackOf(c), c))) items.push({ label: 'Crossfade with neighbor', key: 'Ctrl+Alt+F', run: () => createCrossfades() });
       if (c.type === 'audio' && c.xf) items.push({ label: 'Remove crossfade', run: () => { pushUndo(); c.xf = 0; this.draw(); } }, ...['linear', 'equal', 'slow', 'fast'].map(sh => ({ label: `Crossfade shape: ${{ linear: 'Linear', equal: 'Equal power', slow: 'Slow', fast: 'Fast' }[sh]}${(c.xfShape || 'linear') === sh ? ' ✓' : ''}`, run: () => { pushUndo(); c.xfShape = sh; this.draw(); } })));
+      if (c.type === 'audio') items.push('-', ...(hit.zone === 'wm' ? [{ label: 'Delete this warp marker', danger: true, run: () => { pushUndo('Delete warp marker'); c.wm = c.wm.filter(m => m !== hit.m); this.draw(); if (T.playing) play(nowPos()); } }] : []), ...warpMenu(c, this.pos(x)), '-');
       if (c.type === 'audio') items.push({ label: c.loop ? 'Turn clip loop off' : 'Loop this clip', run: () => { pushUndo('Loop'); c.loop = !c.loop; if (c.loop && !c.loopLen) c.loopLen = Math.min(c.len, Math.max(1, clipNaturalLen(c) - c.offset)); this.draw(); ui.detail(); } });
       if (c.type === 'audio') items.push({ label: c.warp ? 'Turn warp off' : 'Turn warp on', run: () => { pushUndo(); c.warp = !c.warp; if (c.warp) c.srcBpm = c.srcBpm || S.bpm; this.draw(); ui.detail(); } }, { label: 'Slice to new MIDI track', run: () => sliceToMidi(c) }, { label: 'Crop to clip length', run: () => toast('The clip already plays only its region; the file stays untouched.') });
       items.push('-', { label: 'Delete', danger: true, run: () => cmd('delete') });
@@ -400,7 +411,21 @@ const arr = {
 };
 // Smooth zoom: proportional to the scroll distance, capped per event (mouse wheel notch ≈ 12%).
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; return clamp(Math.exp(-d * 0.0018), 0.85, 1.18); };
+// A collapsed track is a thin strip: its clips still show, with their names.
+const rowH = b => (b.collapsed ? 22 : b.h || 40);
+const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, sp = GP.zoomSpeed || 1; return clamp(Math.exp(-d * 0.0021 * sp), 0.8, 1.25); };
+/* Smooth zoom: the view eases toward the target zoom over a few frames, keeping the point under the pointer fixed. */
+const ZOOM = { t: null, raf: 0 };
+function zoomSmooth(target, pos, x) {
+  ZOOM.t = { pps: clamp(target, 0.08, 120), pos, x };
+  if (REDUCED || GP.smooth === false) { V.pps = ZOOM.t.pps; V.scrollX = Math.max(0, pos - x / V.pps); ZOOM.t = null; arr.draw(); return; }
+  if (!ZOOM.raf) ZOOM.raf = requestAnimationFrame(zoomStep);
+}
+function zoomStep() {
+  ZOOM.raf = 0; const z = ZOOM.t; if (!z) return; const k = Math.log(z.pps / V.pps);
+  V.pps = Math.abs(k) < 0.003 ? z.pps : V.pps * Math.exp(k * 0.32); V.scrollX = Math.max(0, z.pos - z.x / V.pps); arr.draw();
+  if (V.pps !== z.pps) ZOOM.raf = requestAnimationFrame(zoomStep); else ZOOM.t = null;
+}
 // Clips that moved or changed length replace whatever they now overlap on their track.
 function settleClips(list) { const moved = new Set(list.map(s => s.c)); new Set(list.map(s => s.t)).forEach(t => { const mine = t.clips.filter(k => moved.has(k)); t.clips = t.clips.filter(k => !moved.has(k)); mine.forEach(k => clearRange(t, k.start, k.start + k.len)); t.clips.push(...mine); }); }
 const barsBeats = s => { if (s < 0) return '-' + barsBeatsLen(-s); const b = barPos(s), r = s - b.start, bt = b.s.bt; return `${b.bar + 1}.${Math.floor(r / bt + 1e-9) + 1}.${Math.floor(r % bt + 1e-9) + 1}`; };

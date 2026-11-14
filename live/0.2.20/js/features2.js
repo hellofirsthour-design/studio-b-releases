@@ -93,7 +93,7 @@ async function offerRecovery() {
     d.onclick = async e => { const b = e.target.closest('[data-v]'); if (!b) return; d.hidden = true; if (b.dataset.v === 'yes') { await loadProjectObj(P, P.autosave.path); S.path = P.autosave.path; S.name = P.autosave.name; delete S.autosave; V.dirty = true; ui.title(); toast('Recovered your unsaved work. Save it to keep it.'); res(true); } else { await clearAutosave(); res(false); } };
   });
 }
-setInterval(() => autosaveNow(), 60000);
+let _lastAuto = Date.now(); setInterval(() => { if (GP.autosave === false) return; if (Date.now() - _lastAuto < (GP.autosaveMin || 1) * 60000 - 500) return; _lastAuto = Date.now(); autosaveNow(); }, 15000);
 
 /* ---------- automation shapes, copy and paste, extra lanes ---------- */
 let AUTO_CLIP = null;

@@ -133,7 +133,7 @@ function cmd(name) {
   }
 }
 const clipSpan = () => { const sc = selectedClips(); return { a: Math.min(...sc.map(x => x.c.start)), b: Math.max(...sc.map(x => x.c.start + x.c.len)) }; };
-function zoomBy(k) { const cx = V.insert >= V.scrollX && V.insert <= arr.pos(arr.lanes.clientWidth) ? V.insert : arr.pos(arr.lanes.clientWidth / 2); const x = arr.x(cx); V.pps = clamp(V.pps * k, 0.08, 120); V.scrollX = Math.max(0, cx - x / V.pps); arr.draw(); }
+function zoomBy(k) { const cx = V.insert >= V.scrollX && V.insert <= arr.pos(arr.lanes.clientWidth) ? V.insert : arr.pos(arr.lanes.clientWidth / 2); const x = arr.x(cx); zoomSmooth((ZOOM.t ? ZOOM.t.pps : V.pps) * k, cx, x); }
 function confirmLeave(fn) { if (!V.dirty) return fn(); const d = $('#leave'); d.hidden = false; d.onclick = async e => { const b = e.target.closest('[data-v]'); if (!b) return; d.hidden = true; if (b.dataset.v === 'save') { if (await saveProject()) fn(); } else if (b.dataset.v === 'discard') fn(); }; }
 
 /* ---------- keyboard ---------- */
@@ -152,7 +152,7 @@ function bindKeys() {
       if (k === 'x' && !e.repeat) { KB.oct = clamp(KB.oct + 1, 0, 8); toast('Computer MIDI keyboard: C' + KB.oct); e.preventDefault(); return; }
       if (k === 'c' && !e.repeat) { KB.vel = clamp(KB.vel - 0.1, 0.1, 1); toast('Velocity ' + Math.round(KB.vel * 127)); return; }
       if (k === 'v' && !e.repeat) { KB.vel = clamp(KB.vel + 0.1, 0.1, 1); toast('Velocity ' + Math.round(KB.vel * 127)); return; }
-      if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
+      if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = isPitched(t) ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
     }
     if (k === ' ') { e.preventDefault(); if (e.repeat) return; e.shiftKey ? (T.playing ? stop() : continuePlay()) : togglePlay(); return; }
     if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec) { if (T.playing) startRecording(nowPos()); else play(); } else if (T.recording) finishRecording(); ui.transport(); return; }
@@ -170,6 +170,7 @@ function bindKeys() {
       if (k === 'g') { e.preventDefault(); return e.shiftKey ? ungroupTrack() : groupTracks(); }
       if (k === '3') { e.preventDefault(); V.triplet = !V.triplet; arr.draw(); return toast(V.triplet ? 'Triplet grid' : 'Straight grid'); }
       if (e.shiftKey && k === 'c') { e.preventDefault(); return cmd('capture'); }
+      if (!e.shiftKey && (k === 'm' || k === 'k')) { e.preventDefault(); return toggleMap(k === 'm' ? 'midi' : 'key'); }
       const map = { z: e.shiftKey ? 'redo' : 'undo', y: 'redo', s: e.shiftKey ? 'saveAs' : 'save', o: 'open', n: 'new', c: 'copy', x: 'cut', v: 'paste', d: 'duplicate', e: 'split', j: 'consolidate', u: 'quantize', l: 'loopSel', a: 'selectAll', r: 'rename', t: e.shiftKey ? 'newMidi' : 'newAudio', i: 'importAudio', m: e.shiftKey ? 'newClip' : null, '=': 'zoomIn', '+': 'zoomIn', '-': 'zoomOut', ',': 'prefs' };
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
       if (e.shiftKey && k === 'f') { e.preventDefault(); return cmd('toggleFollow'); }
@@ -206,7 +207,7 @@ function bindKeys() {
   document.addEventListener('keyup', e => liveNoteOff(e.key.toLowerCase()));
   window.addEventListener('blur', () => [...held.keys()].forEach(liveNoteOff));
   if (navigator.requestMIDIAccess) navigator.requestMIDIAccess().then(acc => {
-    const hook = inp => (inp.onmidimessage = m => { const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n, c === 0x80 ? v / 127 : undefined); });
+    const hook = inp => (inp.onmidimessage = m => { if (GP.midiOff && GP.midiOff[inp.id]) return; if (midiMapIn(m.data)) return; const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0xe0) { liveBend(st & 15, ((v << 7) | n) / 8192 - 1); return; } if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t, st & 15); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n, c === 0x80 ? v / 127 : undefined); });
     acc.inputs.forEach(hook); acc.onstatechange = () => acc.inputs.forEach(hook);
   }).catch(() => { });
 }
@@ -226,7 +227,9 @@ function bindBar() {
   $('#snapBtn').onclick = () => { V.snap = !V.snap; ui.transport(); };
   $('#autoArm').onclick = () => { V.autoArm = !V.autoArm; ui.transport(); toast(V.autoArm ? 'Automation Arm on: move controls while playing to record them' : 'Automation Arm off'); };
   $('#reAuto').onclick = () => reenableAutomation();
+  $('#mapMidi').onclick = () => toggleMap('midi'); $('#mapKey').onclick = () => toggleMap('key');
   $('#kbBtn').onclick = () => { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); };
+  applyLook(); applyOutputMono(); if (GP.outId) applyOutputDevice();
   $('#bpm').onchange = e => setBpm(+e.target.value || S.bpm);
   $('#sig').onchange = e => { const m = String(e.target.value).match(/(\d+)\s*\/\s*(\d+)/); if (m) setSig(+m[1], +m[2]); else ui.transport(); };
   $('#sig').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); };
@@ -279,26 +282,6 @@ function showUpdate(u) {
   else if (u.state === 'current') { bar.hidden = true; toast(`You have the latest version (${u.version})`); }
   else if (u.state === 'error') { bar.hidden = true; toast('Update check: ' + u.message, 5000); }
 }
-async function showPrefs() {
-  const d = $('#prefs'); d.hidden = false; S.prefs = S.prefs || {};
-  if (IS_DESKTOP) { const info = await NATIVE.appInfo(); $('#pfVer').textContent = `Studio B ${info.version}${info.source === 'live' ? ' (updated in place)' : ''}`; $('#pfUpd').hidden = false; $('#pfUpd').onclick = () => { toast('Checking for updates…'); NATIVE.checkUpdate(); }; }
-  else { $('#pfVer').textContent = 'Browser build'; $('#pfUpd').hidden = true; }
-  const lat = Math.round(((LIVE_CTX.baseLatency || 0) + (LIVE_CTX.outputLatency || 0)) * 1000);
-  $('#pfInfo').textContent = `Sample rate ${LIVE_CTX.sampleRate} Hz · output latency about ${lat} ms`;
-  $('#pfLat').value = S.prefs.latencyMs != null ? S.prefs.latencyMs : lat; $('#pfLat').onchange = e => { S.prefs.latencyMs = +e.target.value; markDirty(); };
-  $('#pfMetVol').value = S.prefs.metroVol != null ? S.prefs.metroVol : 0.6; $('#pfMetVol').oninput = e => { S.prefs.metroVol = +e.target.value; click(ctx.currentTime + 0.02, true); };
-  $('#pfMetSnd').value = S.prefs.metroSound || 'click'; $('#pfMetSnd').onchange = e => { S.prefs.metroSound = e.target.value; click(ctx.currentTime + 0.02, true); };
-  $('#pfMetRec').checked = !!S.prefs.metroRecOnly; $('#pfMetRec').onchange = e => { S.prefs.metroRecOnly = e.target.checked; };
-  $('#pfRecQ').value = String(S.prefs.recQuant || 0.0625); $('#pfRecQ').onchange = e => { S.prefs.recQuant = +e.target.value; };
-  let devs = []; try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { }
-  const outs = devs.filter(x => x.kind === 'audiooutput'), ins = devs.filter(x => x.kind === 'audioinput');
-  $('#pfOut').innerHTML = (outs.length ? outs : [{ deviceId: 'default', label: 'System default' }]).map(o => `<option value="${o.deviceId}">${esc(o.label || 'Output')}</option>`).join('');
-  $('#pfOut').onchange = async e => { try { if (LIVE_CTX.setSinkId) { await LIVE_CTX.setSinkId(e.target.value === 'default' ? '' : e.target.value); toast('Output changed'); } else toast('This build cannot switch outputs; use your system sound settings.'); } catch (err) { toast('That output could not be used'); } };
-  $('#pfIn').innerHTML = ins.length ? ins.map(o => `<option value="${o.deviceId}">${esc(o.label || 'Input (allow microphone access to see names)')}</option>`).join('') : '<option>No inputs found yet: arm an audio track to grant access</option>';
-  $('#pfIn').onchange = e => { S.tracks.filter(t => t.kind === 'audio').forEach(t => (t.input = e.target.value)); getInput(e.target.value).then(connectInputs).catch(() => toast('That input could not be opened')); };
-  $('#pfTest').onclick = async () => { try { await getInput('default'); toast('Input access granted'); showPrefs(); } catch (e) { toast('Input access was refused'); } };
-}
-
 /* ---------- starter song ---------- */
 async function demoProject() {
   const P = emptyProject(); const keep = S; S = P;
