@@ -1,13 +1,13 @@
 {
- "version": "0.2.21",
+ "version": "0.2.22",
  "shell": 2,
- "date": "2026-11-14T18:50:51.575Z",
- "notes": "Follow playhead: the grid glides continuously past a fixed playhead; grid lines on physical pixels",
+ "date": "2026-11-14T18:54:38.737Z",
+ "notes": "Hide the clip and devices panel (▾ in its tab bar, Ctrl+Alt+L); a slim bar or opening a clip brings it back",
  "files": [
   {
    "path": "css/base.css",
-   "size": 27141,
-   "sha256": "71fea91b68caa5e89431cb558dbe278862156771ba4724b48da11bb2c57abb44"
+   "size": 27712,
+   "sha256": "78d6b0a25790e45239cd41912220dee1eee8344538b7ee8d244c5504c4049609"
   },
   {
    "path": "css/studio.css",
@@ -16,13 +16,13 @@
   },
   {
    "path": "index.html",
-   "size": 19093,
-   "sha256": "34ef4c85f0f810d28a6d8f2b36e359a09f4e74a05e01407b515557d5556775b6"
+   "size": 19226,
+   "sha256": "5c405cf9eb564a29872dd29b848b917018231eea059d6ad559fe3116f72b1844"
   },
   {
    "path": "js/arrange.js",
-   "size": 49227,
-   "sha256": "9fbb81ffc29be5a7b5aed1db63b42242aafe5286bb5b9f05b64db6870520708b"
+   "size": 49295,
+   "sha256": "60eb1f7f3b025b67cc201d931fb61d9b1cd63e851b6afed027914d993ea08d8d"
   },
   {
    "path": "js/browser.js",
@@ -96,8 +96,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 33859,
-   "sha256": "92cb69fe813dd7d667f5e1810b17dfc16812ec4c7fca3157f036073f5347b583"
+   "size": 34588,
+   "sha256": "813b90e1743c0a68c825e770634f152168f6daf7de13abb788db2ee7a82e2696"
   },
   {
    "path": "js/mapping.js",
@@ -157,7 +157,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "755b09b53dcf27752d5f927f5da0b8f5fd94abde83eae3d035d35db21e68d7a2"
+   "sha256": "e54d2c604282552ae3f9284216522d0f85dabe93a9f1d9c6ce577974c907dfc8"
   }
  ]
 }

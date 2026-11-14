@@ -63,7 +63,7 @@ class Synth {
     this.update();
   }
   update() { const p = this.t.inst; this.lfo.frequency.value = p.lfoRate; this.lfoG.gain.value = p.lfoAmt; this.out.gain.value = p.gain; }
-  noteOn(note, time, vel, dur, rv) {
+  noteOn(note, time, vel, dur, rv, mpe) {
     const p = this.t.inst, f = mtof(note);
     if (p.mono) { this.voices.forEach(v => this.release(v, time, 0.01)); }
     const v = { note, oscs: [] };
@@ -86,6 +86,7 @@ class Synth {
     mix.connect(filt); filt.connect(amp); amp.connect(this.out);
     Object.assign(v, { amp, filt });
     this.voices.push(v); this.lastF = f; if (!isOffline()) flashPadAt(this.t.id, -1, time);
+    if (mpe && mpe.pb && mpe.pb.length && dur) v.oscs.forEach(o => { if (!o.detune) return; const b0 = o.detune.value; o.detune.setValueAtTime(b0 + mpe.pb[0].v * 100, time); mpe.pb.forEach(q => o.detune.linearRampToValueAtTime(b0 + q.v * 100, time + q.t * dur)); });
     if (dur != null) this.release(v, time + dur, null, rv);
     if (this.voices.length > 24) this.release(this.voices[0], time, 0.01);
     return v;
@@ -97,6 +98,7 @@ class Synth {
     setTimeout(() => { this.voices = this.voices.filter(x => x !== v); try { this.lfoG.disconnect(v.filt.detune); } catch (e) { } }, Math.max(0, (time - ctx.currentTime + R * 1.6 + 0.2) * 1000));
   }
   noteOff(v, time, rv) { if (v) this.release(v, time, null, rv); }
+  modulate(k, val) { if (k === 'cutoff') this.voices.forEach(v => { if (!v.done && v.filt) v.filt.frequency.setTargetAtTime(val, ctx.currentTime, 0.015); }); }
   allOff(time) { this.voices.forEach(v => this.release(v, time, 0.03)); }
   dispose() { try { this.lfo.stop(); this.lfo.disconnect(); } catch (e) { } }
 }
@@ -158,4 +160,4 @@ class Sampler {
   noteOff(v, time) { if (v && this.t.inst.oneShot === 'gate') this.stopV(v, time); }
   allOff(time) { this.voices.forEach(v => this.stopV(v, time)); }
 }
-function makeInstrument(t) { const k = t.inst.type; return k === 'drums' ? new DrumKit(t) : k === 'synth' ? new Synth(t) : new Sampler(t); }
+function makeInstrument(t) { const k = t.inst.type; if (typeof INST2_CLS !== 'undefined' && INST2_CLS[k]) return new INST2_CLS[k](t); return k === 'drums' ? new DrumKit(t) : k === 'synth' ? new Synth(t) : new Sampler(t); }

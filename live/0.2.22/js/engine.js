@@ -20,6 +20,7 @@ function newTrack(kind, instType = 'synth', name) {
   return t;
 }
 function newInst(type) {
+  if (typeof INST2_DEF !== 'undefined' && INST2_DEF[type]) return INST2_DEF[type]();
   if (type === 'drums') return { type, pads: ['Kick', 'Snare', 'Clap', 'Closed Hat', 'Open Hat', 'Tom', 'Rim', 'Shaker'].map(k => ({ kind: k, tune: 0, decay: 1, level: 0.85, pan: 0, sampleId: null })) };
   if (type === 'sampler') return { type, sampleId: null, cues: [], semis: 0, sync: true, stretch: true, srcBpm: 0, mode: 'pads', keyCue: 0, oneShot: 'cue', choke: true, gain: 0.8, attack: 0.002, release: 0.02, filter: 0 };
   return { type: 'synth', ...SYNTH_DEFAULT, ...SYNTH_PRESETS.Keys, preset: 'Keys' };
@@ -284,7 +285,7 @@ function stopSources(at) { T.srcs.forEach(h => { try { hold(h.g.gain, at); h.g.g
 
 /* ---------- scheduler ---------- */
 function scheduleWindow(from, to) {
-  const first = from === T.firstPos;
+  const first = from === T.firstPos; runModulators(Math.max(ctx.currentTime, timeAt(from)), from);
   for (const t of S.tracks) {
     if (t.kind === 'midi' && !t.frozen) {
       const inst = RT.get(t.id) && RT.get(t.id).inst; if (!inst) continue;
@@ -298,8 +299,9 @@ function scheduleWindow(from, to) {
             const p = base + n.s + k * L; if (p >= to - 1e-9 || p >= end - 1e-9) break; if (p < from - 1e-9 || p < c.start - 1e-9) continue;
             if (n.c != null && n.c < 1 && Math.random() > n.c) continue;
             const dur = Math.min(n.l, end - p, L - n.s);
-            const vel = n.vr ? clamp(n.v + (Math.random() * 2 - 1) * n.vr, 0.01, 1) : n.v; // velocity range: a random spread around the note's velocity
-            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p)), vel, durSec(p, dur) * 0.98, n.rv);
+            const gv = c.groove ? grooveAt(grooveById(c.groove), p) : null; // groove: shift and accent from the groove pool
+            const vel = clamp((n.vr ? n.v + (Math.random() * 2 - 1) * n.vr : n.v) * (gv ? gv.vel : 1), 0.01, 1); // velocity range: a random spread around the note's velocity
+            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p + (gv ? gv.shift : 0))), vel, durSec(p, dur) * 0.98, n.rv, n.mpe);
           }
         }
       }
@@ -510,17 +512,23 @@ function punchIn(t, c) { clearRange(t, c.start, c.start + c.len); }
 /* ---------- live notes (computer keyboard / MIDI) ---------- */
 const held = new Map();
 function liveTarget() { const t = S.tracks.find(x => x.arm && x.kind === 'midi') || S.tracks.find(x => V.selTracks.has(x.id) && x.kind === 'midi'); return t; }
-function liveNoteOn(key, note, vel = 0.85, t = liveTarget()) {
+function liveNoteOn(key, note, vel = 0.85, t = liveTarget(), ch = 0) {
   if (!t || t.kind !== 'midi') return; if (ctx.state !== 'running') ctx.resume();
   const v = RT.get(t.id).inst.noteOn(note, ctx.currentTime, vel, null);
-  const h = { v, t, note, vel, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
+  const h = { v, t, note, vel, ch, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
   if (T.recording) T.recording.held.set(key, h);
 }
 function liveNoteOff(key, rv) {
   const h = held.get(key); if (!h) return; held.delete(key);
   RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime, rv);
-  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at }); }
+  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); const dur = Math.max(0.01, ctx.currentTime - h.at); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at, mpe: h.pb && h.pb.length ? { pb: [{ t: 0, v: h.pb0 || 0 }, ...h.pb.map(q => ({ t: clamp((q.at - h.at) / dur, 0, 1), v: q.v }))] } : undefined }); }
   if (!R) { CAPTURE.push({ t: h.t.id, p: h.note, t0: h.at, t1: ctx.currentTime, vel: h.vel, rv, pos: h.pos, end: T.playing && h.pos != null ? posAt(ctx.currentTime) : null }); if (CAPTURE.length > 4000) CAPTURE.splice(0, 1000); }
+}
+// Pitch bend: on a member channel (MPE) it bends only that note; on channel 1 it bends everything held.
+function liveBend(ch, x) {
+  const semis = x * (ch === 0 ? (GP.pbRange || 2) : (GP.mpeRange || 48));
+  held.forEach(h => { if (ch !== 0 && h.ch !== ch) return; h.pb = h.pb || []; if (!h.pb.length) h.pb0 = 0; h.pb.push({ at: ctx.currentTime, v: semis });
+    const nodes = (h.v && (h.v.oscs || h.v.srcs)) || []; nodes.forEach(o => { if (!o.detune) return; if (o._b0 == null) o._b0 = o.detune.value; o.detune.setTargetAtTime(o._b0 + semis * 100, ctx.currentTime, 0.005); }); });
 }
 /* Capture MIDI: everything you play while not recording is remembered, so you can turn it into a clip afterwards. */
 const CAPTURE = [];

@@ -39,7 +39,7 @@ function rackView(body, o, d, r) {
   MACROS.forEach(i => {
     const k = knob({ label: p.names[i - 1], value: p['m' + i], min: 0, max: 1, def: 0, fmt: v => Math.round(v * 127) + '', onInput: v => { p['m' + i] = v; changed(); autoTouch(o, `dev:${d.id}:m${i}`, v); } });
     const n = (p.map || []).filter(m => m.m === i).length; k.title = n ? `${n} mapped parameter${n > 1 ? 's' : ''}. Right-click to map more, double-click the name to rename.` : 'Right-click to map a parameter inside the rack. Double-click the name to rename.';
-    if (n) k.classList.add('mapped');
+    if (n) k.classList.add('mapped'); k.dataset.map = `${o.id}|dev:${d.id}:m${i}`; k.dataset.map = `${o.id}|dev:${d.id}:m${i}`;
     k.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); macroMenu(e, o, d, i); });
     const lab = k.querySelector('.klabel, .lab, span'); if (lab) lab.ondblclick = () => askText('Macro name', p.names[i - 1], v => { p.names[i - 1] = v || p.names[i - 1]; markDirty(); ui.detail(); });
     mac.appendChild(k);
