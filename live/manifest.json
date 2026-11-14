@@ -1,13 +1,13 @@
 {
- "version": "0.2.7",
+ "version": "0.2.8",
  "shell": 2,
- "date": "2026-11-14T16:59:17.423Z",
- "notes": "Range selection in clips, recording tools, track rendering, tempo and meter, stems, Ableton effects",
+ "date": "2026-11-14T17:26:02.732Z",
+ "notes": "Utility, Gate, Ensemble, Phase Flange and Auto Pan; sidechain on Glue Comp",
  "files": [
   {
    "path": "css/base.css",
-   "size": 18426,
-   "sha256": "4a14a24b472839b9f7cf8546daa9b3d7dc56ff98d215e3be2b1fb64b4c46b70f"
+   "size": 19888,
+   "sha256": "dcc7c7427a185c4be88b1870eddfbe6d5b1e8c2a92b216ad47ccde483f4c7679"
   },
   {
    "path": "css/studio.css",
@@ -16,33 +16,33 @@
   },
   {
    "path": "index.html",
-   "size": 14011,
-   "sha256": "e4844d70dbcf2450fe38f972f41ba45d69461ecc15346fba96bfeb0b94e04a0e"
+   "size": 17055,
+   "sha256": "b1725ffbc39a5f4b5883ad3b62c58c56c45acb23ae1e3dbe4a9325740feb182a"
   },
   {
    "path": "js/arrange.js",
-   "size": 35917,
-   "sha256": "ae96d6ce82286f4c2d541b1902909f38935a74dfb0a2c32c5baf1ef198e61693"
+   "size": 40698,
+   "sha256": "c0b27ce598fbbe37c959c3a592889218592a288226e806c9ad668a17b11c6fec"
   },
   {
    "path": "js/browser.js",
-   "size": 24094,
-   "sha256": "bca36a87c1e7a3c0ea37a848f5d1b52ffdcb4e6fef31611d1eff0c2fa472b2cb"
+   "size": 24142,
+   "sha256": "b59e7abb0733e3c1f6251ef66286edde593170a40953c810f4b70f5ad815eee7"
   },
   {
    "path": "js/cards.js",
-   "size": 31987,
-   "sha256": "2ae109f0d8f97f4200bfaf3b5ef747d30813b9e15e274512c6f8f75d6c40f0fb"
+   "size": 32579,
+   "sha256": "7e26483892c78e71b9d16a1566c8ce9c32aac348fe5f81065e211dbfadaffee8"
   },
   {
    "path": "js/core.js",
-   "size": 10990,
-   "sha256": "95cda9bc930d1202359fd815ed2909d63d35b11223b2bcb05adb97ba4dc5a760"
+   "size": 12840,
+   "sha256": "7c518b439e0ffeefe746a9fe1ffb484230d9b25c511a09b22634f78353454358"
   },
   {
    "path": "js/devices.js",
-   "size": 20066,
-   "sha256": "a04d703a6b90db8d856f792399140a3de7242b97bf130c35919b50f411b5b125"
+   "size": 29114,
+   "sha256": "334d0d5f0fbd24c31bd43fad9767c530d46eb63ad7a31d85dad070b5a0a94c39"
   },
   {
    "path": "js/dsp.js",
@@ -51,13 +51,18 @@
   },
   {
    "path": "js/engine.js",
-   "size": 35324,
-   "sha256": "9faf5a159f8c3d13559903ce56751794b9566d1864a522741d702fb3b3eb6897"
+   "size": 36493,
+   "sha256": "2388f9ec112490fbf70f9aee082f0cdd525d64dde780fc2e091c51406b575d3e"
   },
   {
    "path": "js/features.js",
    "size": 5866,
    "sha256": "9628794f988db4253857c0589f262036305b27735aa5d142ca43cc947024f80d"
+  },
+  {
+   "path": "js/features2.js",
+   "size": 8681,
+   "sha256": "6a4fa964cdce9c041923699b878848317dff78e7b564e33deb8351fc0b08fe81"
   },
   {
    "path": "js/instruments.js",
@@ -66,38 +71,38 @@
   },
   {
    "path": "js/io.js",
-   "size": 42600,
-   "sha256": "13e0b4e644a25c5be35d6451eb1b2b082b3bf501de681d617377a789bbafce73"
+   "size": 42604,
+   "sha256": "a1960d49b45af737a2fa640cd1a65bc7146baf85a1f6461241f735b5ace2491f"
   },
   {
    "path": "js/main.js",
-   "size": 30411,
-   "sha256": "2e2d458b6740373c0b70bb64666d28d6a0af7761d5141d9f7cec105fc0a4165c"
+   "size": 32837,
+   "sha256": "1f6d6833c74e4657bd1cf425c0e080075f5443fdfbf3cacb32c320aeed70ef1d"
   },
   {
    "path": "js/mixer.js",
-   "size": 8466,
-   "sha256": "f55b5427c07d7e1873d195253bbf1d7f1ff1a319830b2a111bbeededa8263811"
+   "size": 8589,
+   "sha256": "7655646df7e288148284b020fd51ad6c5f66cc1928f436c7056d49f65dcaf2bf"
   },
   {
    "path": "js/roll.js",
-   "size": 29534,
-   "sha256": "5433f4dc94841a5b316c183e16846dcf90d82b487b18130999ecbfb38d26cb18"
+   "size": 31258,
+   "sha256": "2dd0e8620e29bbf7004ba4cd707a67e13350570ff167c1d8da301b11f0540d68"
   },
   {
    "path": "js/timeline.js",
-   "size": 2636,
-   "sha256": "05103a98b7c066262f0325b8b2e4b3f6e262d9423010ce1a96e375f7f624a274"
+   "size": 2822,
+   "sha256": "df50555bf6180621d20c1917038ac76a4aa84a89a075612e06fc2dbf4b12dffd"
   },
   {
    "path": "js/ui.js",
-   "size": 23671,
-   "sha256": "d280779fdef235a65f2b912f484d0728da91923fab821018304b046cb67896ef"
+   "size": 24662,
+   "sha256": "7b64e0fff0a1183476d2c7517f032a4c34a676539ff9263601cda014497fae05"
   },
   {
    "path": "version.json",
    "size": 37,
-   "sha256": "dccf480343448993928c5224cda7e90baf839a85f87ab31da2630e23860e1d1b"
+   "sha256": "ed2bbfad771d1b31f2abb3e8906dd04edd3ef179bd1f7a7a292b24c8ac33dd54"
   }
  ]
 }
