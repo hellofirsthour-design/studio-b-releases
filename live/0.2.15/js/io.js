@@ -105,9 +105,10 @@ async function exportAudio(opts) {
   const a = opts.range === 'loop' ? S.loop.start : opts.range === 'sel' && V.time ? V.time.a : 0;
   const b = opts.range === 'loop' ? S.loop.end : opts.range === 'sel' && V.time ? V.time.b : songEnd();
   const bar = $('#exportProg'); if (bar) bar.hidden = false;
-  const buf = await renderRange(a, b, { sr: opts.sr, tail: opts.tail, onProgress: p => { if (bar) bar.firstElementChild.style.width = Math.round(p * 100) + '%'; } });
-  if (bar) bar.hidden = true;
-  const p = await saveBytes('wav', `${slug(S.name)}.wav`, encodeWav(buf, opts.bits, opts.normalize));
+  const sr = exportSr(opts), buf = await renderRange(a, b, { sr, tail: opts.loop ? Math.max(opts.tail, 2) : opts.tail, onProgress: p => { if (bar) bar.firstElementChild.style.width = Math.round(p * 100) + '%'; } });
+  if (bar) bar.hidden = true; showBusy('Encoding…');
+  const enc = await encodeAudio(buf, { ...opts, loopLen: opts.loop ? loopSamples(a, b, sr) : 0 }); showBusy(null);
+  const p = await saveBytes(enc.ext, `${slug(S.name)}.${enc.ext}`, enc.data);
   if (p) toast(IS_DESKTOP ? `Exported ${basename(p)} (${fmtTime(buf.duration)})` : 'Export ready');
 }
 const slug = s => (s || 'studio-b').replace(/[^\w\- ]+/g, '').trim() || 'Studio B';

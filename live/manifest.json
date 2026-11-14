@@ -1,13 +1,13 @@
 {
- "version": "0.2.14",
+ "version": "0.2.15",
  "shell": 2,
- "date": "2026-11-14T17:57:27.453Z",
- "notes": "MIDI overdub, MIDI takes, Capture MIDI, release velocity and velocity range lanes, multi-clip editing; drag tracks to reorder and into groups; browser search shows a folder tree; preview stops on folder change and drop, with tempo sync, volume and file info",
+ "date": "2026-11-14T18:03:29.924Z",
+ "notes": "Device presets, A/B compare, hot-swap and collapse; instrument presets; tempo ramps; time signature changes mid-song; Capture shortcut; templates in the browser; docs: medium items done",
  "files": [
   {
    "path": "css/base.css",
-   "size": 21582,
-   "sha256": "dbb9d810da1b628307839105cae371ec0932a97a183c6aed10f2a1d3afb4d7ce"
+   "size": 21723,
+   "sha256": "7d5171e3e15c732683fec796808abf06047368cd162e6c6edefee86e7334945f"
   },
   {
    "path": "css/studio.css",
@@ -21,18 +21,18 @@
   },
   {
    "path": "js/arrange.js",
-   "size": 44543,
-   "sha256": "a017a35e8391dfca58df981881816433195e5bcb642378a7836feac6c15829e7"
+   "size": 46409,
+   "sha256": "a3b9ba3f1d1308c5e178a47a98f617dbbc09bc579dc73730c4a1441558b95f7a"
   },
   {
    "path": "js/browser.js",
-   "size": 29007,
-   "sha256": "6fcde07e8929ef9f8a1837016c382379f9380af462e31e28f05350f99139e543"
+   "size": 29524,
+   "sha256": "6595c1d190c818d709937d22049e8c59b5864db6bfad9e2f9334db55035db59a"
   },
   {
    "path": "js/cards.js",
-   "size": 32834,
-   "sha256": "2e763d49bb31389b6b1a7093001510ad082d530bcd80aa319836f6d3a483525a"
+   "size": 37409,
+   "sha256": "f7b16c07db75962d6a03c7bb4ec893e8190bb74f3eedf7ecd0013672d30e4396"
   },
   {
    "path": "js/core.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 48729,
-   "sha256": "e50d9b565dd7ce7122b8670e1bdcd71ab8f76b1113b78666c508b1a2d4dfd073"
+   "size": 48723,
+   "sha256": "cfd50c2af4cb8ee182cd0b1f1d438fbbe5bea2be4472972224c22bb4cba1f37b"
   },
   {
    "path": "js/features.js",
@@ -81,8 +81,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 36142,
-   "sha256": "fc74bf27ff5d6c60c695b054a06d6521d016a66a7457b597a409fbf839bbd074"
+   "size": 36224,
+   "sha256": "c2c551413a5231bdc6325f69c915639dbbd945e149056574f0a444f273596ee0"
   },
   {
    "path": "js/mixer.js",
@@ -96,8 +96,8 @@
   },
   {
    "path": "js/timeline.js",
-   "size": 2909,
-   "sha256": "759127a333a6bb4921a70740cfb9427ea18f70dbce184ff98fffd71d93ce0fc3"
+   "size": 5116,
+   "sha256": "e34e60a252210717d15b8e516d38de2ecd14ee7c7a43128810111311ad5eaa67"
   },
   {
    "path": "js/ui.js",
@@ -117,7 +117,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "e8069f3711123d14854a3a36a3b59924824b777cd1681d030fdfefc8fcde2525"
+   "sha256": "69163a2988ecdfa4b735fb3d1cd3643cfc812a42541b8782ebd216b7aee7badb"
   }
  ]
 }
