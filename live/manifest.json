@@ -1,13 +1,13 @@
 {
- "version": "0.2.8",
+ "version": "0.2.9",
  "shell": 2,
- "date": "2026-11-14T17:26:02.732Z",
- "notes": "Utility, Gate, Ensemble, Phase Flange and Auto Pan; sidechain on Glue Comp",
+ "date": "2026-11-14T17:30:59.879Z",
+ "notes": "Fix bugs from the bug hunt",
  "files": [
   {
    "path": "css/base.css",
-   "size": 19888,
-   "sha256": "dcc7c7427a185c4be88b1870eddfbe6d5b1e8c2a92b216ad47ccde483f4c7679"
+   "size": 20183,
+   "sha256": "a97840a126dde8a278f05e716fbb69ef54306367c4a36d0a01516af963a633d6"
   },
   {
    "path": "css/studio.css",
@@ -21,8 +21,8 @@
   },
   {
    "path": "js/arrange.js",
-   "size": 40698,
-   "sha256": "c0b27ce598fbbe37c959c3a592889218592a288226e806c9ad668a17b11c6fec"
+   "size": 40909,
+   "sha256": "da9df5566d1765b2f24af78435cfe144b3d2300fb1a471398ed7d8ca94bed283"
   },
   {
    "path": "js/browser.js",
@@ -31,13 +31,13 @@
   },
   {
    "path": "js/cards.js",
-   "size": 32579,
-   "sha256": "7e26483892c78e71b9d16a1566c8ce9c32aac348fe5f81065e211dbfadaffee8"
+   "size": 32780,
+   "sha256": "2b2df7552fe719215ce51c62bdbfc2e5d474daa460fdc6dea37442843ef1b08b"
   },
   {
    "path": "js/core.js",
-   "size": 12840,
-   "sha256": "7c518b439e0ffeefe746a9fe1ffb484230d9b25c511a09b22634f78353454358"
+   "size": 12891,
+   "sha256": "01cab3d5974ebe5a22392abf1aba73ff0a60857089f7ac35fa9b3a141bfd1d61"
   },
   {
    "path": "js/devices.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 36493,
-   "sha256": "2388f9ec112490fbf70f9aee082f0cdd525d64dde780fc2e091c51406b575d3e"
+   "size": 37845,
+   "sha256": "0862d5a441fab4e1033b802bcfe83f6070101dead6aef3e7e886345a8f9e7b13"
   },
   {
    "path": "js/features.js",
@@ -66,43 +66,43 @@
   },
   {
    "path": "js/instruments.js",
-   "size": 14418,
-   "sha256": "5dddc87b7ef9ef30b2b2ba8f80d88ef442a1b07c556dbc2009267fb3cc93f462"
+   "size": 14496,
+   "sha256": "ef8001dc625b30d1f1bd89f4108581e32fff4c6192890217e4d902299a793708"
   },
   {
    "path": "js/io.js",
-   "size": 42604,
-   "sha256": "a1960d49b45af737a2fa640cd1a65bc7146baf85a1f6461241f735b5ace2491f"
+   "size": 43350,
+   "sha256": "39ec404f3b62a88e5da707b50ce240616d403ee0d5f859bc4cad150414a6d1fc"
   },
   {
    "path": "js/main.js",
-   "size": 32837,
-   "sha256": "1f6d6833c74e4657bd1cf425c0e080075f5443fdfbf3cacb32c320aeed70ef1d"
+   "size": 33540,
+   "sha256": "bd76e0f5a82dc1ee3c198a622241c121998da2fb18aca5d5bb87fcaa80b7faa0"
   },
   {
    "path": "js/mixer.js",
-   "size": 8589,
-   "sha256": "7655646df7e288148284b020fd51ad6c5f66cc1928f436c7056d49f65dcaf2bf"
+   "size": 8639,
+   "sha256": "0e57a86fd8f655472cddf7cfee371699d908e9035d5278cb3f4a605d1506ba8d"
   },
   {
    "path": "js/roll.js",
-   "size": 31258,
-   "sha256": "2dd0e8620e29bbf7004ba4cd707a67e13350570ff167c1d8da301b11f0540d68"
+   "size": 31507,
+   "sha256": "57db12eaff3c4254a0c5ab977c0fe3f5c1e426829b87608a41bcce75c0d8b6dc"
   },
   {
    "path": "js/timeline.js",
-   "size": 2822,
-   "sha256": "df50555bf6180621d20c1917038ac76a4aa84a89a075612e06fc2dbf4b12dffd"
+   "size": 2909,
+   "sha256": "759127a333a6bb4921a70740cfb9427ea18f70dbce184ff98fffd71d93ce0fc3"
   },
   {
    "path": "js/ui.js",
-   "size": 24662,
-   "sha256": "7b64e0fff0a1183476d2c7517f032a4c34a676539ff9263601cda014497fae05"
+   "size": 25299,
+   "sha256": "3e002a2c9d1b3d2f7d949c88b414d42f1b4d3d65c70b5f94bcb3d0da6a63ea05"
   },
   {
    "path": "version.json",
    "size": 37,
-   "sha256": "ed2bbfad771d1b31f2abb3e8906dd04edd3ef179bd1f7a7a292b24c8ac33dd54"
+   "sha256": "c48dcccd04b0874f1656993786a8a25e663acc54d175949ba926a0eab6a5311d"
   }
  ]
 }
