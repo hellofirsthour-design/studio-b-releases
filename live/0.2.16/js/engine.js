@@ -29,7 +29,7 @@ const newAudioClip = (sid, start, len) => { const s = SAMPLES.get(sid); return {
 function newBusLike(name, devs) { return { id: uid(), name, color: '#a7a3b8', vol: 0.79, pan: 0, mute: false, devices: devs, auto: {}, autoShow: 'vol', h: 40 }; }
 function emptyProject() {
   const keep = S;
-  S = { v: 1, name: 'Untitled', path: null, bpm: 120, root: 0, scale: 'minor', metro: false, loop: { on: false, start: 0, end: 64 }, markers: [], tracks: [],
+  S = { v: 1, name: 'Untitled', path: null, bpm: (typeof GP !== 'undefined' && GP.bpm) || 120, root: 0, scale: 'minor', metro: false, loop: { on: false, start: 0, end: 64 }, markers: [], tracks: [],
     returns: [newBusLike('Space', [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })]), newBusLike('Echo Pair', [newDevice('delay', { ...DEVICES.delay.def(), mix: 1 })])],
     master: { id: uid(), name: 'Main', vol: 0.79, pan: 0, devices: [newDevice('limit')], auto: {}, autoShow: 'vol', h: 40 }, length: 256, view: {} };
   S.tracks.push(newTrack('audio'), newTrack('audio'), newTrack('midi', 'drums'), newTrack('midi', 'synth'));
@@ -238,6 +238,7 @@ const SHAPES = { linear: x => x, equal: x => Math.sin(x * Math.PI / 2), slow: x 
 const shapeF = (name, x) => (SHAPES[name] || SHAPES.linear)(clamp(x, 0, 1));
 function clipGainAt(c, p, sp) {
   const base = dbToGain(c.gain), end = c.start + c.len; let g = 1;
+  if (GP.edgeFade !== false && !c.frozen) { const e4 = 0.004 * bpmAt(c.start) / 15; if (!sp.fin && !(c.fadeIn > 0)) g = Math.min(g, clamp((p - c.start) / e4, 0, 1)); if (!sp.fout && !(c.fadeOut > 0)) g = Math.min(g, clamp((end - p) / e4, 0, 1)); }
   if (sp.fin > 0) g = Math.min(g, shapeF(c.xfShape, (p - (c.start - sp.hin)) / sp.fin)); else if (c.fadeIn > 0) g = Math.min(g, shapeF(c.fadeShape, (p - c.start) / c.fadeIn));
   if (sp.fout > 0) g = Math.min(g, shapeF(sp.outShape, ((end + sp.hout) - p) / sp.fout)); else if (c.fadeOut > 0) g = Math.min(g, shapeF(c.fadeShape, (end - p) / c.fadeOut));
   return base * g;
@@ -296,7 +297,8 @@ function scheduleWindow(from, to) {
             const p = base + n.s + k * L; if (p >= to - 1e-9 || p >= end - 1e-9) break; if (p < from - 1e-9 || p < c.start - 1e-9) continue;
             if (n.c != null && n.c < 1 && Math.random() > n.c) continue;
             const dur = Math.min(n.l, end - p, L - n.s);
-            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p)), n.v, durSec(p, dur) * 0.98);
+            const vel = n.vr ? clamp(n.v + (Math.random() * 2 - 1) * n.vr, 0.01, 1) : n.v; // velocity range: a random spread around the note's velocity
+            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p)), vel, durSec(p, dur) * 0.98, n.rv);
           }
         }
       }
@@ -308,7 +310,7 @@ function scheduleWindow(from, to) {
     applyAutomation(t, from, to, first);
   }
   S.returns.forEach(b => applyAutomation(b, from, to, first)); applyAutomation(S.master, from, to, first);
-  if ((S.metro || T.countUntil != null) && !isOffline()) { const bt = BEAT(), bar = SPB(); for (let b = Math.ceil(from / bt - 1e-9) * bt; b < to - 1e-9; b += bt) click(timeAt(b), Math.abs(((b % bar) + bar) % bar) < 1e-6); }
+  if ((S.metro || T.countUntil != null) && !isOffline()) { for (const B of barLines(from, to)) for (let b = B.p; b < B.p + B.spb - 1e-6; b += B.bt) if (b >= from - 1e-9 && b < to - 1e-9) click(timeAt(b), b === B.p); }
 }
 function tick(lookahead = 0.12) {
   if (!T.playing) return;
@@ -382,8 +384,12 @@ function setBpm(b) {
 const INPUTS = new Map(); // deviceId -> {stream, src}
 async function getInput(deviceId = 'default') {
   if (INPUTS.has(deviceId)) return INPUTS.get(deviceId);
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: deviceId === 'default' ? undefined : { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 } });
-  const inp = { stream, src: LIVE_CTX.createMediaStreamSource(stream) }; INPUTS.set(deviceId, inp); connectInputs(); return inp;
+  if (deviceId === 'default' && GP.inId === 'none') throw new Error('Audio input is off in Settings');
+  const dev = deviceId === 'default' ? GP.inId : deviceId;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: !dev || dev === 'default' ? undefined : { exact: dev }, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 } });
+  let src = LIVE_CTX.createMediaStreamSource(stream);
+  if (deviceId === 'default' && (GP.inCh === 'l' || GP.inCh === 'r')) { const sp = LIVE_CTX.createChannelSplitter(2), mg = LIVE_CTX.createChannelMerger(2), ch = GP.inCh === 'l' ? 0 : 1; src.connect(sp); sp.connect(mg, ch, 0); sp.connect(mg, ch, 1); const raw = src; src = mg; src._raw = raw; }
+  const inp = { stream, src }; INPUTS.set(deviceId, inp); connectInputs(); return inp;
 }
 const monitorOn = t => t.kind === 'audio' && (t.monitor === 'in' || (t.monitor === 'auto' && t.arm));
 const internalInput = t => t.input === 'resample' || String(t.input || '').startsWith('track:');
@@ -469,11 +475,24 @@ function finishRecording() {
     R.held.forEach(h => { if (h.t === m.t) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, endPos - h.pos), vel: h.vel }); });
     m.notes.forEach(x => { if (x.abs < R.from && x.abs > R.from - BEAT()) { x.l -= R.from - x.abs; x.abs = R.from; } });
     const notes = m.notes.filter(x => x.abs >= Math.max(pa, R.from) - 1e-6 && x.abs < pb && x.l > 0); if (!notes.length) continue;
-    const bar = SPB(), a = Math.floor(Math.min(...notes.map(x => x.abs)) / bar) * bar, b = Math.ceil(Math.max(...notes.map(x => x.abs + x.l)) / bar) * bar;
-    const c = newMidiClip(a, Math.max(bar, b - a), 'Recorded'); c.bars = Math.max(bar, b - a) / 16;
-    const q = (S.prefs && S.prefs.recQuant) || 0.0625;
-    c.notes = notes.map(x => ({ p: x.p, s: Math.round((x.abs - a) / q) * q, l: Math.max(0.25, Math.round(x.l * 4) / 4), v: x.vel != null ? x.vel : x.v, c: 1 })).sort((x, y) => x.s - y.s);
-    clearRange(m.t, c.start, c.start + c.len); m.t.clips.push(c); markDirty();
+    const bar = SPB(), q = (S.prefs && S.prefs.recQuant) || 0.0625, t = m.t, n = (t.takeCount = (t.takeCount || 0) + 1);
+    const mk = (list, name) => { const a = Math.floor(Math.min(...list.map(x => x.abs)) / bar) * bar, b = Math.ceil(Math.max(...list.map(x => x.abs + x.l)) / bar) * bar;
+      const c = newMidiClip(a, Math.max(bar, b - a), name); c.bars = Math.max(bar, b - a) / 16; c.src = uid();
+      c.notes = list.map(x => ({ p: x.p, s: Math.round((x.abs - a) / q) * q, l: Math.max(0.25, Math.round(x.l * 4) / 4), v: x.vel != null ? x.vel : x.v, rv: x.rv, c: 1 })).sort((x, y) => x.s - y.s); return c; };
+    if (V.midiOd) { const c = mk(notes, 'Recorded'); mergeMidiInto(t, c); markDirty(); continue; } // overdub: add to what is there
+    // which loop pass each note was played in
+    const passOf = x => (x.at == null ? 0 : R.wraps.filter(w => w <= x.at + 1e-4).length), np = Math.max(...notes.map(passOf)) + 1;
+    const groups = [...Array(np)].map((_, k) => notes.filter(x => passOf(x) === k)).filter(g => g.length);
+    const clips = groups.map((g, k) => mk(g, groups.length > 1 ? `${t.name} ${n}.${k + 1}` : `${t.name} take ${n}`));
+    if (np > 1 && R.loop.on !== false) clips.forEach((c, k) => { if (k || groups.length > 1) { const L = R.loop.end - R.loop.start; if (c.start >= R.loop.start - 1e-6 && c.start + c.len <= R.loop.end + 1e-6) { c.notes.forEach(x => (x.s += c.start - R.loop.start)); c.start = R.loop.start; c.len = L; c.bars = L / 16; } } });
+    const a = Math.min(...clips.map(c => c.start)), b = Math.max(...clips.map(c => c.start + c.len)), before = t.clips.map(c => cropClip(c, a, b)).filter(Boolean);
+    if (clips.length > 1 || before.length) { // MIDI takes, like audio: every pass (and what was there) on a take lane
+      t.takes = t.takes || [];
+      if (before.length) t.takes.push({ id: uid(), name: 'Before take ' + n, clips: before.map(c => ({ ...deep(c), id: uid() })) });
+      clips.forEach((c, k) => t.takes.push({ id: uid(), name: clips.length > 1 ? `Take ${n}.${k + 1}` : `Take ${n}`, clips: [{ ...deep(c), id: uid() }] }));
+      t.showTakes = true;
+    }
+    const main = clips[clips.length - 1]; clearRange(t, main.start, main.start + main.len); t.clips.push(main); markDirty();
   }
   arr.draw(); ui.detail();
 }
@@ -483,7 +502,7 @@ function compRange(t, lane, a, b) {
   pushUndo('Comp'); clearRange(t, a, b); parts.forEach(p => t.clips.push(p)); markDirty(); return true;
 }
 // Is this part of a take lane what the main lane is playing? (same file, same alignment)
-function compActive(t, k, p) { return t.clips.some(m => m.sampleId === k.sampleId && p >= m.start - 1e-6 && p < m.start + m.len && Math.abs((m.offset - m.start) - (k.offset - k.start)) < 1e-3); }
+function compActive(t, k, p) { if (k.type === 'midi') return t.clips.some(m => m.type === 'midi' && m.src && m.src === k.src && p >= m.start - 1e-6 && p < m.start + m.len); return t.clips.some(m => m.sampleId === k.sampleId && p >= m.start - 1e-6 && p < m.start + m.len && Math.abs((m.offset - m.start) - (k.offset - k.start)) < 1e-3); }
 // Recording replaces what was underneath it on the track.
 function punchIn(t, c) { clearRange(t, c.start, c.start + c.len); }
 
@@ -493,13 +512,38 @@ function liveTarget() { const t = S.tracks.find(x => x.arm && x.kind === 'midi')
 function liveNoteOn(key, note, vel = 0.85, t = liveTarget()) {
   if (!t || t.kind !== 'midi') return; if (ctx.state !== 'running') ctx.resume();
   const v = RT.get(t.id).inst.noteOn(note, ctx.currentTime, vel, null);
-  const h = { v, t, note, vel, pos: T.playing ? posAt(ctx.currentTime) : null }; held.set(key, h);
+  const h = { v, t, note, vel, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
   if (T.recording) T.recording.held.set(key, h);
 }
-function liveNoteOff(key) {
+function liveNoteOff(key, rv) {
   const h = held.get(key); if (!h) return; held.delete(key);
-  RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime);
-  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel }); }
+  RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime, rv);
+  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at }); }
+  if (!R) { CAPTURE.push({ t: h.t.id, p: h.note, t0: h.at, t1: ctx.currentTime, vel: h.vel, rv, pos: h.pos, end: T.playing && h.pos != null ? posAt(ctx.currentTime) : null }); if (CAPTURE.length > 4000) CAPTURE.splice(0, 1000); }
+}
+/* Capture MIDI: everything you play while not recording is remembered, so you can turn it into a clip afterwards. */
+const CAPTURE = [];
+function captureMidi() {
+  const now = ctx.currentTime; let list = CAPTURE.filter(n => now - n.t1 < 600); if (!list.length) return toast('Play something first, then Capture turns it into a clip');
+  list.sort((a, b) => a.t0 - b.t0); let i = list.length - 1; while (i > 0 && list[i].t0 - list[i - 1].t1 < 4) i--; list = list.slice(i); // the last phrase: back to the first 4-second gap
+  const t = S.tracks.find(x => x.id === list[list.length - 1].t) || liveTarget(); if (!t) return;
+  const bar = SPB(), timed = list.every(n => n.pos != null && n.end != null && n.end > n.pos);
+  let notes;
+  if (timed) notes = list.map(n => ({ p: n.p, abs: n.pos, l: Math.max(0.25, n.end - n.pos), v: n.vel, rv: n.rv }));
+  else { const sps = bpmAt(V.insert) / 15, a0 = list[0].t0, at = Math.floor(V.insert / BEAT()) * BEAT(); notes = list.map(n => ({ p: n.p, abs: at + Math.round((n.t0 - a0) * sps * 4) / 4, l: Math.max(0.25, Math.round((n.t1 - n.t0) * sps * 4) / 4), v: n.vel, rv: n.rv })); }
+  const a = Math.floor(Math.min(...notes.map(n => n.abs)) / bar) * bar, b = Math.max(a + bar, Math.ceil(Math.max(...notes.map(n => n.abs + n.l)) / bar) * bar);
+  pushUndo('Capture MIDI'); const c = newMidiClip(a, b - a, 'Captured'); c.bars = (b - a) / 16; c.notes = notes.map(n => ({ p: n.p, s: n.abs - a, l: n.l, v: n.v, rv: n.rv, c: 1 })).sort((x, y) => x.s - y.s);
+  if (V.midiOd) mergeMidiInto(t, c); else { clearRange(t, a, b); t.clips.push(c); }
+  CAPTURE.length = 0; V.selClips = new Set([c.id]); openClip(c); ui.all(); toast(`Captured ${c.notes.length} notes on ${t.name}`);
+}
+// Overdub: merge a new clip's notes with whatever MIDI already sits under it, into one clip.
+function mergeMidiInto(t, c) {
+  const under = t.clips.filter(k => k.type === 'midi' && k.start < c.start + c.len && k.start + k.len > c.start);
+  if (!under.length) { t.clips.push(c); return c; }
+  const a = Math.min(c.start, ...under.map(k => k.start)), b = Math.max(c.start + c.len, ...under.map(k => k.start + k.len));
+  const old = under.flatMap(k => flattenMidi(k).map(n => ({ ...n, s: n.s + k.start - a })));
+  clearRange(t, a, b); c.notes = [...old, ...c.notes.map(n => ({ ...n, s: n.s + c.start - a }))].sort((x, y) => x.s - y.s); c.start = a; c.len = b - a; c.bars = (b - a) / 16; c.offset = 0; c.name = under[0].name;
+  t.clips.push(c); return c;
 }
 
 /* ---------- editing primitives ---------- */

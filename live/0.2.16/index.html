@@ -24,6 +24,8 @@
       <button class="tb ic" id="play" title="Play / stop (Space)" aria-label="Play"><svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg></button>
       <button class="tb ic" id="stop" title="Stop. Press again to return to the start." aria-label="Stop"><svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9"/></svg></button>
       <button class="tb ic badged" id="countIn" title="Count-in before recording: off" aria-label="Count-in"><svg viewBox="0 0 16 16" class="sic"><path d="M3 13v-2.5M6.3 13V8.5M9.7 13V6M13 13V3.5"/></svg><b class="badge"></b></button>
+      <button class="tb ic" id="midiOd" title="MIDI arrangement overdub: recording adds to existing notes" aria-label="MIDI overdub"><svg viewBox="0 0 16 16" class="sic"><path d="M8 3v10M3 8h10"/></svg></button>
+      <button class="tb ic" id="capture" title="Capture MIDI (Ctrl+Shift+C): turn what you just played into a clip" aria-label="Capture MIDI"><svg viewBox="0 0 16 16" class="sic"><rect x="2.5" y="4" width="11" height="8" rx="1"/><path d="M5 4v5M8 4v5M11 4v5"/></svg></button>
       <button class="tb ic" id="rec" title="Arrangement record (F9)" aria-label="Record"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/></svg></button>
       <span id="clock" class="lcd dim">0:00.000</span>
     </div>
@@ -50,7 +52,7 @@
     <span id="projName" class="pname"></span>
     <div class="grp"><span id="mmeter" class="hmet" title="Main output"><i class="lvl"></i><i class="pk"></i></span><button id="mclip" class="clipled" title="Clip indicator. Click to reset." aria-label="Reset clip indicator"></button></div>
     <div class="grp">
-      <button class="tb ic" id="openBtn" title="Open (Ctrl+O)" aria-label="Open"><svg viewBox="0 0 16 16" class="sic"><path d="M2 4.2h4.2l1.4 1.6H14V13H2z"/></svg></button><button class="tb ic" id="saveBtn" title="Save (Ctrl+S)" aria-label="Save"><svg viewBox="0 0 16 16" class="sic"><path d="M3 2.5h7.8L13.5 5v8.5H3z"/><path d="M5.5 2.5v3.3h4.6V2.5M5.5 13.5V9.6h5v3.9"/></svg></button><button class="tb ic" id="exportBtn" title="Export audio (Ctrl+Shift+R)" aria-label="Export audio"><svg viewBox="0 0 16 16" class="sic"><path d="M8 10.2V2.2M5.2 5 8 2.2 10.8 5"/><path d="M3 8.5v5h10v-5"/></svg></button>
+      <button class="tb ic" id="fileBtn" title="New from template, templates, MIDI files" aria-label="File menu"><svg viewBox="0 0 16 16" class="sic"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button><button class="tb ic" id="openBtn" title="Open (Ctrl+O)" aria-label="Open"><svg viewBox="0 0 16 16" class="sic"><path d="M2 4.2h4.2l1.4 1.6H14V13H2z"/></svg></button><button class="tb ic" id="saveBtn" title="Save (Ctrl+S)" aria-label="Save"><svg viewBox="0 0 16 16" class="sic"><path d="M3 2.5h7.8L13.5 5v8.5H3z"/><path d="M5.5 2.5v3.3h4.6V2.5M5.5 13.5V9.6h5v3.9"/></svg></button><button class="tb ic" id="exportBtn" title="Export audio (Ctrl+Shift+R)" aria-label="Export audio"><svg viewBox="0 0 16 16" class="sic"><path d="M8 10.2V2.2M5.2 5 8 2.2 10.8 5"/><path d="M3 8.5v5h10v-5"/></svg></button>
       <button class="tb ic" id="prefsBtn" title="Settings (Ctrl+,)" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <button class="tb ic" id="helpBtn" title="Shortcuts (F1)" aria-label="Help"><svg viewBox="0 0 16 16" class="sic"><circle cx="8" cy="8" r="6"/><path d="M6.3 6.3a1.8 1.8 0 1 1 2.6 1.6c-.6.3-.9.7-.9 1.3v.4"/><circle cx="8" cy="11.6" r=".6" class="f"/></svg></button>
     </div>
@@ -62,7 +64,8 @@
       <nav id="bside" aria-label="Browser sections"></nav>
       <div class="bmain"><div id="bcolhead"></div><div id="blist"></div></div>
     </div>
-    <div class="bfoot"><button id="bprev" class="tb ic" title="Preview files when you click them" aria-label="Preview"><svg viewBox="0 0 16 16"><path d="M3 10V8a5 5 0 0 1 10 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/></svg></button><span class="muted">Preview</span></div>
+    <div class="bfoot"><button id="bprev" class="tb ic" title="Preview files when you click them" aria-label="Preview"><svg viewBox="0 0 16 16"><path d="M3 10V8a5 5 0 0 1 10 0v2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/></svg></button><span class="muted">Preview</span><button id="bsync" class="tb ic" title="Sync preview to the song tempo while it plays" aria-label="Sync preview to tempo"><svg viewBox="0 0 16 16" class="sic"><path d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3"/><path d="M12 2v3h-3M4 14v-3h3"/></svg></button><input id="bvol" type="range" min="0" max="1.2" step="0.01" title="Preview volume" aria-label="Preview volume"></div>
+    <div class="binfo muted small" id="binfo"></div>
     <div id="bresize" aria-hidden="true"></div>
   </aside>
 
@@ -88,35 +91,27 @@
 </div>
 
 <div id="export" class="modal" hidden><div class="sheet">
-  <h2>Export audio</h2><p>Renders to WAV faster than real time.</p>
+  <h2>Export audio</h2><p>Renders faster than real time.</p>
   <div class="form">
     <label class="fld"><span>What to export</span><select id="exWhat" class="dd"><option value="mix">Main mix (one file)</option><option value="stems">All tracks as stems (one file per track)</option><option value="stemsSel">Selected tracks as stems</option></select></label>
     <label class="chk" id="exStemOpts" hidden><input type="checkbox" id="exReturns" checked> Include returns and the main mix with the stems</label>
     <label class="fld"><span>Range</span><select id="exRange" class="dd"></select></label>
+    <label class="fld"><span>Format</span><select id="exFmt" class="dd"><option value="wav">WAV</option><option value="aiff">AIFF</option><option value="flac">FLAC (lossless, smaller)</option><option value="mp3">MP3</option></select></label>
+    <label class="fld" id="exKbpsF" hidden><span>MP3 bit rate</span><select id="exKbps" class="dd"><option value="320">320 kbps</option><option value="256">256 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option></select></label>
     <label class="fld"><span>Sample rate</span><select id="exSr" class="dd"><option value="44100">44.1 kHz</option><option value="48000" selected>48 kHz</option><option value="88200">88.2 kHz</option><option value="96000">96 kHz</option></select></label>
-    <label class="fld"><span>Bit depth</span><select id="exBits" class="dd"><option value="16">16-bit</option><option value="24" selected>24-bit</option><option value="32">32-bit float</option></select></label>
+    <label class="fld" id="exBitsF"><span>Bit depth</span><select id="exBits" class="dd"><option value="16">16-bit</option><option value="24" selected>24-bit</option><option value="32">32-bit float</option></select></label>
     <label class="fld"><span>Tail (seconds of reverb and delay after the end)</span><select id="exTail" class="dd"><option value="0">None</option><option value="2" selected>2</option><option value="5">5</option></select></label>
     <label class="chk"><input type="checkbox" id="exNorm"> Normalize to -0.1 dBFS</label>
+    <label class="chk" id="exDitherF"><input type="checkbox" id="exDither" checked> Dither (adds a tiny noise floor that hides 16 and 24-bit rounding)</label>
+    <label class="chk"><input type="checkbox" id="exLoop"> Render as loop (the reverb and delay tail wraps to the start)</label>
   </div>
   <div id="exportProg" class="prog" hidden><i></i></div><p id="exProgText" class="muted small"></p>
   <div class="btns"><button class="btn prim big" id="exGo">Export</button><button class="btn big ghostb" data-close>Cancel</button></div>
 </div></div>
 
-<div id="prefs" class="modal" hidden><div class="sheet">
-  <h2>Settings</h2><p id="pfInfo" class="muted"></p>
-  <div class="row pfver"><span id="pfVer" class="muted"></span><button class="btn ghostb" id="pfUpd">Check for updates</button></div>
-  <div class="form">
-    <label class="fld"><span>Audio output</span><select id="pfOut" class="dd"></select></label>
-    <label class="fld"><span>Audio input</span><select id="pfIn" class="dd"></select></label>
-    <button class="btn ghostb" id="pfTest">Allow input access</button>
-    <label class="fld"><span>Recording latency compensation (ms)</span><input id="pfLat" type="number" min="0" max="500" step="1"></label>
-    <label class="fld"><span>Metronome volume</span><input id="pfMetVol" type="range" min="0" max="1" step="0.01"></label>
-    <label class="fld"><span>Metronome sound</span><select id="pfMetSnd" class="dd"><option value="click">Click</option><option value="wood">Wood</option><option value="beep">Beep</option></select></label>
-    <label class="chk"><input type="checkbox" id="pfMetRec"> Metronome only while recording</label>
-    <label class="fld"><span>Record quantize (MIDI)</span><select id="pfRecQ" class="dd"><option value="0.0625">Off</option><option value="2">1/8</option><option value="1">1/16</option><option value="0.5">1/32</option><option value="4">1/4</option></select></label>
-  </div>
-  <p class="muted small">Recorded audio is shifted earlier by this amount so it lines up with what you heard. Raise it if takes land late.</p>
-  <div class="btns"><button class="btn big" data-close>Done</button></div>
+<div id="prefs" class="modal" hidden><div class="sheet prefsheet">
+  <div class="pfhead"><h2>Settings</h2><button class="ic" data-close aria-label="Close">✕</button></div>
+  <div class="pfwrap"><nav id="pfTabs" class="pftabs" aria-label="Settings sections"></nav><div id="pfBody" class="pfbody"></div></div>
 </div></div>
 
 <div id="leave" class="modal" hidden><div class="sheet"><h2>Save changes first?</h2><p>This project has changes that are not saved.</p><div class="btns"><button class="btn big prim" data-v="save">Save</button><button class="btn big" data-v="discard">Don’t save</button><button class="btn big ghostb" data-close data-v="cancel">Cancel</button></div></div></div>
@@ -154,6 +149,8 @@
 <script src="js/mixer.js"></script>
 <script src="js/features.js"></script>
 <script src="js/features2.js"></script>
+<script src="js/files.js"></script>
+<script src="js/prefs.js"></script>
 <script src="js/browser.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

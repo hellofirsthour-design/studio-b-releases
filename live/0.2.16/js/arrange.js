@@ -4,10 +4,10 @@ const arr = {
   dirty: true,
   layout() {
     let y = 0; const rows = [];
-    S.tracks.forEach(b => { if (hiddenByFold(b)) return; rows.push({ b, kind: 'track', y, h: b.h }); y += b.h + 1; if (b.showTakes && b.takes && b.takes.length) b.takes.forEach(lane => { rows.push({ b, kind: 'take', lane, y, h: 30 }); y += 31; }); (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; }); });
+    S.tracks.forEach(b => { if (hiddenByFold(b)) return; const bh = rowH(b); rows.push({ b, kind: 'track', y, h: bh }); y += bh + 1; if (b.collapsed) return; if (b.showTakes && b.takes && b.takes.length) b.takes.forEach(lane => { rows.push({ b, kind: 'take', lane, y, h: 30 }); y += 31; }); (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; }); });
     const lanesOf = b => (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; });
-    y += 10; S.returns.forEach(b => { rows.push({ b, kind: 'return', y, h: b.h || 40 }); y += (b.h || 40) + 1; lanesOf(b); });
-    rows.push({ b: S.master, kind: 'master', y, h: S.master.h || 40 }); y += (S.master.h || 40) + 1; lanesOf(S.master);
+    y += 10; S.returns.forEach(b => { rows.push({ b, kind: 'return', y, h: rowH(b) }); y += rowH(b) + 1; if (!b.collapsed) lanesOf(b); });
+    rows.push({ b: S.master, kind: 'master', y, h: rowH(S.master) }); y += rowH(S.master) + 1; if (!S.master.collapsed) lanesOf(S.master);
     this.rows = rows; this.totalH = y + 80; return rows;
   },
   rowAt(y) { y += V.scrollY; return this.rows.find(r => y >= r.y && y < r.y + r.h + 1) || null; },
@@ -47,11 +47,12 @@ const arr = {
       g.fillStyle = css.line; g.fillRect(0, y + r.h, w, 1);
     });
     // grid
-    { const spb = SPB(), bt = BEAT();
-      g.fillStyle = css.barAlt; for (let bs = Math.floor(p0 / spb) * spb; bs <= p1; bs += spb) if (Math.round(bs / spb) % 2 === 1) g.fillRect(this.x(bs), 0, spb * V.pps, h);
-      if (V.pps >= 7 && gs > 1) { g.fillStyle = css.gridHair; for (let s = Math.floor(p0); s <= p1; s += 1) if (Math.abs(s % gs) > 1e-6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
-      for (let s = Math.floor(p0 / gs) * gs; s <= p1; s += gs) { const x = Math.round(this.x(s)) + 0.5, isBar = Math.abs(s % spb) < 1e-6, isBeat = Math.abs(s % bt) < 1e-6; g.fillStyle = isBar ? css.gridBar : isBeat ? css.gridBeat : css.gridFine; g.fillRect(x, 0, isBar ? 1.25 : 1, h); }
-      if (gs > bt) { g.fillStyle = css.gridFine; for (let s = Math.floor(p0 / bt) * bt; s <= p1; s += bt) if (Math.abs(s % gs) > 1e-6 && bt * V.pps >= 6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
+    for (const B of barLines(p0, p1)) { const spb = B.spb, bt = B.bt, gsb = gs >= SPB() ? gs : gs;
+      if (B.bar % 2 === 1) { g.fillStyle = css.barAlt; g.fillRect(this.x(B.p), 0, spb * V.pps, h); }
+      if (V.pps >= 7 && gs > 1) { g.fillStyle = css.gridHair; for (let s = B.p; s < B.p + spb - 1e-6; s += 1) if (Math.abs((s - B.p) % gs) > 1e-6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
+      if (gsb >= spb) { const every = Math.round(gsb / SPB()) || 1; if (B.bar % every === 0) { g.fillStyle = css.gridBar; g.fillRect(Math.round(this.x(B.p)) + 0.5, 0, 1.25, h); } continue; }
+      for (let s = B.p; s < B.p + spb - 1e-6; s += gsb) { const x = Math.round(this.x(s)) + 0.5, isBar = s === B.p, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBar ? css.gridBar : isBeat ? css.gridBeat : css.gridFine; g.fillRect(x, 0, isBar ? 1.25 : 1, h); }
+      if (gsb > bt) { g.fillStyle = css.gridFine; for (let s = B.p + bt; s < B.p + spb - 1e-6; s += bt) if (Math.abs((s - B.p) % gsb) > 1e-6 && bt * V.pps >= 6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
     }
     // loop region and time selection
     if (S.loop.on) { g.fillStyle = css.loopShade; g.fillRect(this.x(S.loop.start), 0, (S.loop.end - S.loop.start) * V.pps, h); }
@@ -147,7 +148,7 @@ const arr = {
     g.strokeStyle = has ? css.env : css.envIdle; g.lineWidth = 1.5; g.beginPath();
     if (!has) { const yy = this.envY(r, p, cur); g.moveTo(0, yy); g.lineTo(w, yy); g.stroke(); return; }
     if (OVERRIDES.has(ovKey(r.b, p.key))) { g.strokeStyle = css.dim; g.setLineDash([4, 3]); }
-    g.moveTo(0, this.envY(r, p, pts[0].v)); pts.forEach((q, i) => { if (p.steps && i) g.lineTo(this.x(q.t), this.envY(r, p, pts[i - 1].v)); else if (i && pts[i - 1].c) { const a0 = pts[i - 1]; for (let k = 1; k < 16; k++) { const tt = a0.t + (q.t - a0.t) * k / 16; g.lineTo(this.x(tt), this.envY(r, p, autoValue(pts, tt))); } } g.lineTo(this.x(q.t), this.envY(r, p, q.v)); }); g.lineTo(w, this.envY(r, p, pts[pts.length - 1].v)); g.stroke(); g.setLineDash([]);
+    g.moveTo(0, this.envY(r, p, pts[0].v)); pts.forEach((q, i) => { if (p.steps && i && !q.ramp) g.lineTo(this.x(q.t), this.envY(r, p, pts[i - 1].v)); else if (i && pts[i - 1].c) { const a0 = pts[i - 1]; for (let k = 1; k < 16; k++) { const tt = a0.t + (q.t - a0.t) * k / 16; g.lineTo(this.x(tt), this.envY(r, p, autoValue(pts, tt))); } } g.lineTo(this.x(q.t), this.envY(r, p, q.v)); }); g.lineTo(w, this.envY(r, p, pts[pts.length - 1].v)); g.stroke(); g.setLineDash([]);
     if (p.steps) { g.fillStyle = css.env; g.font = '10px ' + css.mono; pts.forEach(q => { const x = this.x(q.t); if (x > -40 && x < w) g.fillText(q.v.toFixed(1), x + 5, this.envY(r, p, q.v) - 5); }); }
     pts.forEach(q => { const x = this.x(q.t); if (x < -6 || x > w + 6) return; g.fillStyle = this.envSel && this.envSel.pt === q ? css.fg : css.env; g.beginPath(); g.arc(x, this.envY(r, p, q.v), 3.5, 0, 7); g.fill(); });
   },
@@ -161,14 +162,15 @@ const arr = {
     // bars
     const spb = SPB(), gs = Math.max(BEAT(), this.gridStep()), barPx = spb * V.pps, every = barPx >= 40 ? 1 : barPx >= 20 ? 2 : barPx >= 10 ? 4 : barPx >= 5 ? 8 : 16;
     g.font = '10px ' + css.mono;
-    for (let s = Math.floor(this.pos(0) / gs) * gs; s <= this.pos(w); s += gs) {
-      const x = Math.round(this.x(s)) + 0.5, bar = Math.floor(s / spb + 1e-9);
-      if (Math.abs(s % spb) < 1e-6) { g.fillStyle = css.dim; g.fillRect(x, LS, 1, h - LS); if ((bar) % every === 0) { g.fillStyle = css.fg; g.fillText(String(bar + 1), x + 3, LS + 11); } }
-      else { const bt = BEAT(), isBeat = Math.abs(s % bt) < 1e-6; g.fillStyle = isBeat ? css.dim : css.gridBeat; g.fillRect(x, h - (isBeat ? 8 : 5), 1, isBeat ? 8 : 5); if (isBeat && bt * V.pps >= 34) { g.fillStyle = css.dim; g.font = '9px ' + css.mono; g.fillText(`${bar + 1}.${Math.round((s % spb) / bt) + 1}`, x + 3, LS + 11); g.font = '10px ' + css.mono; } }
+    meterMap().slice(1).forEach(m => { const x = this.x(m.p); if (x < -40 || x > w) return; g.fillStyle = css.accent; g.font = 'bold 9px ' + css.mono; g.fillText(`${m.n}/${m.d}`, x + 3, LS + 22); g.font = '10px ' + css.mono; });
+    for (const B of barLines(this.pos(0), this.pos(w))) for (let s = B.p; s < B.p + B.spb - 1e-6; s += Math.min(gs, B.spb)) {
+      const x = Math.round(this.x(s)) + 0.5, bar = B.bar, spb = B.spb;
+      if (s === B.p) { g.fillStyle = css.dim; g.fillRect(x, LS, 1, h - LS); if ((bar) % every === 0) { g.fillStyle = css.fg; g.fillText(String(bar + 1), x + 3, LS + 11); } }
+      else { const bt = B.bt, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBeat ? css.dim : css.gridBeat; g.fillRect(x, h - (isBeat ? 8 : 5), 1, isBeat ? 8 : 5); if (isBeat && bt * V.pps >= 34) { g.fillStyle = css.dim; g.font = '9px ' + css.mono; g.fillText(`${bar + 1}.${Math.round((s - B.p) / bt) + 1}`, x + 3, LS + 11); g.font = '10px ' + css.mono; } }
     }
     S.markers.forEach(m => { const x = this.x(m.t); g.fillStyle = css.marker; g.beginPath(); g.moveTo(x, h); g.lineTo(x, h - 12); g.lineTo(x + 8, h - 9); g.lineTo(x, h - 6); g.fill(); g.fillStyle = css.dim; g.font = '9px ' + css.ui; g.fillText(m.name, x + 10, h - 4); });
     const rs = V.time && V.time.b > V.time.a ? V.time : this.compSel; if (rs) { const x0 = this.x(rs.a), x1 = this.x(rs.b); g.fillStyle = css.timeSel; g.fillRect(x0, LS, x1 - x0, h - LS); g.fillStyle = css.timeSelEdge; g.fillRect(x0, LS, 1.5, h - LS); g.fillRect(x1 - 1, LS, 1.5, h - LS); }
-    tempoMap().slice(1).forEach(sg => { const x = this.x(sg.p); if (x < -40 || x > w) return; g.fillStyle = css.env; g.fillRect(x, LS, 1, 8); g.font = '9px ' + css.mono; g.fillText(Math.round(sg.bpm * 10) / 10 + '', x + 3, LS + 22); });
+    tempoPoints().filter(q => q.t > 1e-9).forEach(q => { const x = this.x(q.t); if (x < -40 || x > w) return; g.fillStyle = css.env; g.fillRect(x, LS, 1, 8); g.font = '9px ' + css.mono; g.fillText((q.ramp ? '↗' : '') + Math.round(clamp(q.v, 20, 300) * 10) / 10, x + 3, LS + 22); });
     if (T.playing) { const x = this.x(nowPos()); g.fillStyle = css.playhead; g.beginPath(); g.moveTo(x - 5, LS); g.lineTo(x + 5, LS); g.lineTo(x, LS + 8); g.fill(); }
     const ix = this.x(V.insert); g.fillStyle = css.insert; g.beginPath(); g.moveTo(ix - 4, h); g.lineTo(ix + 4, h); g.lineTo(ix, h - 6); g.fill();
   },
@@ -207,8 +209,8 @@ const arr = {
       const x0 = e.clientX, y0 = e.clientY, pps0 = V.pps, anchor = pos; let mode = null;
       rc.onpointermove = ev => {
         const dx = ev.clientX - x0, dy = ev.clientY - y0;
-        if (!mode && Math.hypot(dx, dy) > 7) mode = Math.abs(dy) > Math.abs(dx) * 1.6 ? 'zoom' : 'scroll';
-        if (mode === 'zoom') { V.pps = clamp(pps0 * Math.exp(dy * 0.0055), 0.08, 120); V.scrollX = Math.max(0, anchor - x / V.pps); }
+        if (!mode && Math.hypot(dx, dy) > 5) mode = Math.abs(dy) > Math.abs(dx) * 1.3 ? 'zoom' : 'scroll';
+        if (mode === 'zoom') { zoomSmooth(pps0 * Math.exp(dy * 0.0095 * (GP.zoomSpeed || 1)), anchor, x); return; }
         if (mode === 'scroll') V.scrollX = Math.max(0, anchor - (ev.clientX - b.left) / V.pps);
         this.draw();
       };
@@ -216,7 +218,7 @@ const arr = {
     });
     rc.addEventListener('contextmenu', e => { e.preventDefault(); const b = rc.getBoundingClientRect(), x = e.clientX - b.left, mk = S.markers.find(m => Math.abs(this.x(m.t) - x) < 8);
       popMenu(e, mk ? [{ label: 'Loop to next locator', run: () => loopToNextLocator(mk) }, { label: 'Rename locator', run: () => renameMarker(mk) }, { label: 'Delete locator', danger: true, run: () => { pushUndo(); S.markers = S.markers.filter(m => m !== mk); this.draw(); } }]
-        : [{ label: 'Add locator here', run: () => addMarker(this.snap(this.pos(x))) }, { label: 'Select loop range', run: () => selectLoop() }, { label: S.loop.on ? 'Turn loop off' : 'Turn loop on', run: () => { S.loop.on = !S.loop.on; ui.transport(); this.draw(); } }]); });
+        : [{ label: 'Add locator here', run: () => addMarker(this.snap(this.pos(x))) }, (() => { const bp = barPos(this.pos(x)), ex = (S.sigs || []).find(c => c.bar === bp.bar + 1); return bp.bar < 1 ? { label: 'Change the song meter in the toolbar', run: () => $('#sig').focus() } : ex ? { label: `Remove ${ex.n}/${ex.d} at bar ${bp.bar + 1}`, run: () => setMeterAt(bp.bar + 1, 0, 0) } : { label: `Time signature change at bar ${bp.bar + 1}…`, run: () => askText('Time signature (for example 6/8)', `${bp.s.n}/${bp.s.d}`, v => { const m = String(v).match(/(\d+)\s*\/\s*(\d+)/); if (m && [1, 2, 4, 8, 16].includes(+m[2])) setMeterAt(bp.bar + 1, clamp(+m[1], 1, 32), +m[2]); }) }; })(), { label: 'Select loop range', run: () => selectLoop() }, { label: S.loop.on ? 'Turn loop off' : 'Turn loop on', run: () => { S.loop.on = !S.loop.on; ui.transport(); this.draw(); } }]); });
   },
 
   /* ---------- lane interaction ---------- */
@@ -236,7 +238,7 @@ const arr = {
     const cv = this.lanes;
     cv.addEventListener('wheel', e => {
       e.preventDefault(); const b = cv.getBoundingClientRect(), x = e.clientX - b.left;
-      if (e.ctrlKey || e.metaKey) { const p = this.pos(x); V.pps = clamp(V.pps * zoomFactor(e), 0.08, 120); V.scrollX = Math.max(0, p - x / V.pps); }
+      if (e.ctrlKey || e.metaKey) { const z = ZOOM.t, p = z ? z.pos + (x - z.x) / z.pps : this.pos(x); zoomSmooth((z ? z.pps : V.pps) * zoomFactor(e), p, x); return; }
       else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) V.scrollX = Math.max(0, V.scrollX + (e.deltaX || e.deltaY) / V.pps);
       else if (e.altKey) { const r = this.rowAt(e.clientY - b.top); if (r) { r.b.h = clamp(r.b.h - Math.sign(e.deltaY) * 8, 22, 300); ui.headers(); } }
       else V.scrollY = Math.max(0, V.scrollY + e.deltaY);
@@ -358,6 +360,11 @@ const arr = {
   },
   context(e) {
     const b = this.lanes.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y), hit = this.hitClip(r, x, y);
+    const eh = r && (V.autoMode || r.kind === 'auto') ? this.envHit(r, x, y) : null;
+    if (eh) { const pts = r.b.auto[eh.p.key], i = pts.indexOf(eh.pt); return popMenu(e, [
+      ...(eh.p.key === 'tempo' && i > 0 ? [{ label: eh.pt.ramp ? 'Jump to this tempo (no ramp)' : 'Ramp into this tempo', run: () => { pushUndo('Tempo ramp'); eh.pt.ramp = !eh.pt.ramp; unfreezeForTempo && unfreezeForTempo(); this.draw(); if (T.playing) play(nowPos()); } }] : []),
+      ...(eh.pt.c ? [{ label: 'Straighten the curve after this point', run: () => { pushUndo('Curve'); delete eh.pt.c; this.draw(); } }] : []),
+      { label: 'Delete point', danger: true, run: () => { pushUndo('Delete point'); r.b.auto[eh.p.key] = pts.filter(q => q !== eh.pt); this.draw(); } }]); }
     if (hit) {
       if (!V.selClips.has(hit.c.id)) V.selClips = new Set([hit.c.id]); this.draw(); const c = hit.c;
       const items = [
@@ -368,7 +375,9 @@ const arr = {
       ];
       items.push({ label: 'Crop', key: 'Ctrl+Shift+J', run: () => cropClips() });
       if (c.type === 'audio') items.push({ label: c.revOf ? 'Un-reverse' : 'Reverse', key: 'R', run: () => reverseClips() });
-      if (c.type === 'midi') items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') }, { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
+      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) });
+      items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') });
+      if (c.type === 'midi') items.push( { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
       if (c.type === 'audio' && (leftOf(trackOf(c), c) || rightOf(trackOf(c), c))) items.push({ label: 'Crossfade with neighbor', key: 'Ctrl+Alt+F', run: () => createCrossfades() });
       if (c.type === 'audio' && c.xf) items.push({ label: 'Remove crossfade', run: () => { pushUndo(); c.xf = 0; this.draw(); } }, ...['linear', 'equal', 'slow', 'fast'].map(sh => ({ label: `Crossfade shape: ${{ linear: 'Linear', equal: 'Equal power', slow: 'Slow', fast: 'Fast' }[sh]}${(c.xfShape || 'linear') === sh ? ' ✓' : ''}`, run: () => { pushUndo(); c.xfShape = sh; this.draw(); } })));
       if (c.type === 'audio') items.push({ label: c.loop ? 'Turn clip loop off' : 'Loop this clip', run: () => { pushUndo('Loop'); c.loop = !c.loop; if (c.loop && !c.loopLen) c.loopLen = Math.min(c.len, Math.max(1, clipNaturalLen(c) - c.offset)); this.draw(); ui.detail(); } });
@@ -383,6 +392,7 @@ const arr = {
     if (CLIPBOARD) items.push({ label: 'Paste', key: 'Ctrl+V', run: () => cmd('paste') });
     if (r && r.kind === 'track') items.push(...trackRenderMenu(r.b), '-');
     if (V.time) items.push({ label: 'Delete Time', key: 'Ctrl+Shift+Del', run: () => deleteTime(V.time.a, V.time.b) }, { label: 'Insert Silence', key: 'Ctrl+Alt+I', run: () => insertSilence(V.time.a, V.time.b) }, { label: 'Duplicate Time', key: 'Ctrl+Shift+D', run: () => duplicateTime(V.time.a, V.time.b) }, { label: 'Crop to selection', key: 'Ctrl+Shift+J', run: () => cropClips() }, '-');
+    if (V.time) items.push({ label: 'Consolidate time to new clip', key: 'Ctrl+J', run: () => cmd('consolidate') }, { label: 'Bounce selection to new track', run: () => bounceSelection() });
     if (V.time) items.push({ label: 'Loop selection', key: 'Ctrl+L', run: () => cmd('loopSel') }, { label: 'Split at selection', key: 'Ctrl+E', run: () => cmd('split') }, { label: 'Delete time-range contents', run: () => cmd('delete') });
     items.push({ label: 'Add locator at insert marker', run: () => addMarker(V.insert) }, { label: 'Import audio file…', run: importAudioDialog });
     popMenu(e, items);
@@ -390,10 +400,24 @@ const arr = {
 };
 // Smooth zoom: proportional to the scroll distance, capped per event (mouse wheel notch ≈ 12%).
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; return clamp(Math.exp(-d * 0.0012), 0.88, 1.14); };
+// A collapsed track is a thin strip: its clips still show, with their names.
+const rowH = b => (b.collapsed ? 22 : b.h || 40);
+const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, sp = GP.zoomSpeed || 1; return clamp(Math.exp(-d * 0.0021 * sp), 0.8, 1.25); };
+/* Smooth zoom: the view eases toward the target zoom over a few frames, keeping the point under the pointer fixed. */
+const ZOOM = { t: null, raf: 0 };
+function zoomSmooth(target, pos, x) {
+  ZOOM.t = { pps: clamp(target, 0.08, 120), pos, x };
+  if (REDUCED || GP.smooth === false) { V.pps = ZOOM.t.pps; V.scrollX = Math.max(0, pos - x / V.pps); ZOOM.t = null; arr.draw(); return; }
+  if (!ZOOM.raf) ZOOM.raf = requestAnimationFrame(zoomStep);
+}
+function zoomStep() {
+  ZOOM.raf = 0; const z = ZOOM.t; if (!z) return; const k = Math.log(z.pps / V.pps);
+  V.pps = Math.abs(k) < 0.003 ? z.pps : V.pps * Math.exp(k * 0.32); V.scrollX = Math.max(0, z.pos - z.x / V.pps); arr.draw();
+  if (V.pps !== z.pps) ZOOM.raf = requestAnimationFrame(zoomStep); else ZOOM.t = null;
+}
 // Clips that moved or changed length replace whatever they now overlap on their track.
 function settleClips(list) { const moved = new Set(list.map(s => s.c)); new Set(list.map(s => s.t)).forEach(t => { const mine = t.clips.filter(k => moved.has(k)); t.clips = t.clips.filter(k => !moved.has(k)); mine.forEach(k => clearRange(t, k.start, k.start + k.len)); t.clips.push(...mine); }); }
-const barsBeats = s => { const spb = SPB(), bt = BEAT(); if (s < 0) return '-' + barsBeatsLen(-s); return `${Math.floor(s / spb) + 1}.${Math.floor((s % spb) / bt) + 1}.${Math.floor(s % bt) + 1}`; };
+const barsBeats = s => { if (s < 0) return '-' + barsBeatsLen(-s); const b = barPos(s), r = s - b.start, bt = b.s.bt; return `${b.bar + 1}.${Math.floor(r / bt + 1e-9) + 1}.${Math.floor(r % bt + 1e-9) + 1}`; };
 const barsBeatsLen = s => { const spb = SPB(), bt = BEAT(); return `${Math.floor(s / spb)}.${Math.floor((s % spb) / bt)}.${+(s % bt).toFixed(2)}`; };
 function mix(c1, c2, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const a = p(c1.length === 7 ? c1 : '#888888'), b = p(c2.length === 7 ? c2 : '#222222'); return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
 let _css = null, _cssT = 0;
@@ -408,6 +432,7 @@ function renameMarker(m) { askText('Locator name', m.name, v => { pushUndo(); m.
 function renameClip(c) { askText('Clip name', c.name, v => { pushUndo(); c.name = v; arr.draw(); ui.detail(); }); }
 function openClip(c) { V.editClip = c.id; V.selClips = new Set([c.id]); const t = trackOf(c); if (t) V.selTracks = new Set([t.id]); V.detail = 'clip'; ui.detail(); ui.headers(); arr.draw(); }
 async function dropOnTimeline(e, r, at) {
+  if (typeof browser !== 'undefined' && browser.stopPreview) browser.stopPreview();
   const dt = e.dataTransfer, track = r && r.kind === 'track' ? r.b : null;
   const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst');
   if (sbd) { const b = r ? r.b : null; if (b) { pushUndo('Add device'); b.devices.push(newDevice(sbd)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.all(); } return; }
@@ -418,7 +443,7 @@ async function dropOnTimeline(e, r, at) {
     let sid = null;
     if (f.sid) sid = f.sid; else if (f.path) sid = await loadAudioPath(f.path);
     else if (f.fileId) { const wf = WEB_FILES.get(f.fileId); if (wf) sid = await loadAudioFile({ name: wf.name, path: null, data: await wf.arrayBuffer() }); }
-    else if (f.file) { if (/\.(als|sbproj|json)$/i.test(f.file.name)) { openProjectFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); return; } sid = await loadAudioFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); }
+    else if (f.file) { if (/\.midi?$/i.test(f.file.name)) { await importMidiFile({ name: f.file.name, data: await f.file.arrayBuffer() }, at, track); return; } if (/\.(als|sbproj|json)$/i.test(f.file.name)) { openProjectFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); return; } sid = await loadAudioFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); }
     if (!sid) continue; const res = placeAudio(sid, t, at); if (res) { V.selClips = new Set([res.clip.id]); V.editClip = res.clip.id; t = null; }
   }
   ui.all();

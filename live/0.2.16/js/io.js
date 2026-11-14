@@ -30,7 +30,7 @@ function placeAudio(sid, track, at) {
   if (!track || track.kind !== 'audio') { track = newTrack('audio'); track.name = s.name.slice(0, 24); S.tracks.push(track); buildBus(track, 'track'); }
   const c = newAudioClip(sid, at, 0);
   const loopish = s.buf.duration < 32 && s.bpm && Math.abs(s.buf.duration * s.bpm / 60 - Math.round(s.buf.duration * s.bpm / 60)) < 0.08;
-  c.warp = !!loopish; c.srcBpm = loopish ? s.bpm : S.bpm; c.len = clipNaturalLen(c);
+  c.warp = !!loopish && GP.autoWarp !== false; c.srcBpm = loopish ? s.bpm : S.bpm; if (c.warp && GP.warpMode && GP.warpMode !== 'complex') c.wmode = GP.warpMode; c.len = clipNaturalLen(c);
   clearRange(track, c.start, c.start + c.len); track.clips.push(c);
   return { track, clip: c };
 }
@@ -105,9 +105,10 @@ async function exportAudio(opts) {
   const a = opts.range === 'loop' ? S.loop.start : opts.range === 'sel' && V.time ? V.time.a : 0;
   const b = opts.range === 'loop' ? S.loop.end : opts.range === 'sel' && V.time ? V.time.b : songEnd();
   const bar = $('#exportProg'); if (bar) bar.hidden = false;
-  const buf = await renderRange(a, b, { sr: opts.sr, tail: opts.tail, onProgress: p => { if (bar) bar.firstElementChild.style.width = Math.round(p * 100) + '%'; } });
-  if (bar) bar.hidden = true;
-  const p = await saveBytes('wav', `${slug(S.name)}.wav`, encodeWav(buf, opts.bits, opts.normalize));
+  const sr = exportSr(opts), buf = await renderRange(a, b, { sr, tail: opts.loop ? Math.max(opts.tail, 2) : opts.tail, onProgress: p => { if (bar) bar.firstElementChild.style.width = Math.round(p * 100) + '%'; } });
+  if (bar) bar.hidden = true; showBusy('Encoding…');
+  const enc = await encodeAudio(buf, { ...opts, loopLen: opts.loop ? loopSamples(a, b, sr) : 0 }); showBusy(null);
+  const p = await saveBytes(enc.ext, `${slug(S.name)}.${enc.ext}`, enc.data);
   if (p) toast(IS_DESKTOP ? `Exported ${basename(p)} (${fmtTime(buf.duration)})` : 'Export ready');
 }
 const slug = s => (s || 'studio-b').replace(/[^\w\- ]+/g, '').trim() || 'Studio B';
@@ -128,10 +129,10 @@ const b64 = ab => { const u8 = new Uint8Array(ab); let s = ''; for (let i = 0; i
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
 // Recorded takes have no file yet: write them next to the project as WAV before saving.
 async function writeRecordings(projPath) {
-  if (!IS_DESKTOP) { const used = usedSampleIds(); for (const [id, s] of SAMPLES) if (used.has(id) && !s.path && !s.bytes) s.bytes = encodeWav(s.buf, 24); return; }
+  if (!IS_DESKTOP) { const used = usedSampleIds(); for (const [id, s] of SAMPLES) if (used.has(id) && !s.path && !s.bytes) s.bytes = encodeWav(s.buf, GP.recBits || 24); return; }
   const dir = joinPath(dirname(projPath), 'Samples');
   const used = usedSampleIds();
-  for (const [id, s] of SAMPLES) if (!s.path && used.has(id)) { const p = joinPath(joinPath(dir, 'Recorded'), `${slug(s.name)}-${id.slice(0, 5)}.wav`); await NATIVE.write(p, encodeWav(s.buf, 24)); s.path = p; s.recorded = false; }
+  for (const [id, s] of SAMPLES) if (!s.path && used.has(id)) { const p = joinPath(joinPath(dir, 'Recorded'), `${slug(s.name)}-${id.slice(0, 5)}.wav`); await NATIVE.write(p, encodeWav(s.buf, GP.recBits || 24)); s.path = p; s.recorded = false; }
 }
 async function saveProject(as) {
   try {

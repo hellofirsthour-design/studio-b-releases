@@ -1,13 +1,13 @@
 {
- "version": "0.2.15",
+ "version": "0.2.16",
  "shell": 2,
- "date": "2026-11-14T18:03:29.924Z",
- "notes": "Device presets, A/B compare, hot-swap and collapse; instrument presets; tempo ramps; time signature changes mid-song; Capture shortcut; templates in the browser; docs: medium items done",
+ "date": "2026-11-14T18:18:18.534Z",
+ "notes": "Settings window with sections (look, audio, tempo/MIDI, files, library, plug-ins, record/warp, updates): input/output device, channel config, sample rate, buffer size, latency, test tone, CPU simulator; smoother zoom with a speed setting; collapsible tracks; remove duplicated clip editor controls",
  "files": [
   {
    "path": "css/base.css",
-   "size": 21723,
-   "sha256": "7d5171e3e15c732683fec796808abf06047368cd162e6c6edefee86e7334945f"
+   "size": 24105,
+   "sha256": "f097046a7cfef33428806aa79e572969c46680c832156c391a1dcbd3b52f396f"
   },
   {
    "path": "css/studio.css",
@@ -16,13 +16,13 @@
   },
   {
    "path": "index.html",
-   "size": 19626,
-   "sha256": "4c33e669b0a43f6d1dbc5edbb71f18799c8205e9008a048b3bfa839bc848fafe"
+   "size": 18385,
+   "sha256": "eded296e1597b847f87f7e5fa3e83d39f9f2fbc16d6a9f8af914dcfc8d689f31"
   },
   {
    "path": "js/arrange.js",
-   "size": 46409,
-   "sha256": "a3b9ba3f1d1308c5e178a47a98f617dbbc09bc579dc73730c4a1441558b95f7a"
+   "size": 47408,
+   "sha256": "24269ac44330303cada93fc5590160c4c37b592516db5c3a4cee9fc6f1e4e645"
   },
   {
    "path": "js/browser.js",
@@ -36,8 +36,8 @@
   },
   {
    "path": "js/core.js",
-   "size": 12891,
-   "sha256": "01cab3d5974ebe5a22392abf1aba73ff0a60857089f7ac35fa9b3a141bfd1d61"
+   "size": 13762,
+   "sha256": "7f041a753bbb1438cf64421e552c7809e69f96b134807482d150a0c7b3bf6da8"
   },
   {
    "path": "js/devices.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 48723,
-   "sha256": "cfd50c2af4cb8ee182cd0b1f1d438fbbe5bea2be4472972224c22bb4cba1f37b"
+   "size": 49478,
+   "sha256": "d02422a0438326dff57cc3182bd26ba0d4fd05fdd11ed38952aa76d72dfecf9b"
   },
   {
    "path": "js/features.js",
@@ -61,8 +61,8 @@
   },
   {
    "path": "js/features2.js",
-   "size": 14366,
-   "sha256": "50ea7a43ba0a59a65e621345165f4c7f02b9349f3de2f80e91fe83b912752c9e"
+   "size": 14532,
+   "sha256": "7503f8ff4dc8c6b0c25883d5b3001493e8d1f8bfca151d3f8c24c4f597300a55"
   },
   {
    "path": "js/files.js",
@@ -76,18 +76,23 @@
   },
   {
    "path": "js/io.js",
-   "size": 44829,
-   "sha256": "8565485ff9e83165b4372f9d16515415fe100e957bdff237ee80177191d60329"
+   "size": 44961,
+   "sha256": "d2cb0e14f0cea576bc4e255b89084def97742a85b98909564ab9c6354041b678"
   },
   {
    "path": "js/main.js",
-   "size": 36224,
-   "sha256": "c2c551413a5231bdc6325f69c915639dbbd945e149056574f0a444f273596ee0"
+   "size": 33532,
+   "sha256": "351be6b50568d6a7564a814270b97ab17bff02538bd75548fdecd4fc2fb5dec9"
   },
   {
    "path": "js/mixer.js",
    "size": 10058,
    "sha256": "09618422f94f0814c4d6f4a536920977e60e6d75e41c3511bfce8419c1ef56d7"
+  },
+  {
+   "path": "js/prefs.js",
+   "size": 19870,
+   "sha256": "ac3107ae86156df1c8c21fe724d9fd5418482e17e39d86145d3d3f041bf88811"
   },
   {
    "path": "js/roll.js",
@@ -101,8 +106,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 36359,
-   "sha256": "ca0c4e9c915a8501880e41d1b50907ed285ff9dc11dd568676d6e637c2f14a75"
+   "size": 35964,
+   "sha256": "77357b95fae88737233ff431901748bb0d6f3e4fbeabc85cd6e211358d729b39"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -117,7 +122,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "69163a2988ecdfa4b735fb3d1cd3643cfc812a42541b8782ebd216b7aee7badb"
+   "sha256": "18269a93aa88d37df3e65f2e9108bb95a4f59e0614b25ee11bd08856864c0bb2"
   }
  ]
 }
