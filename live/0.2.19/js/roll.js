@@ -50,7 +50,7 @@ const roll = {
           <div class="seg"><button data-mode="ptr" class="${this.draw ? '' : 'on'}" title="Select tool (B toggles)">Select</button><button data-mode="draw" class="${this.draw ? 'on' : ''}" title="Draw tool (B toggles)">Draw</button></div>
           <label class="fld inl"><span>Grid</span><select id="rGrid">${GRIDS.map(([l, v]) => `<option value="${v}" ${v === this.grid ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           <button class="tog ${this.snap ? 'on' : ''}" id="rSnap">Snap</button>
-          ${t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? `<button class="tog ${this.fold ? 'on' : ''}" id="rFold">Fold to scale</button>` : ''}
+          ${isPitched(t) ? `<button class="tog ${this.fold ? 'on' : ''}" id="rFold">Fold to scale</button>` : ''}
           <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button><button data-lane="vr" class="${this.lane === 'vr' ? 'on' : ''}" title="Velocity range: a random spread each time the note plays">Vel range</button><button data-lane="rel" class="${this.lane === 'rel' ? 'on' : ''}" title="Release velocity">Release</button></div>
           <button class="tog ${this.preview !== false ? 'on' : ''}" id="rPrev" title="Play notes as you add or move them">Preview</button>
           <span class="spacer"></span><span class="muted hint">Double-click to add · drag edges to resize · Alt-drag copies · Del removes · Ctrl+wheel zooms</span>
@@ -173,7 +173,7 @@ const roll = {
     if (cv.width !== Math.round(g.w * dpr) || cv.height !== Math.round(g.h * dpr)) { cv.width = Math.round(g.w * dpr); cv.height = Math.round(g.h * dpr); }
     const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
     const css = getComputedStyle(document.documentElement), V = k => css.getPropertyValue(k).trim();
-    const t = this.track, col = t.color, pitched = t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys');
+    const t = this.track, col = t.color, pitched = isPitched(t);
     x.fillStyle = V('--roll'); x.fillRect(0, 0, g.w, g.h);
     // rows
     x.save(); x.beginPath(); x.rect(g.keysW, g.rulerH, g.gridW, g.gridH); x.clip();
@@ -244,7 +244,7 @@ function clipCmd(k) {
 function transform(k) {
   if (!roll.clip) return; const ns = targetNotes(); if (!ns.length && !['seed'].includes(k)) return toast('This clip has no notes yet');
   pushUndo(); const c = roll.clip, L = c.bars * 16, g = roll.grid;
-  const pitched = roll.track.inst.type === 'synth' || (roll.track.inst.type === 'sampler' && roll.track.inst.mode === 'keys');
+  const pitched = isPitched(roll.track);
   const groups = () => { const m = new Map(); ns.forEach(n => { const k = Math.round(n.s * 100); if (!m.has(k)) m.set(k, []); m.get(k).push(n); }); return [...m.values()]; };
   switch (k) {
     case 'x2': { const s0 = Math.min(...ns.map(n => n.s)); ns.forEach(n => { n.s = s0 + (n.s - s0) * 2; n.l *= 2; }); const need = Math.max(...ns.map(n => n.s + n.l)); if (need > L) c.bars = Math.min(64, Math.ceil(need / SPB()) * SPB() / 16); break; }
@@ -284,7 +284,7 @@ function transform(k) {
 }
 function generate(k) {
   if (!roll.clip) return; pushUndo(); const c = roll.clip, L = c.bars * 16, t = roll.track, g = roll.grid;
-  const pitched = t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys');
+  const pitched = isPitched(t);
   const base = pitched ? snapToScale(t.inst.type === 'synth' && t.inst.mono ? 45 : 60) : 0;
   const out = [];
   if (k === 'seed') {

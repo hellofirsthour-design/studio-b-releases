@@ -30,7 +30,7 @@ function placeAudio(sid, track, at) {
   if (!track || track.kind !== 'audio') { track = newTrack('audio'); track.name = s.name.slice(0, 24); S.tracks.push(track); buildBus(track, 'track'); }
   const c = newAudioClip(sid, at, 0);
   const loopish = s.buf.duration < 32 && s.bpm && Math.abs(s.buf.duration * s.bpm / 60 - Math.round(s.buf.duration * s.bpm / 60)) < 0.08;
-  c.warp = !!loopish; c.srcBpm = loopish ? s.bpm : S.bpm; c.len = clipNaturalLen(c);
+  c.warp = !!loopish && GP.autoWarp !== false; c.srcBpm = loopish ? s.bpm : S.bpm; if (c.warp && GP.warpMode && GP.warpMode !== 'complex') c.wmode = GP.warpMode; c.len = clipNaturalLen(c);
   clearRange(track, c.start, c.start + c.len); track.clips.push(c);
   return { track, clip: c };
 }
@@ -129,10 +129,10 @@ const b64 = ab => { const u8 = new Uint8Array(ab); let s = ''; for (let i = 0; i
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer;
 // Recorded takes have no file yet: write them next to the project as WAV before saving.
 async function writeRecordings(projPath) {
-  if (!IS_DESKTOP) { const used = usedSampleIds(); for (const [id, s] of SAMPLES) if (used.has(id) && !s.path && !s.bytes) s.bytes = encodeWav(s.buf, 24); return; }
+  if (!IS_DESKTOP) { const used = usedSampleIds(); for (const [id, s] of SAMPLES) if (used.has(id) && !s.path && !s.bytes) s.bytes = encodeWav(s.buf, GP.recBits || 24); return; }
   const dir = joinPath(dirname(projPath), 'Samples');
   const used = usedSampleIds();
-  for (const [id, s] of SAMPLES) if (!s.path && used.has(id)) { const p = joinPath(joinPath(dir, 'Recorded'), `${slug(s.name)}-${id.slice(0, 5)}.wav`); await NATIVE.write(p, encodeWav(s.buf, 24)); s.path = p; s.recorded = false; }
+  for (const [id, s] of SAMPLES) if (!s.path && used.has(id)) { const p = joinPath(joinPath(dir, 'Recorded'), `${slug(s.name)}-${id.slice(0, 5)}.wav`); await NATIVE.write(p, encodeWav(s.buf, GP.recBits || 24)); s.path = p; s.recorded = false; }
 }
 async function saveProject(as) {
   try {
