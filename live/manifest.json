@@ -1,13 +1,13 @@
 {
- "version": "0.2.6",
+ "version": "0.2.7",
  "shell": 2,
- "date": "2026-11-14T16:33:37.858Z",
- "notes": "CI: build Windows installer under bash; release whichever installers built",
+ "date": "2026-11-14T16:59:17.423Z",
+ "notes": "Range selection in clips, recording tools, track rendering, tempo and meter, stems, Ableton effects",
  "files": [
   {
    "path": "css/base.css",
-   "size": 17560,
-   "sha256": "b19825d5f1032a01931d36d6750bf9b906dff2091ded781dd6b113189001c535"
+   "size": 18426,
+   "sha256": "4a14a24b472839b9f7cf8546daa9b3d7dc56ff98d215e3be2b1fb64b4c46b70f"
   },
   {
    "path": "css/studio.css",
@@ -16,13 +16,13 @@
   },
   {
    "path": "index.html",
-   "size": 12380,
-   "sha256": "a0b551ca6684094698a524ea45c01c2acf75cdb3f2c6dac8847f159de4ea8774"
+   "size": 14011,
+   "sha256": "e4844d70dbcf2450fe38f972f41ba45d69461ecc15346fba96bfeb0b94e04a0e"
   },
   {
    "path": "js/arrange.js",
-   "size": 31797,
-   "sha256": "21ba567ea9f711e7b14759de75e78bd42b236aa79e35d2ad9b981e63394b768d"
+   "size": 35917,
+   "sha256": "ae96d6ce82286f4c2d541b1902909f38935a74dfb0a2c32c5baf1ef198e61693"
   },
   {
    "path": "js/browser.js",
@@ -31,8 +31,8 @@
   },
   {
    "path": "js/cards.js",
-   "size": 31981,
-   "sha256": "4a901f68133307556c2efcd9324c90516190e2da55bf1ab3aeca6c211a4b25be"
+   "size": 31987,
+   "sha256": "2ae109f0d8f97f4200bfaf3b5ef747d30813b9e15e274512c6f8f75d6c40f0fb"
   },
   {
    "path": "js/core.js",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/devices.js",
-   "size": 20002,
-   "sha256": "a0b82028008f38c4665ef5c7b68f9779a268fd84c47a527b830900e1b98d30da"
+   "size": 20066,
+   "sha256": "a04d703a6b90db8d856f792399140a3de7242b97bf130c35919b50f411b5b125"
   },
   {
    "path": "js/dsp.js",
@@ -51,8 +51,13 @@
   },
   {
    "path": "js/engine.js",
-   "size": 27501,
-   "sha256": "40b160025b4ab284ea1fc1f480a5ca6f5792bd6a7ad67a19df34ad6c6462caf3"
+   "size": 35324,
+   "sha256": "9faf5a159f8c3d13559903ce56751794b9566d1864a522741d702fb3b3eb6897"
+  },
+  {
+   "path": "js/features.js",
+   "size": 5866,
+   "sha256": "9628794f988db4253857c0589f262036305b27735aa5d142ca43cc947024f80d"
   },
   {
    "path": "js/instruments.js",
@@ -61,13 +66,13 @@
   },
   {
    "path": "js/io.js",
-   "size": 29828,
-   "sha256": "bc7b5d2e9d027a27e1689552e075ef2262f737a031dace21f232cf900d57aacb"
+   "size": 42600,
+   "sha256": "13e0b4e644a25c5be35d6451eb1b2b082b3bf501de681d617377a789bbafce73"
   },
   {
    "path": "js/main.js",
-   "size": 28512,
-   "sha256": "d8b73a5cb2d8611848075971cbf355c4b910c39b0b80b201315e61c8c17f9258"
+   "size": 30411,
+   "sha256": "2e2d458b6740373c0b70bb64666d28d6a0af7761d5141d9f7cec105fc0a4165c"
   },
   {
    "path": "js/mixer.js",
@@ -76,18 +81,23 @@
   },
   {
    "path": "js/roll.js",
-   "size": 29397,
-   "sha256": "c41a530b4bf67da683a9f869a4c12bd03262aa5815a99f4814b5c8bd8beb94de"
+   "size": 29534,
+   "sha256": "5433f4dc94841a5b316c183e16846dcf90d82b487b18130999ecbfb38d26cb18"
+  },
+  {
+   "path": "js/timeline.js",
+   "size": 2636,
+   "sha256": "05103a98b7c066262f0325b8b2e4b3f6e262d9423010ce1a96e375f7f624a274"
   },
   {
    "path": "js/ui.js",
-   "size": 21817,
-   "sha256": "48ca1db671f80538ecb6ed54e12eec564acf26f1c557f58a63efd8795cc66ff7"
+   "size": 23671,
+   "sha256": "d280779fdef235a65f2b912f484d0728da91923fab821018304b046cb67896ef"
   },
   {
    "path": "version.json",
    "size": 37,
-   "sha256": "dcda4b8cb75e627de17d36d5dce5a1709eaa5b145dc42bba68caaba07cc2717b"
+   "sha256": "dccf480343448993928c5224cda7e90baf839a85f87ab31da2630e23860e1d1b"
   }
  ]
 }
