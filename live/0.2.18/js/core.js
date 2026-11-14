@@ -67,7 +67,11 @@ const hann = n => { const w = new Float32Array(n); for (let i = 0; i < n; i++) w
 
 /* ============ audio context ============ */
 // `ctx` is swapped for an OfflineAudioContext while rendering an export, so every node factory reads it at call time.
-let ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+// App-wide preferences (Settings). Sample rate and buffer size are read once, when audio starts.
+const GP = (() => { try { return JSON.parse(localStorage.getItem('sb-prefs') || '{}') || {}; } catch (e) { return {}; } })();
+GP._bootBuffer = GP.buffer || null;
+function saveGP() { try { const o = { ...GP }; delete o._bootBuffer; localStorage.setItem('sb-prefs', JSON.stringify(o)); } catch (e) { } }
+let ctx = (() => { const AC = window.AudioContext || window.webkitAudioContext, sr = GP.sr || undefined; try { return new AC({ latencyHint: GP.buffer ? GP.buffer / (sr || 48000) : 'interactive', sampleRate: sr }); } catch (e) { return new AC({ latencyHint: 'interactive' }); } })();
 const LIVE_CTX = ctx;
 function setCtx(c) { ctx = c; }
 const isOffline = () => ctx !== LIVE_CTX;
@@ -204,6 +208,8 @@ class GWDyn extends AudioWorkletProcessor {
   }
 }
 registerProcessor('gw-dyn', GWDyn);
+class GWBurn extends AudioWorkletProcessor { constructor(){ super(); this.n=0; this.port.onmessage=e=>{ this.n=e.data.n|0; }; } process(){ let x=0; for(let k=0;k<this.n;k++) x+=Math.sin(k); if(x===1.2345) this.port.postMessage(x); return true; } }
+registerProcessor('gw-burn', GWBurn);
 `;
 const WORKLET_DONE = new WeakSet();
 async function loadWorklets(c) {

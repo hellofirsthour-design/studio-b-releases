@@ -1,13 +1,13 @@
 {
- "version": "0.2.17",
+ "version": "0.2.18",
  "shell": 2,
- "date": "2026-11-14T18:24:24.382Z",
- "notes": "Audio Effect Rack: parallel chains with volume, pan, mute and solo, 8 macros with parameter mapping and ranges, variations, randomize; group a device into a rack and ungroup",
+ "date": "2026-11-14T18:31:12.601Z",
+ "notes": "Modulators (LFO, Envelope Follower, Shaper) that move any device, rack macro, synth or track parameter; MIDI Map and Key Map modes (Ctrl+M / Ctrl+K) for faders, knobs, track buttons and the transport",
  "files": [
   {
    "path": "css/base.css",
-   "size": 25077,
-   "sha256": "47f7767d18f02d949e8f7fd1e0b6e4d2e772f8435eb80eac23bd86a9ce8302cc"
+   "size": 26687,
+   "sha256": "fe7715c24662a447232b2caa1a8cf73bb677f9f20dee032450d73adf60e26e4a"
   },
   {
    "path": "css/studio.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "index.html",
-   "size": 18456,
-   "sha256": "cc6ea7726cc9afb39d27b592c6d0f13f97e4a077d44f566fd873689dba069753"
+   "size": 18975,
+   "sha256": "d7e4b0c41798324c5e73314f7d2a26f87e26dc700b7171936a098476fb9d205e"
   },
   {
    "path": "js/arrange.js",
@@ -26,13 +26,13 @@
   },
   {
    "path": "js/browser.js",
-   "size": 29532,
-   "sha256": "484f613c96f882827a54027af55b73a9af6aab68e34e44c32515cdff37ced609"
+   "size": 29575,
+   "sha256": "7d5410d379ef90b668016241622a87d446f224ef9e543eac5b6b1ddcd17a6407"
   },
   {
    "path": "js/cards.js",
-   "size": 37681,
-   "sha256": "38395d12f02e68a3ecf23633a3b21208b2a571096138db5c2528f949cdc9303e"
+   "size": 37858,
+   "sha256": "7da6139dae7407a92cc4168d340000d48f17b2df0244bf3c4edd08061a1c5670"
   },
   {
    "path": "js/core.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 49729,
-   "sha256": "fdc7803c776da1fd4ab59dbe1f409faa2c1fe4ff15dd98c0f5c8ae085b6eb047"
+   "size": 49791,
+   "sha256": "0330a9b19fba3c9ec4f7dab309654ba3dda079edb460e245b58c8248920fdd87"
   },
   {
    "path": "js/features.js",
@@ -71,8 +71,8 @@
   },
   {
    "path": "js/instruments.js",
-   "size": 14654,
-   "sha256": "deced1e336c0160d4574d9009f5b0895a8f6a702b884ef0e7c92224950933ac8"
+   "size": 14814,
+   "sha256": "f05ecbe2a7dc6ca9c96e28e163d9b71e801709907df241f7ff566b1f016afdc4"
   },
   {
    "path": "js/io.js",
@@ -81,13 +81,23 @@
   },
   {
    "path": "js/main.js",
-   "size": 33532,
-   "sha256": "351be6b50568d6a7564a814270b97ab17bff02538bd75548fdecd4fc2fb5dec9"
+   "size": 33782,
+   "sha256": "ab2b4093f599da33241f99481ff599df78ccdb9948ac04762d475b7ba2b31f8b"
+  },
+  {
+   "path": "js/mapping.js",
+   "size": 7170,
+   "sha256": "62b6842b3cc7e0563620d1a20473eb85f437166c70d557404cdc7d7d224707c7"
   },
   {
    "path": "js/mixer.js",
-   "size": 10058,
-   "sha256": "09618422f94f0814c4d6f4a536920977e60e6d75e41c3511bfce8419c1ef56d7"
+   "size": 10403,
+   "sha256": "50e00bc7a86e0eeb657de8cdb601dde1b1188a35e00069891cff0845a5a3734c"
+  },
+  {
+   "path": "js/mods.js",
+   "size": 8066,
+   "sha256": "8abab31841748232bd65735f33385662ccd7a67848063e6aa02f25a28e3bccaa"
   },
   {
    "path": "js/prefs.js",
@@ -96,8 +106,8 @@
   },
   {
    "path": "js/racks.js",
-   "size": 11339,
-   "sha256": "432661ed1ec453c491fc255abacb23db6df83cebbc91a77b32d09cd920fc7430"
+   "size": 11429,
+   "sha256": "8d5e769d659aa1c62be8b529e639dca195e16aa78e5ed957a221bd494334813b"
   },
   {
    "path": "js/roll.js",
@@ -111,8 +121,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 36946,
-   "sha256": "4f864352dde648148d8ab8ac316897e3cce0bf6f43300a355d3ec9baedbb910d"
+   "size": 37040,
+   "sha256": "7647df846f82ca140d92e00f1f873e34c4e8300581de0742ee4511f2e65c770a"
   },
   {
    "path": "js/warp.js",
@@ -132,7 +142,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "b7791fd4d4576e159fc8c349b16b60ba94fcddf34117c03da2deb7b160fdf46d"
+   "sha256": "1c270d5c6281be20211e389e168619ba317d62239a0c13bcba6687e66cbf3375"
   }
  ]
 }

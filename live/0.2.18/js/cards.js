@@ -38,14 +38,14 @@ function toggleEl(label, on, onChange) {
   const b = document.createElement('button'); b.className = 'tog' + (on ? ' on' : ''); b.textContent = label; b.setAttribute('aria-pressed', on);
   b.onclick = () => { on = !on; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); onChange(on); }; return b;
 }
-function paramGrid(defs, obj, onChange) {
+function paramGrid(defs, obj, onChange, mapPre) {
   const g = document.createElement('div'); g.className = 'pgrid';
   for (const d of defs) {
     if (d.group) { const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = d.group; g.appendChild(h); continue; }
     let el;
     if (d.options) { el = document.createElement('label'); el.className = 'psel'; el.innerHTML = `<span>${esc(d.label)}</span>`; el.appendChild(selectEl(d.options, obj[d.k], v => { obj[d.k] = v; onChange(d.k, v); }, d.label)); }
     else if (d.toggle) el = toggleEl(d.label, !!obj[d.k], v => { obj[d.k] = v; onChange(d.k, v); });
-    else el = knob({ label: d.label, value: obj[d.k], min: d.min, max: d.max, scale: d.scale, fmt: d.fmt, step: d.step, onInput: v => { obj[d.k] = v; onChange(d.k, v); } });
+    else { el = knob({ label: d.label, value: obj[d.k], min: d.min, max: d.max, scale: d.scale, fmt: d.fmt, step: d.step, onInput: v => { obj[d.k] = v; onChange(d.k, v); } }); if (mapPre) el.dataset.map = mapPre + d.k; }
     g.appendChild(el);
   }
   return g;
@@ -65,6 +65,28 @@ function flashPad(tid, pad) {
 function flashPadAt(tid, pad, time) { setTimeout(() => flashPad(tid, pad), Math.max(0, (time - ctx.currentTime) * 1000)); }
 
 /* ============ device cards ============ */
+/* ---------- presets: devices and instruments, saved per type (and to User Library/Presets on desktop) ---------- */
+const PRESET_SKIP = new Set(['sc', 'sampleId', 'cues', 'pads', 'preset']);
+const presetStore = () => { try { return JSON.parse(lsGet('sb-presets') || '{}'); } catch (e) { return {}; } };
+function userPresets(kind) { return presetStore()[kind] || {}; }
+function savePreset(kind, name, params) {
+  const all = presetStore(); all[kind] = all[kind] || {}; all[kind][name] = Object.fromEntries(Object.entries(params).filter(([k]) => !PRESET_SKIP.has(k)));
+  lsSet('sb-presets', JSON.stringify(all));
+  if (IS_DESKTOP) NATIVE.paths().then(p => NATIVE.write(joinPath(joinPath(joinPath(joinPath(p.music, 'Studio B'), 'User Library'), 'Presets'), `${kind} - ${slug(name)}.json`), JSON.stringify(all[kind][name], null, 1))).catch(() => { });
+  toast(`Saved preset "${name}"`);
+}
+function deletePreset(kind, name) { const all = presetStore(); if (all[kind]) delete all[kind][name]; lsSet('sb-presets', JSON.stringify(all)); }
+// kind: preset family; get(): current params; apply(params|null for defaults)
+function presetMenu(e, kind, get, apply, label = 'preset') {
+  const ups = userPresets(kind);
+  popMenu(e, [
+    { label: `Save ${label}…`, run: () => askText('Preset name', 'My ' + label, v => v && savePreset(kind, v, get())) },
+    { label: 'Default settings', run: () => apply(null) },
+    ...(Object.keys(ups).length ? ['-', ...Object.keys(ups).sort().map(n => ({ label: n, run: () => apply(deep(ups[n])) }))] : []),
+    ...(Object.keys(ups).length ? ['-', { label: 'Delete a preset…', run: () => popMenu(e, Object.keys(ups).map(n => ({ label: 'Delete ' + n, danger: true, run: () => deletePreset(kind, n) }))) }] : []),
+  ]);
+}
+
 function cardShell(title, sub, opts = {}) {
   const c = document.createElement('div'); c.className = 'card' + (opts.wide ? ' wide' : '') + (opts.off ? ' off' : '');
   c.innerHTML = `<div class="ch">${opts.power ? `<button class="pwr ${opts.off ? '' : 'on'}" aria-label="Turn ${esc(title)} on or off"></button>` : ''}<span class="cname">${esc(title)}</span><span class="csub">${esc(sub || '')}</span><span class="spacer"></span>${opts.tools || ''}</div><div class="cb"></div>`;
@@ -72,10 +94,16 @@ function cardShell(title, sub, opts = {}) {
 }
 function deviceCard(o, d, i) {
   const def = DEVICES[d.type];
-  const c = cardShell(d.type === 'plugin' ? d.p.name : def.name, d.type === 'plugin' ? `${d.p.format} ${d.p.role === 'instrument' ? 'instrument' : 'effect'} · not loaded` : def.blurb, { power: true, off: !d.on, wide: def.wide, tools: `<button class="ic" data-mv="-1" aria-label="Move left">‹</button><button class="ic" data-mv="1" aria-label="Move right">›</button><button class="ic" data-rm aria-label="Remove device">✕</button>` });
-  c.draggable = true; c.dataset.di = i;
+  const c = cardShell(d.type === 'plugin' ? d.p.name : def.name, d.type === 'plugin' ? `${d.p.format} ${d.p.role === 'instrument' ? 'instrument' : 'effect'} · not loaded` : def.blurb, { power: true, off: !d.on, wide: def.wide, tools: `${d.type === 'plugin' ? '' : `<button class="ic dtool" data-pre title="Presets" aria-label="Presets">☰</button><button class="ic dtool ab ${d.ab ? 'on' : ''}" data-ab title="A/B compare: switch between two settings">${d.ab && d.ab.cur === 'b' ? 'B' : 'A'}</button><button class="ic dtool" data-swap title="Swap for another device" aria-label="Swap device">⇄</button>`}<button class="ic dtool" data-fold title="Collapse" aria-label="Collapse">${d.fold ? '▸' : '▾'}</button><button class="ic" data-mv="-1" aria-label="Move left">‹</button><button class="ic" data-mv="1" aria-label="Move right">›</button><button class="ic" data-rm aria-label="Remove device">✕</button>` });
+  c.draggable = true; c.dataset.di = i; if (d.fold) c.classList.add('folded');
   const r = devRT(d), body = $('.cb', c);
   const changed = () => { r.set(); markDirty(); };
+  const setP = p => { const keep = d.type === 'comp' ? d.p.sc : undefined; Object.keys(d.p).forEach(k => delete d.p[k]); Object.assign(d.p, DEVICES[d.type].def(), p || {}); if (keep) d.p.sc = keep; r.set(); if (d.type === 'comp') wireSidechains(); markDirty(); ui.detail(); };
+  const tb = s => c.querySelector('[data-' + s + ']');
+  if (tb('fold')) tb('fold').onclick = () => { d.fold = !d.fold; ui.detail(); };
+  if (tb('pre')) tb('pre').onclick = e => presetMenu(e, 'dev:' + d.type, () => d.p, p => { pushUndo('Preset'); setP(p); });
+  if (tb('ab')) tb('ab').onclick = () => { pushUndo('A/B'); if (!d.ab) d.ab = { cur: 'a', a: null, b: null }; const cur = d.ab.cur, other = cur === 'a' ? 'b' : 'a'; d.ab[cur] = deep(d.p); d.ab.cur = other; setP(d.ab[other] || deep(d.p)); toast(`Now on ${other.toUpperCase()}. Changes go to ${other.toUpperCase()} until you switch back.`); };
+  if (tb('swap')) tb('swap').onclick = e => popMenu(e, Object.keys(DEVICES).filter(k => k !== 'plugin' && k !== d.type).map(k => ({ label: DEVICES[k].name, run: () => { pushUndo('Swap device'); const nd = newDevice(k); nd.on = d.on; o.devices[i] = nd; r.dispose(); DEV_RT.delete(d.id); rewire(o); ui.detail(); markDirty(); } })));
   $('.pwr', c).onclick = () => { d.on = !d.on; c.classList.toggle('off', !d.on); $('.pwr', c).classList.toggle('on', d.on); rewire(o); markDirty(); };
   $('[data-rm]', c).onclick = () => { o.devices.splice(i, 1); r.dispose(); DEV_RT.delete(d.id); rewire(o); ui.detail(); markDirty(); };
   $$('[data-mv]', c).forEach(b => (b.onclick = () => { const j = i + +b.dataset.mv; if (j < 0 || j >= o.devices.length) return; [o.devices[i], o.devices[j]] = [o.devices[j], o.devices[i]]; rewire(o); ui.detail(); markDirty(); }));
@@ -84,14 +112,16 @@ function deviceCard(o, d, i) {
   c.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('gw/dev')) { e.preventDefault(); c.classList.add('dropl'); } });
   c.addEventListener('dragleave', () => c.classList.remove('dropl'));
   c.addEventListener('drop', e => { const f = e.dataTransfer.getData('gw/dev'); if (f === '') return; e.preventDefault(); const [x] = o.devices.splice(+f, 1); o.devices.splice(i, 0, x); rewire(o); ui.detail(); markDirty(); });
-  c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [{ label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
+  c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [...(o._rack ? [] : d.type === 'rack' ? [{ label: 'Ungroup rack (keeps the selected chain)', run: () => ungroupRack(o, i) }] : [{ label: 'Group into a rack', key: 'Ctrl+G', run: () => groupIntoRack(o, i) }]), { label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
   if (d.type === 'plugin') { body.innerHTML = `<p class="plugnote">Studio B can't run ${esc(d.p.format)} plug-ins yet, so this slot passes audio straight through.${d.p.role === 'instrument' ? ' The notes are playing on a built-in synth for now.' : ''}</p><p class="plugnote muted">To hear the real sound: in Ableton, right-click the track and choose <b>Freeze Track</b>, save, then open the set here again. Studio B brings frozen tracks in as audio.</p>`; return c; }
+  if (d.type === 'rack') { rackView(body, o, d, r); return c; }
+  if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (d.type === 'eq') eqEditor(body, d, r, changed);
-  else if (d.type === 'tune') { tuneView(body, d, r); body.appendChild(paramGrid(def.params, d.p, changed)); }
+  else if (d.type === 'tune') { tuneView(body, d, r); body.appendChild(paramGrid(def.params, d.p, changed, `${o.id}|dev:${d.id}:`)); }
   else {
     if (d.type === 'comp' || d.type === 'limit' || d.type === 'gate') grMeter(body, r);
     if (d.type === 'comp') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
-    body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }));
+    body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`));
   }
   return c;
 }
@@ -209,10 +239,16 @@ function eqEditor(body, d, r, changed) {
 }
 
 /* ============ instrument cards ============ */
-function instrumentCard(t) {
+function instrumentCard(t) { const c = instrumentCard_(t); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
+function applyInstPreset(t, p) {
+  const keep = Object.fromEntries([...PRESET_SKIP].filter(k => k !== 'preset' && t.inst[k] !== undefined).map(k => [k, t.inst[k]]));
+  const base = deep(newInst(t.inst.type)); Object.keys(t.inst).forEach(k => delete t.inst[k]); Object.assign(t.inst, base, p || {}, keep, { preset: p ? 'User' : t.inst.preset });
+  removeBus(t); buildBus(t, 'track'); routeOut(t); rewire(t); applyMix(t); connectInputs(); ui.detail(); markDirty();
+}
+function instrumentCard_(t) {
   const inst = RT.get(t.id).inst;
   if (t.inst.type === 'synth') {
-    const c = cardShell('Contour', 'Synth', { wide: true }); const body = $('.cb', c);
+    const c = cardShell('Contour', 'Synth', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
     const top = document.createElement('div'); top.className = 'row';
     top.appendChild(selectEl(['Init', ...Object.keys(SYNTH_PRESETS)], t.inst.preset, v => { Object.assign(t.inst, SYNTH_DEFAULT, SYNTH_PRESETS[v] || {}, { preset: v }); inst.update(); ui.detail(); markDirty(); }, 'Preset'));
     const tip = document.createElement('span'); tip.className = 'muted'; tip.textContent = 'Play it from your computer keyboard: A W S E D F T G Y H U J K. Z and X change octave.'; top.appendChild(tip);
@@ -226,7 +262,7 @@ function instrumentCard(t) {
     return c;
   }
   if (t.inst.type === 'drums') {
-    const c = cardShell('Kit', 'Drum rack', { wide: true }); const body = $('.cb', c);
+    const c = cardShell('Kit', 'Drum rack', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
     const grid = document.createElement('div'); grid.className = 'kit';
     t.inst.pads.forEach((pad, pi) => {
       const cell = document.createElement('div'); cell.className = 'kpad'; cell.style.setProperty('--tc', t.color);
@@ -247,7 +283,7 @@ function instrumentCard(t) {
 /* --- Sampler card --- */
 function samplerCard(t, inst) {
   const p = t.inst, s = SAMPLES.get(p.sampleId);
-  const c = cardShell('Cutline', 'Sampler', { wide: true }); c.classList.add('smp'); const body = $('.cb', c);
+  const c = cardShell('Cutline', 'Sampler', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); c.classList.add('smp'); const body = $('.cb', c);
   const songKey = keyLabel(S.root, S.scale === 'major' ? 'major' : 'minor');
   const shifted = s ? keyLabel(s.key.root + p.semis, s.key.mode) : '-';
   body.innerHTML = `<div class="smptop">

@@ -4,7 +4,7 @@ const ui = {
   title() { const t = `${S.name}${V.dirty ? ' *' : ''} — Studio B`; document.title = t; if (IS_DESKTOP) NATIVE.setTitle(t); $('#projName').textContent = S.name + (V.dirty ? ' •' : ''); },
   transport() {
     if (document.activeElement !== $('#bpm')) $('#bpm').value = S.bpm;
-    $('#play').classList.toggle('on', T.playing); $('#rec').classList.toggle('on', T.rec);
+    $('#play').classList.toggle('on', T.playing); $('#rec').classList.toggle('on', T.rec); $('#midiOd').classList.toggle('on', !!V.midiOd); $('#capture').classList.toggle('hot', CAPTURE.length > 0);
     $('#metro').classList.toggle('on', !!S.metro); $('#loopBtn').classList.toggle('on', S.loop.on);
     $('#follow').classList.toggle('on', V.follow); $('#autoBtn').classList.toggle('on', V.autoMode); $('#autoArm').classList.toggle('on', !!V.autoArm); $('#reAuto').classList.toggle('hot', OVERRIDES.size > 0); $('#reAuto').disabled = !OVERRIDES.size;
     $('#root').value = S.root; $('#scale').value = S.scale; $('#snapBtn').classList.toggle('on', V.snap);
@@ -20,17 +20,17 @@ const ui = {
       if (r.kind === 'auto') { const ps = autoParams(r.b); h += `<div class="hdr autolane" data-id="${r.b.id}" data-li="${r.li}" style="top:${r.y}px;height:${r.h}px;--tc:${r.b.color || '#a7a3b8'};--depth:${S.tracks.includes(r.b) ? depthOf(r.b) : 0}"><i class="hcol dim"></i><div class="hmain"><div class="hrow"><select class="dd hauto" data-h="laneKey" aria-label="Automation lane parameter">${ps.map(p => `<option value="${p.key}" ${p.key === r.key ? 'selected' : ''}>${r.b.auto[p.key] && r.b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select><button class="hb" data-h="delLane" title="Hide this lane (its automation stays)">✕</button></div></div></div>`; return; }
       if (r.kind === 'take') { h += `<div class="hdr take" data-id="${r.b.id}" data-lane="${r.lane.id}" style="top:${r.y}px;height:${r.h}px;--tc:${r.b.color}"><i class="hcol dim"></i><div class="hmain"><div class="hrow"><span class="hname tname" title="Drag across a take (or click it) to comp it onto the track">${esc(r.lane.name)}</span><button class="hb" data-h="compAll" title="Use this whole take">Use</button><button class="hb" data-h="delTake" title="Delete this take lane">✕</button></div></div></div>`; return; }
       const b = r.b, isT = r.kind === 'track', sel = V.selTracks.has(b.id), num = isT ? S.tracks.indexOf(b) + 1 : r.kind === 'return' ? RET_LETTERS[S.returns.indexOf(b)] || 'R' : 'M', grp = b.kind === 'group';
-      const big = r.h >= 50, params = V.autoMode ? autoParams(b) : null;
+      const big = r.h >= 50 && !b.collapsed, params = V.autoMode ? autoParams(b) : null;
       h += `<div class="hdr ${sel ? 'sel' : ''} ${r.kind} ${grp ? 'group' : ''}" data-id="${b.id}" style="top:${r.y}px;height:${r.h}px;--tc:${b.color || '#a7a3b8'};--depth:${isT ? depthOf(b) : 0}">
         <i class="hcol"></i>
         <div class="hmain">
-          <div class="hrow">${grp ? `<button class="hb fold" data-h="fold" title="Fold or unfold the group">${b.fold ? '▸' : '▾'}</button>` : ''}<span class="hname" title="Double-click to rename">${esc(b.name)}</span>${r.kind === 'return' ? `<button class="hb ${b.pre ? 'on' : ''}" data-h="pre" title="Sends into this return are taken before the track faders (Pre) or after them (Post)">${b.pre ? 'Pre' : 'Post'}</button>` : ''}
-            ${r.kind !== 'master' ? `<button class="hb act ${b.mute ? '' : 'on'}" data-h="mute" title="Track activator">${num}</button>` : ''}
-            ${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-h="solo" title="Solo">S</button>${grp ? '' : `<button class="hb arm ${b.arm ? 'on' : ''}" data-h="arm" title="Arm recording">●</button>`}` : ''}${isT && b.takes && b.takes.length ? `<button class="hb tk ${b.showTakes ? 'on' : ''}" data-h="takes" title="Show or hide take lanes">T${b.takes.length}</button>` : ''}${isT && b.frozen ? '<span class="frz" title="Frozen">❄</span>' : ''}
+          <div class="hrow">${grp ? `<button class="hb fold" data-h="fold" title="Fold or unfold the group">${b.fold ? '▸' : '▾'}</button>` : `<button class="hb fold clp" data-h="collapse" title="Collapse or expand this track (Alt-click: all tracks)">${b.collapsed ? '▸' : '▾'}</button>`}<span class="hname" title="Double-click to rename">${esc(b.name)}</span>${r.kind === 'return' ? `<button class="hb ${b.pre ? 'on' : ''}" data-h="pre" title="Sends into this return are taken before the track faders (Pre) or after them (Post)">${b.pre ? 'Pre' : 'Post'}</button>` : ''}
+            ${r.kind !== 'master' ? `<button class="hb act ${b.mute ? '' : 'on'}" data-h="mute" data-map="${b.id}|mute" title="Track activator">${num}</button>` : ''}
+            ${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-h="solo" data-map="${b.id}|solo" title="Solo">S</button>${grp ? '' : `<button class="hb arm ${b.arm ? 'on' : ''}" data-h="arm" data-map="${b.id}|arm" title="Arm recording">●</button>`}` : ''}${isT && b.takes && b.takes.length ? `<button class="hb tk ${b.showTakes ? 'on' : ''}" data-h="takes" title="Show or hide take lanes">T${b.takes.length}</button>` : ''}${isT && b.frozen ? '<span class="frz" title="Frozen">❄</span>' : ''}
           </div>
           ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
           : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${{ synth: 'Contour', drums: 'Kit', sampler: 'Cutline' }[b.inst.type]}</span>` : ''}
-              <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
+              <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" data-map="${b.id}|vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
           ${r.h >= 86 && !V.autoMode ? `<div class="hrow hsm"><span class="lab">Pan</span><input type="range" class="hpan" min="-1" max="1" step="0.01" value="${b.pan || 0}" data-h="pan" aria-label="Pan">${isT ? `<span class="lab">A</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendA}" data-h="sendA" aria-label="Send A"><span class="lab">B</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendB}" data-h="sendB" aria-label="Send B">` : ''}</div>` : ''}
         </div>
         <div class="hmeter" data-meter="${b.id}"><i class="lvl"></i><i class="pk"></i></div>
@@ -76,7 +76,22 @@ function bindHeaders() {
       h.onpointerup = () => { h.onpointermove = null; ui.headers(); }; return;
     }
     if (h && h.tagName !== 'DIV') return;
-    if (e.shiftKey || e.ctrlKey || e.metaKey) V.selTracks.add(b.id); else V.selTracks = new Set([b.id]);
+    if (e.shiftKey || e.ctrlKey || e.metaKey) V.selTracks.add(b.id); else if (!V.selTracks.has(b.id)) V.selTracks = new Set([b.id]);
+    // drag a header up or down to reorder; drop on the middle of a group to put it inside
+    if (S.tracks.includes(b) && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      const y0 = e.clientY; let drag = false, drop = null; const line = document.createElement('div'); line.className = 'hdrdrop';
+      const move = ev => {
+        if (!drag && Math.abs(ev.clientY - y0) < 6) return; if (!drag) { drag = true; hd.classList.add('dragging'); box.appendChild(line); }
+        const el = document.elementFromPoint(e.clientX, ev.clientY), th = el && el.closest('.hdr'), tb = th && !th.dataset.lane && th.dataset.li == null ? busById(th.dataset.id) : null;
+        if (!tb || !S.tracks.includes(tb) || V.selTracks.has(tb.id)) { drop = null; line.hidden = true; return; }
+        const r = th.getBoundingClientRect(), f = (ev.clientY - r.top) / r.height, into = tb.kind === 'group' && f > 0.3 && f < 0.7;
+        drop = { t: tb, where: into ? 'into' : f < 0.5 ? 'before' : 'after' }; line.hidden = false; line.classList.toggle('into', into);
+        const top = th.offsetTop + (into ? 0 : f < 0.5 ? 0 : th.offsetHeight); line.style.top = top + 'px'; line.style.height = into ? th.offsetHeight + 'px' : '';
+      };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); line.remove(); hd.classList.remove('dragging');
+        if (drag && drop) moveTracks(V.selTracks, drop.t, drop.where); else if (!drag) { V.selTracks = new Set([b.id]); ui.headers(); } };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    }
     V.editClip = null; $$('.hdr', box).forEach(el => el.classList.toggle('sel', V.selTracks.has(el.dataset.id)));
     if (V.detail === 'clip') V.detail = 'devices'; ui.detail(); arr.draw();
   });
@@ -92,6 +107,7 @@ function bindHeaders() {
       case 'clearAuto': pushUndo('Clear automation'); delete b.auto[b.autoShow || 'vol']; releaseAutomation(); _tmKey = ''; break;
       case 'takes': b.showTakes = !b.showTakes; break;
       case 'compAll': { const lane = b.takes.find(l => l.id === hd.dataset.lane); const a = Math.min(...lane.clips.map(c => c.start)), z = Math.max(...lane.clips.map(c => c.start + c.len)); compRange(b, lane, a, z); break; }
+      case 'collapse': { const to = !b.collapsed; (e.altKey ? [...S.tracks.filter(x => x.kind !== 'group'), ...S.returns, S.master] : [b]).forEach(x => (x.collapsed = to)); break; }
       case 'delLane': b.lanes.splice(+hd.dataset.li, 1); break;
       case 'delLane': b.lanes.splice(+hd.dataset.li, 1); break;
       case 'delTake': pushUndo('Delete take'); b.takes = b.takes.filter(l => l.id !== hd.dataset.lane); if (!b.takes.length) b.showTakes = false; break;
@@ -118,11 +134,12 @@ function bindHeaders() {
     if (isT) items.push({ label: 'Select all clips on track', run: () => selectTrackClips(b) });
     if (isT) items.push({ label: 'Duplicate track', run: () => duplicateTrack(b) }, { label: 'Delete track', danger: true, run: () => deleteTrack(b) }, { colors: c => { pushUndo(); b.color = c; ui.all(); } });
     if (isT && b.kind !== 'group') items.push('-', ...trackRenderMenu(b));
+    if (isT) items.push({ label: 'Move up', key: 'Ctrl+Alt+↑', run: () => { V.selTracks = new Set([b.id]); nudgeTrack(-1); } }, { label: 'Move down', key: 'Ctrl+Alt+↓', run: () => { V.selTracks = new Set([b.id]); nudgeTrack(1); } });
     if (isT) items.push(b.kind === 'group' ? { label: 'Ungroup', key: 'Ctrl+Shift+G', run: () => ungroupTrack(b) } : { label: 'Group selected tracks', key: 'Ctrl+G', run: () => { V.selTracks.add(b.id); groupTracks(); } });
     if (isT && b.takes && b.takes.length) items.push({ label: b.showTakes ? 'Hide take lanes' : 'Show take lanes', run: () => { b.showTakes = !b.showTakes; ui.headers(); } });
     if (isT && b.kind === 'audio') items.push('-', { label: 'Choose input…', run: () => chooseInput(b) });
     if (S.returns.includes(b)) items.push({ label: 'Delete return', danger: true, run: () => { if (S.returns.length <= 1) return toast('Keep at least one return'); pushUndo(); S.returns = S.returns.filter(r => r !== b); rebuildAll(); ui.all(); } });
-    items.push('-', { label: 'Show automation', run: () => { V.autoMode = true; ui.all(); } }, { label: 'Show automation in new lane', run: () => addAutoLane(b) }, { label: 'Show automation in new lane', run: () => addAutoLane(b) }, { label: 'Fold to small height', run: () => { b.h = 26; ui.headers(); } }, { label: 'Make tall', run: () => { b.h = 110; ui.headers(); } });
+    items.push('-', { label: 'Show automation', run: () => { V.autoMode = true; ui.all(); } }, { label: 'Show automation in new lane', run: () => addAutoLane(b) }, { label: 'Show automation in new lane', run: () => addAutoLane(b) }, { label: b.collapsed ? 'Expand track' : 'Collapse track', run: () => { b.collapsed = !b.collapsed; ui.all(); } }, { label: 'Collapse all tracks', run: () => { [...S.tracks.filter(x => x.kind !== 'group'), ...S.returns, S.master].forEach(x => (x.collapsed = true)); ui.all(); } }, { label: 'Expand all tracks', run: () => { [...S.tracks, ...S.returns, S.master].forEach(x => (x.collapsed = false)); ui.all(); } }, { label: 'Make tall', run: () => { b.h = 110; ui.headers(); } });
     popMenu(e, items);
   });
   box.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('sb/device') || e.dataTransfer.types.includes('sb/inst')) e.preventDefault(); });
@@ -169,6 +186,9 @@ function audioEditor(c) {
     const half = document.createElement('button'); half.className = 'btn ghostb tiny'; half.textContent = '÷2'; half.onclick = () => { pushUndo(); c.srcBpm /= 2; changed(); audioEditor(c); };
     const dbl = document.createElement('button'); dbl.className = 'btn ghostb tiny'; dbl.textContent = '×2'; dbl.onclick = () => { pushUndo(); c.srcBpm *= 2; changed(); audioEditor(c); };
     ctl.append(half, dbl);
+    ctl.appendChild(selectEl(WARP_MODES, c.wmode || 'complex', v => { pushUndo('Warp mode'); c.wmode = v; changed(); }, 'Warp mode'));
+    const wt = document.createElement('button'); wt.className = 'btn ghostb'; wt.textContent = hasWm(c) ? `Warp markers: ${c.wm.length}` : 'Warp from transients'; wt.title = 'Put a warp marker on each transient. Drag the yellow handles in the arrangement to move the audio; right-click a clip for more.';
+    wt.onclick = e => popMenu(e, warpMenu(c, V.insert >= c.start && V.insert < c.start + c.len ? V.insert : c.start)); ctl.appendChild(wt);
   }
   ctl.appendChild(knob({ label: 'Gain', value: c.gain, min: -36, max: 24, def: 0, fmt: fDb, onInput: v => { c.gain = v; changed(); } }));
   ctl.appendChild(knob({ label: 'Transpose', value: c.semis, min: -24, max: 24, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v + ' st', onInput: v => { c.semis = v; changed(); } }));
@@ -176,10 +196,6 @@ function audioEditor(c) {
   const rv = document.createElement('button'); rv.className = 'btn ghostb'; rv.textContent = c.revOf ? 'Un-reverse' : 'Reverse'; rv.onclick = () => { V.selClips = new Set([c.id]); reverseClips(); }; ctl.appendChild(rv);
   ctl.appendChild(knob({ label: 'Fade in', value: c.fadeIn, min: 0, max: Math.max(0.25, c.len / 2), def: 0, fmt: v => barsBeatsLen(v), onInput: v => { c.fadeIn = v; changed(); } }));
   ctl.appendChild(knob({ label: 'Fade out', value: c.fadeOut, min: 0, max: Math.max(0.25, c.len / 2), def: 0, fmt: v => barsBeatsLen(v), onInput: v => { c.fadeOut = v; changed(); } }));
-  ctl.appendChild(toggleEl('Loop', !!c.loop, v => { pushUndo('Loop'); c.loop = v; if (v && !c.loopLen) c.loopLen = Math.min(c.len, Math.max(1, clipNaturalLen(c) - c.offset)); changed(); audioEditor(c); }));
-  if (c.loop) { const ll = document.createElement('label'); ll.className = 'chip'; ll.innerHTML = `<span>Loop length (beats)</span><input type="number" min="0.25" step="0.25" value="${+(c.loopLen / BEAT()).toFixed(2)}" aria-label="Loop length in beats">`; ll.querySelector('input').onkeydown = e => e.stopPropagation(); ll.querySelector('input').onchange = e => { pushUndo('Loop length'); c.loopLen = Math.max(0.25, +e.target.value * BEAT()); changed(); }; ctl.appendChild(ll); }
-  ctl.appendChild(selectEl([['linear', 'Fades: linear'], ['equal', 'Fades: equal power'], ['slow', 'Fades: slow'], ['fast', 'Fades: fast']], c.fadeShape || 'linear', v => { pushUndo('Fade shape'); c.fadeShape = v; changed(); }, 'Fade shape'));
-  ctl.appendChild(selectEl([['', 'Clip envelope: off'], ['gain', 'Clip envelope: gain'], ['pan', 'Clip envelope: pan']], V.clipEnv || '', v => { V.clipEnv = v || null; drawW(); }, 'Clip envelope'));
   ctl.appendChild(toggleEl('Loop', !!c.loop, v => { pushUndo('Loop'); c.loop = v; if (v && !c.loopLen) c.loopLen = Math.min(c.len, Math.max(1, clipNaturalLen(c) - c.offset)); changed(); audioEditor(c); }));
   if (c.loop) { const ll = document.createElement('label'); ll.className = 'chip'; ll.innerHTML = `<span>Loop length (beats)</span><input type="number" min="0.25" step="0.25" value="${+(c.loopLen / BEAT()).toFixed(2)}" aria-label="Loop length in beats">`; ll.querySelector('input').onkeydown = e => e.stopPropagation(); ll.querySelector('input').onchange = e => { pushUndo('Loop length'); c.loopLen = Math.max(0.25, +e.target.value * BEAT()); changed(); }; ctl.appendChild(ll); }
   ctl.appendChild(selectEl([['linear', 'Fades: linear'], ['equal', 'Fades: equal power'], ['slow', 'Fades: slow'], ['fast', 'Fades: fast']], c.fadeShape || 'linear', v => { pushUndo('Fade shape'); c.fadeShape = v; changed(); }, 'Fade shape'));
@@ -199,6 +215,7 @@ function audioEditor(c) {
     for (let px = 0; px < w; px++) { const i0 = Math.floor(px / k * wv.sr / PEAK_BLOCK), i1 = Math.max(i0 + 1, Math.floor((px + 1) / k * wv.sr / PEAK_BLOCK)); let lo = 0, hi = 0; for (let i = i0; i < i1 && i < wv.mx.length; i++) { lo = Math.min(lo, wv.mn[i]); hi = Math.max(hi, wv.mx[i]); } const sec = px / k; g.fillStyle = sec >= a && sec <= b ? (t ? t.color : css.fg) : css.dim; g.fillRect(px, mid - clamp(hi * gain, 0, 1) * amp, 1, Math.max(1, (clamp(hi * gain, 0, 1) - clamp(lo * gain, -1, 0)) * amp)); }
     g.fillStyle = css.accent; g.fillRect(a * k, 0, 2, h); g.fillRect(b * k - 2, 0, 2, h); g.font = '10px ' + css.mono; g.fillText('Start', a * k + 4, 12); g.fillText('End', b * k - 26, 12);
     if (c.warp && c.srcBpm) { g.fillStyle = css.gridBeat; for (let beat = 0; beat * 60 / c.srcBpm < total; beat++) { const x = beat * 60 / c.srcBpm * k; g.fillRect(x, h - (beat % 4 ? 5 : 10), 1, beat % 4 ? 5 : 10); } }
+    if (c.warp) { g.fillStyle = 'rgba(255,255,255,.28)'; transientsOf(c.sampleId).forEach(sec => g.fillRect(Math.round(sec * k) + 0.5, h - 7, 1, 7)); if (hasWm(c)) { g.fillStyle = '#f2c14e'; c.wm.forEach(m => { const X = Math.round(m.s * k) + 0.5; g.globalAlpha = 0.55; g.fillRect(X, 0, 1, h); g.globalAlpha = 1; g.beginPath(); g.moveTo(X - 4, 0); g.lineTo(X + 4, 0); g.lineTo(X, 6); g.fill(); }); } }
     if (T.playing) { const p = nowPos(); if (p >= c.start && p < c.start + c.len) { g.fillStyle = css.playhead; g.fillRect(srcSecAt(c, p - c.start + c.offset) * k, 0, 1.5, h); } }
     if (V.clipEnv) { const ev = envGeo(), pts = (c.env && c.env[V.clipEnv]) || []; g.strokeStyle = css.env; g.lineWidth = 1.5; g.beginPath(); if (!pts.length) { g.moveTo(ev.xAt(0), ev.yAt(ev.def)); g.lineTo(ev.xAt(c.len), ev.yAt(ev.def)); } else { g.moveTo(ev.xAt(0), ev.yAt(pts[0].v)); pts.forEach(q => g.lineTo(ev.xAt(q.t), ev.yAt(q.v))); g.lineTo(ev.xAt(c.len), ev.yAt(pts[pts.length - 1].v)); } g.stroke(); g.fillStyle = css.env; pts.forEach(q => { g.beginPath(); g.arc(ev.xAt(q.t), ev.yAt(q.v), 3.5, 0, 7); g.fill(); }); g.font = '10px ' + css.mono; g.fillText(V.clipEnv === 'gain' ? 'Clip gain (dB)' : 'Clip pan', ev.xAt(0) + 4, 26); }
   };
@@ -246,5 +263,5 @@ function askText(title, value, done) {
   i.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') fin(true); if (e.key === 'Escape') fin(false); };
   $('#askOk').onclick = () => fin(true); $('#askCancel').onclick = () => fin(false);
 }
-function showTip(e, text) { const t = $('#tip'); t.hidden = false; t.textContent = text; t.style.left = (e.clientX + 14) + 'px'; t.style.top = (e.clientY - 26) + 'px'; }
+function showTip(e, text) { if (GP.tips === false && !(e && e.buttons)) return; const t = $('#tip'); t.hidden = false; t.textContent = text; t.style.left = (e.clientX + 14) + 'px'; t.style.top = (e.clientY - 26) + 'px'; }
 function hideTip() { $('#tip').hidden = true; }

@@ -20,19 +20,19 @@ const ICON = {
   phones: '<path d="M3 10V8a5 5 0 0 1 10 0v2"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/>',
 };
 const ico = (k, cls = '') => `<svg class="bico ${cls}" viewBox="0 0 16 16" aria-hidden="true">${ICON[k] || ICON.file}</svg>`;
-const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat']], ['Dynamics', ['comp', 'gate', 'limit']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility']]];
+const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat']], ['Dynamics', ['comp', 'gate', 'limit']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
 const SOUND_FOLDERS = [['Bass', ['Sub Bass', 'Reese']], ['Keys', ['Keys']], ['Lead', ['Saw Lead']], ['Pad', ['Warm Pad']], ['Pluck', ['Pluck']]];
 const DEFAULT_COLLECTIONS = [['Favorites', '#ff5d5d'], ['Orange', '#ff9a3c'], ['Yellow', '#f2d544'], ['Green', '#6fdc8c'], ['Blue', '#4ea3ff'], ['Purple', '#b18cff'], ['Gray', '#a7a3b8']];
 const DRUM_WORDS = /kick|snare|clap|hat|hh|perc|tom|rim|cymbal|crash|ride|808|shaker|snap|drum|bd|sd/i;
 
 const browser = {
-  sel: 'fx', q: '', expanded: new Set(), listing: new Map(), places: [], userLib: null, preview: null, previewOn: true, sortDesc: false,
+  sel: 'fx', q: '', pInfo: new Map(), pVol: 0.8, sync: false, expanded: new Set(), listing: new Map(), places: [], userLib: null, preview: null, previewOn: true, sortDesc: false,
   index: new Map(), indexing: new Set(), cols: null,
   async init() {
     try { this.places = JSON.parse(lsGet('sb-places') || '[]'); } catch (e) { this.places = []; }
     try { this.cols = JSON.parse(lsGet('sb-collections') || 'null'); } catch (e) { this.cols = null; }
     if (!this.cols) this.cols = { list: DEFAULT_COLLECTIONS.map(([name, color], i) => ({ id: 'c' + i, name, color })), items: {} };
-    this.previewOn = lsGet('sb-preview') !== '0'; this.sel = lsGet('sb-bsel') || 'fx';
+    this.previewOn = lsGet('sb-preview') !== '0'; this.pVol = lsGet('sb-pvol') != null ? +lsGet('sb-pvol') : 0.8; this.sync = lsGet('sb-psync') === '1'; this.sel = lsGet('sb-bsel') || 'fx';
     if (IS_DESKTOP) {
       const p = await NATIVE.paths(); this.userLib = joinPath(joinPath(p.music, 'Studio B'), 'User Library');
       if (!(await NATIVE.exists(this.userLib))) { try { await NATIVE.write(joinPath(this.userLib, 'Read me.txt'), 'Put samples and presets you want close at hand in this folder. Studio B lists it under Places > User Library.\n'); } catch (e) { } }
@@ -42,9 +42,12 @@ const browser = {
     el.addEventListener('click', e => this.click(e));
     el.addEventListener('dblclick', e => { const c = e.target.closest('[data-side^="col:"]'); if (c) { const col = this.cols.list.find(x => 'col:' + x.id === c.dataset.side); askText('Collection name', col.name, v => { col.name = v; this.saveCols(); this.render(); }); } });
     el.addEventListener('contextmenu', e => this.context(e));
-    el.addEventListener('dragstart', e => { const it = e.target.closest('[data-drag]'); if (!it) return; e.dataTransfer.setData(it.dataset.drag, it.dataset.val); e.dataTransfer.effectAllowed = 'copy'; });
+    el.addEventListener('dragstart', e => { this.stopPreview(); const it = e.target.closest('[data-drag]'); if (!it) return; e.dataTransfer.setData(it.dataset.drag, it.dataset.val); e.dataTransfer.effectAllowed = 'copy'; });
     $('#bsearch').addEventListener('input', e => { this.q = e.target.value.trim().toLowerCase(); this.renderList(); });
-    $('#bprev').onclick = () => { this.previewOn = !this.previewOn; lsSet('sb-preview', this.previewOn ? '1' : '0'); this.renderFoot(); };
+    $('#bprev').onclick = () => { this.previewOn = !this.previewOn; lsSet('sb-preview', this.previewOn ? '1' : '0'); if (!this.previewOn) this.stopPreview(); this.renderFoot(); };
+    $('#bsync').onclick = () => { this.sync = !this.sync; lsSet('sb-psync', this.sync ? '1' : '0'); this.renderFoot(); };
+    $('#bvol').value = this.pVol; $('#bvol').oninput = e => { this.pVol = +e.target.value; lsSet('sb-pvol', String(this.pVol)); if (this.pGain) this.pGain.gain.value = this.pVol; };
+    $('#bvol').onkeydown = e => e.stopPropagation();
     const rz = $('#bresize'); rz.onpointerdown = e => { rz.setPointerCapture(e.pointerId); const x0 = e.clientX, w0 = $('#browser').offsetWidth; rz.onpointermove = ev => { const w = clamp(w0 + ev.clientX - x0, 260, 720); $('#app').style.setProperty('--browserW', w + 'px'); lsSet('sb-browserW', w); arr.draw(); }; rz.onpointerup = () => (rz.onpointermove = null); };
     const bw = +lsGet('sb-browserW'); if (bw) $('#app').style.setProperty('--browserW', bw + 'px');
     this.render();
@@ -60,7 +63,7 @@ const browser = {
     h += this.places.map((p, i) => item('place:' + i, ico('folder'), p.name)).join('') + `<button class="bside dim" data-act="addPlace">${ico('add')}<span>Add Folder…</span></button>`;
     $('#bside').innerHTML = h;
   },
-  renderFoot() { $('#bprev').classList.toggle('on', this.previewOn); $('#bprev').setAttribute('aria-pressed', this.previewOn); },
+  renderFoot() { $('#bsync').classList.toggle('on', this.sync); $('#bprev').classList.toggle('on', this.previewOn); $('#bprev').setAttribute('aria-pressed', this.previewOn); },
   // ---------- content rows ----------
   row(o, depth = 0) {
     const pad = 8 + depth * 14, tagDots = o.key ? this.tagsOf(o.key).map(c => `<i class="cdot sm" style="background:${c.color}"></i>`).join('') : '';
@@ -88,7 +91,7 @@ const browser = {
   roots() { const r = this.places.map((p, i) => ({ id: p.path, name: p.name, path: p.path })); if (this.userLib) r.unshift({ id: this.userLib, name: 'User Library', path: this.userLib }); return r; },
   searchHits(filter) { // flat results from the file index of every place
     const out = []; const q = this.q;
-    for (const r of this.roots()) { this.ensureIndex(r.path); for (const f of this.index.get(r.path) || []) { if (f.name.toLowerCase().includes(q) && (!filter || filter(f))) { out.push(f); if (out.length > 400) return out; } } }
+    for (const r of this.roots()) { this.ensureIndex(r.path); for (const f of this.index.get(r.path) || []) { if (!f.dir && f.name.toLowerCase().includes(q) && (!filter || filter(f))) { out.push(f); if (out.length > 400) return out; } } }
     return out;
   },
   renderList() {
@@ -128,32 +131,54 @@ const browser = {
       title = 'Samples';
       const ps = this.projectSamples().filter(o => m(o.name));
       h = this.staticFolderOpen('In this project', ps);
-      if (q && IS_DESKTOP) h += this.staticFolderOpen(`Matches in your folders`, this.searchHits(audio).map(f => this.fileItem(f)));
+      if (q && IS_DESKTOP) h += this.roots().map(r => { const id = 'sqroot:' + r.path, t = this.searchTree(r.path, audio, r.name); if (/No matches/.test(t)) return ''; if (!this.expanded.has('closed:' + id)) this.expanded.add(id); return this.row({ dir: true, id, name: r.name }, 0) + (this.expanded.has(id) ? t.replace(/padding-left:(\d+)px/g, (m, v) => `padding-left:${+v + 14}px`) : ''); }).join('') || '<div class="brow dim">No matches in your folders</div>';
       else h += this.roots().map(r => this.folderRows(r.path, r.name, r.path, 0, audio)).join('') + (!IS_DESKTOP ? this.webPlaces(audio) : '');
     } else if (sel === 'grooves') { title = 'Grooves'; h = this.empty('Grooves are coming', 'Swing and groove templates (extract, apply, commit) are planned. The piano roll’s Humanize and Quantize cover timing for now.'); }
-    else if (sel === 'templates') { title = 'Templates'; h = this.empty('Templates are coming', 'Saving a project as your default starting point is planned. For now, keep a project set up the way you like and use <b>Save As</b> from it.'); }
+    else if (sel === 'templates') { title = 'Templates'; h = (this.tpls || []).filter(t => m(t.name)).map(t => `<div class="brow" data-act="tpl" data-name="${esc(t.name)}" title="Click to start a new project from this template">${ico('set')}<b>${esc(t.name)}</b></div>`).join('') || this.empty('No templates yet', 'Set up a project the way you like, then use the ☰ menu in the toolbar: <b>Save as template</b> or <b>Save as default set</b>.'); listTemplates().then(ts => { const n = ts.map(t => t.name).join(); if (n !== (this.tpls || []).map(t => t.name).join()) { this.tpls = ts; this.renderList(); } }); }
     else if (sel === 'project') {
       title = 'Current Project'; const ps = this.projectSamples().filter(o => m(o.name));
       h = this.staticFolderOpen('Samples', ps);
       if (S.path && IS_DESKTOP) h += this.folderRows(dirname(S.path), basename(dirname(S.path)), dirname(S.path), 0, null);
       else h += `<div class="brow dim">Save the project to see its folder here.</div>`;
     } else if (sel === 'userlib') {
-      title = 'User Library'; h = q ? this.searchHitsIn(this.userLib) : this.folderRows(this.userLib, 'User Library', this.userLib, 0, null);
+      title = 'User Library'; h = q ? this.searchTree(this.userLib, null) : this.folderRows(this.userLib, 'User Library', this.userLib, 0, null);
     } else if (sel.startsWith('place:')) {
       const p = this.places[+sel.slice(6)]; title = p ? p.name : '';
-      if (p) h = q && IS_DESKTOP ? this.searchHitsIn(p.path) : p.path.startsWith('web:') ? this.webPlace(p) : this.folderRows(p.path, p.name, p.path, 0, null);
+      if (p) h = q && IS_DESKTOP ? this.searchTree(p.path, null) : p.path.startsWith('web:') ? this.webPlace(p) : this.folderRows(p.path, p.name, p.path, 0, null);
     }
     $('#bcolhead').innerHTML = `<span>${esc(title || 'Name')}</span><button class="bsort" data-act="sort" aria-label="Sort">${this.sortDesc ? '▼' : '▲'}</button>`;
     $('#blist').innerHTML = h;
   },
   staticFolderOpen(name, items) { const id = 'open:' + name; if (!this.expanded.has('closed:' + id)) this.expanded.add(id); return this.staticFolder(id, name, items); },
+  /* Search results as a tree: folders whose name matches show closed (open them to browse everything inside),
+     and matching files sit inside their folders, which show how many matches they hold. */
+  searchTree(root, filter, rootName) {
+    this.ensureIndex(root); const idx = this.index.get(root);
+    if (!idx) return '<div class="brow dim">Searching…</div>';
+    const q = this.q, sep = /[\\/]/, rel = p => p.slice(root.length).split(sep).filter(Boolean);
+    const hitDirs = idx.filter(e => e.dir && e.name.toLowerCase().includes(q)), inHit = p => hitDirs.some(d => p !== d.path && p.startsWith(d.path) && sep.test(p.charAt(d.path.length)));
+    const topDirs = hitDirs.filter(d => !inHit(d.path)), files = idx.filter(e => !e.dir && e.name.toLowerCase().includes(q) && (!filter || filter(e)) && !inHit(e.path));
+    if (!topDirs.length && !files.length) return this.indexing.has(root) ? '<div class="brow dim">Searching…</div>' : '<div class="brow dim">No matches</div>';
+    const mk = (name, path) => ({ name, path, dirs: new Map(), files: [], hits: [], n: 0 }), top = mk(rootName || '', root);
+    const nodeFor = p => { const parts = rel(p).slice(0, -1); let n = top, cur = root; for (const part of parts) { cur = cur + (cur.endsWith('/') || cur.endsWith('\\') ? '' : p.charAt(root.length) || '/') + part; if (!n.dirs.has(part)) n.dirs.set(part, mk(part, cur)); n = n.dirs.get(part); } return n; };
+    files.forEach(f => nodeFor(f.path).files.push(f)); topDirs.forEach(d => nodeFor(d.path).hits.push(d));
+    const count = n => (n.n = n.files.length + n.hits.length + [...n.dirs.values()].reduce((s, c) => s + count(c), 0));
+    count(top); const cmp = (a, b) => (this.sortDesc ? -1 : 1) * a.name.localeCompare(b.name, undefined, { numeric: true });
+    const render = (n, depth) => {
+      let h = ''; [...n.hits].sort(cmp).forEach(d => { h += this.folderRows(d.path, d.name, d.path, depth, filter).replace('class="brow dir"', 'class="brow dir hit"'); });
+      [...n.dirs.values()].sort(cmp).forEach(c => { const id = 'sq:' + c.path; h += this.row({ dir: true, id, name: c.name, count: c.n }, depth); if (this.expanded.has(id)) h += render(c, depth + 1); });
+      [...n.files].sort(cmp).forEach(f => { h += this.row(this.fileItem(f), depth); });
+      return h;
+    };
+    return render(top, 0);
+  },
   searchHitsIn(root) { this.ensureIndex(root); const hits = (this.index.get(root) || []).filter(f => f.name.toLowerCase().includes(this.q)).slice(0, 400); return hits.length ? hits.map(f => this.row(this.fileItem(f))).join('') : (this.indexing.has(root) ? '<div class="brow dim">Searching…</div>' : '<div class="brow dim">No matches</div>'); },
   webPlaces(filter) { return this.places.filter(p => p.path.startsWith('web:')).map(p => this.webPlace(p, filter)).join(''); },
   webPlace(p, filter) { const items = (this.listing.get(p.path) || []).filter(f => (!filter || filter(f)) && (!this.q || f.name.toLowerCase().includes(this.q))); return this.staticFolderOpen(p.name, items.map(f => this.fileItem(f))); },
   async ensureIndex(root) { // recursive file list for search, built once per place
     if (!IS_DESKTOP || !root || root.startsWith('web:') || this.index.has(root) || this.indexing.has(root)) return;
     this.indexing.add(root); const out = [], queue = [[root, 0]]; let n = 0;
-    while (queue.length && out.length < 30000 && n < 4000) { const [dir, d] = queue.shift(); n++; let items = []; try { items = await NATIVE.list(dir); } catch (e) { continue; } for (const it of items) { if (it.dir) { if (d < 8) queue.push([it.path, d + 1]); } else out.push(it); } }
+    while (queue.length && out.length < 30000 && n < 4000) { const [dir, d] = queue.shift(); n++; let items = []; try { items = await NATIVE.list(dir); } catch (e) { continue; } for (const it of items) { if (it.dir) { out.push(it); if (d < 8) queue.push([it.path, d + 1]); } else out.push(it); } }
     this.index.set(root, out); this.indexing.delete(root); this.renderList();
   },
   fromKey(k) {
@@ -167,18 +192,19 @@ const browser = {
   tagsOf(key) { const ids = this.cols.items[key] || []; return this.cols.list.filter(c => ids.includes(c.id)); },
   // ---------- interaction ----------
   async click(e) {
-    const s = e.target.closest('[data-side]'); if (s) { this.sel = s.dataset.side; lsSet('sb-bsel', this.sel); this.render(); return; }
+    const s = e.target.closest('[data-side]'); if (s) { this.stopPreview(); this.sel = s.dataset.side; lsSet('sb-bsel', this.sel); this.render(); return; }
     const a = e.target.closest('[data-act]'); if (!a) return; const act = a.dataset.act;
     if (act === 'sort') { this.sortDesc = !this.sortDesc; this.renderList(); return; }
     if (act === 'inst') return addInstrumentTrack(a.dataset.val, null);
     if (act === 'fx') { const b = busById([...V.selTracks][0]); if (!b) return toast('Select a track first'); pushUndo('Add device'); b.devices.push(newDevice(a.dataset.val)); rewire(b); V.detail = V.detail === 'clip' ? 'both' : V.detail; ui.detail(); return; }
-    if (act === 'dir') {
+    if (act === 'dir') { this.stopPreview();
       const id = a.dataset.id, p = a.dataset.path;
-      if (this.expanded.has(id)) { this.expanded.delete(id); if (id.startsWith('open:')) this.expanded.add('closed:' + id); }
+      if (this.expanded.has(id)) { this.expanded.delete(id); if (id.startsWith('open:') || id.startsWith('sqroot:')) this.expanded.add('closed:' + id); }
       else { this.expanded.add(id); this.expanded.delete('closed:' + id); if (p && IS_DESKTOP && !this.listing.has(id)) { this.renderList(); try { this.listing.set(id, await NATIVE.list(p)); } catch (err) { this.listing.set(id, []); toast('That folder could not be read'); } } }
       this.renderList(); return;
     }
     if (act === 'addPlace') return this.addPlace();
+    if (act === 'tpl') { const t = (this.tpls || []).find(x => x.name === a.dataset.name); if (t) confirmLeave(() => newFromTemplate(t)); return; }
     if (act === 'prev') { $$('.brow.sel', $('#blist')).forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) this.previewItem(a); return; }
     if (act === 'openSet') { if (e.detail === 2) confirmLeave(() => openPath(a.dataset.path)); return; }
     if (act === 'showClip') { const c = clipById(a.dataset.path); if (c) { openClip(c); V.scrollX = Math.max(0, c.start - 8); arr.draw(); } }
@@ -198,8 +224,13 @@ const browser = {
     if (IS_DESKTOP && row.dataset.path && key.startsWith('file:')) items.push('-', { label: 'Show in Finder / Explorer', run: () => NATIVE.reveal(row.dataset.path) });
     popMenu(e, items);
   },
+  stopPreview() {
+    this.pTok = (this.pTok || 0) + 1; // also cancels a preview that is still loading
+    if (this.preview) { try { this.preview.onended = null; this.preview.stop(); } catch (e) { } this.preview = null; }
+    document.querySelectorAll('.brow.playing').forEach(x => x.classList.remove('playing'));
+  },
   async previewItem(a) {
-    if (this.preview) { try { this.preview.stop(); } catch (e) { } this.preview = null; }
+    this.stopPreview(); const tok = this.pTok;
     if (ctx.state !== 'running') ctx.resume();
     let buf = null;
     try {
@@ -207,7 +238,15 @@ const browser = {
       else if (a.dataset.file) buf = await decodeAudio(await WEB_FILES.get(a.dataset.file).arrayBuffer());
       else if (a.dataset.path && IS_DESKTOP) buf = await decodeAudio(await NATIVE.read(a.dataset.path));
     } catch (e) { return toast('That file could not be previewed'); }
-    if (!buf) return; const s = LIVE_CTX.createBufferSource(); s.buffer = buf; s.connect(M.cue); s.start(); this.preview = s;
-    $$('.brow.playing').forEach(x => x.classList.remove('playing')); a.classList.add('playing'); s.onended = () => a.classList.remove('playing');
+    if (!buf || tok !== this.pTok) return;
+    const key = a.dataset.sid || a.dataset.path || a.dataset.file; let info = this.pInfo.get(key);
+    if (!info) { const x = monoOf(buf), bpm = buf.duration > 1 && buf.duration < 40 ? detectTempo(onsetEnvelope(x), buf.sampleRate, 512, buf.duration) : null; info = { bpm }; this.pInfo.set(key, info); if (this.pInfo.size > 300) this.pInfo.delete(this.pInfo.keys().next().value); }
+    const nm = a.textContent.trim(), bi = document.getElementById('binfo'); bi.textContent = `${nm} · ${buf.duration < 60 ? buf.duration.toFixed(1) + ' s' : fmtTime(buf.duration)} · ${(buf.sampleRate / 1000).toFixed(1)} kHz · ${buf.numberOfChannels > 1 ? 'stereo' : 'mono'}${info.bpm ? ` · ~${Math.round(info.bpm)} BPM` : ''}`; bi.title = bi.textContent;
+    // Sync: loops previewed while the song plays are stretched to its tempo and start on the next beat
+    let play = buf, when = 0, loop = false;
+    if (this.sync && T.playing && info.bpm && buf.duration < 40) { play = stretchBuffer(buf, info.bpm / bpmAt(nowPos())); if (tok !== this.pTok) return; when = timeAt(Math.ceil(nowPos() / BEAT() + 1e-6) * BEAT()); loop = true; }
+    if (!this.pGain) { this.pGain = LIVE_CTX.createGain(); this.pGain.connect(M.cue); } this.pGain.gain.value = this.pVol;
+    const s = LIVE_CTX.createBufferSource(); s.buffer = play; s.loop = loop; s.connect(this.pGain); s.start(when); this.preview = s;
+    a.classList.add('playing'); s.onended = () => a.classList.remove('playing');
   },
 };
