@@ -49,10 +49,10 @@ const arr = {
     // grid
     for (const B of barLines(p0, p1)) { const spb = B.spb, bt = B.bt, gsb = gs >= SPB() ? gs : gs;
       if (B.bar % 2 === 1) { g.fillStyle = css.barAlt; g.fillRect(this.x(B.p), 0, spb * V.pps, h); }
-      if (V.pps >= 7 && gs > 1) { g.fillStyle = css.gridHair; for (let s = B.p; s < B.p + spb - 1e-6; s += 1) if (Math.abs((s - B.p) % gs) > 1e-6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
-      if (gsb >= spb) { const every = Math.round(gsb / SPB()) || 1; if (B.bar % every === 0) { g.fillStyle = css.gridBar; g.fillRect(Math.round(this.x(B.p)) + 0.5, 0, 1.25, h); } continue; }
-      for (let s = B.p; s < B.p + spb - 1e-6; s += gsb) { const x = Math.round(this.x(s)) + 0.5, isBar = s === B.p, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBar ? css.gridBar : isBeat ? css.gridBeat : css.gridFine; g.fillRect(x, 0, isBar ? 1.25 : 1, h); }
-      if (gsb > bt) { g.fillStyle = css.gridFine; for (let s = B.p + bt; s < B.p + spb - 1e-6; s += bt) if (Math.abs((s - B.p) % gsb) > 1e-6 && bt * V.pps >= 6) g.fillRect(Math.round(this.x(s)) + 0.5, 0, 1, h); }
+      if (V.pps >= 7 && gs > 1) { g.fillStyle = css.gridHair; for (let s = B.p; s < B.p + spb - 1e-6; s += 1) if (Math.abs((s - B.p) % gs) > 1e-6) g.fillRect(px(this.x(s)), 0, 1, h); }
+      if (gsb >= spb) { const every = Math.round(gsb / SPB()) || 1; if (B.bar % every === 0) { g.fillStyle = css.gridBar; g.fillRect(px(this.x(B.p)), 0, 1.25, h); } continue; }
+      for (let s = B.p; s < B.p + spb - 1e-6; s += gsb) { const x = px(this.x(s)), isBar = s === B.p, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBar ? css.gridBar : isBeat ? css.gridBeat : css.gridFine; g.fillRect(x, 0, isBar ? 1.25 : 1, h); }
+      if (gsb > bt) { g.fillStyle = css.gridFine; for (let s = B.p + bt; s < B.p + spb - 1e-6; s += bt) if (Math.abs((s - B.p) % gsb) > 1e-6 && bt * V.pps >= 6) g.fillRect(px(this.x(s)), 0, 1, h); }
     }
     // loop region and time selection
     if (S.loop.on) { g.fillStyle = css.loopShade; g.fillRect(this.x(S.loop.start), 0, (S.loop.end - S.loop.start) * V.pps, h); }
@@ -69,7 +69,7 @@ const arr = {
       }
       if (r.kind !== 'track') return;
       if (r.b.kind === 'group') { const ms = descendants(r.b).filter(t => t.kind !== 'group'), lh = Math.max(2, (r.h - 6) / Math.max(1, ms.length)); ms.forEach((t, i) => t.clips.forEach(c => { const x0 = this.x(c.start), cw = c.len * V.pps; if (x0 > w || x0 + cw < 0) return; g.fillStyle = c.muted ? css.muted : t.color; g.globalAlpha = 0.7; g.fillRect(x0, y + 3 + i * lh, cw, Math.max(1.5, lh - 1)); g.globalAlpha = 1; })); return; }
-      r.b.clips.forEach(c => { const x = this.x(c.start), cw = c.len * V.pps; if (x > w || x + cw < 0) return; this.drawClip(g, r.b, c, x, y, cw, r.h, css); });
+      r.b.clips.forEach(c => { const x = this.x(c.start), cw = c.len * V.pps; if (x > w || x + cw < 0) return; this.drawClip(g, r.b, c, x, y, cw, r.h, css); this.drawWarp(g, c, y, r.h); });
       r.b.clips.forEach(c => { const xi = xfInfo(r.b, c); if (!xi) return; const x0 = this.x(c.start - xi.ext), x1 = this.x(c.start - xi.ext + xi.fade), yb = y + r.h - 2, yt = y + (r.h >= 34 ? 16 : 2);
         g.strokeStyle = css.fg; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, yt); g.lineTo(x1, yb); g.moveTo(x0, yb); g.lineTo(x1, yt); g.stroke(); g.fillStyle = css.fg; g.fillRect(this.x(c.start) - 3, yb - 5, 6, 6); });
       if (r.b.frozen) { g.fillStyle = 'rgba(150,200,255,.13)'; g.fillRect(0, y, w, r.h); g.fillStyle = 'rgba(190,220,255,.8)'; g.font = '600 10px ' + css.ui; g.fillText('Frozen', 6, y + r.h - 6); }
@@ -164,7 +164,7 @@ const arr = {
     g.font = '10px ' + css.mono;
     meterMap().slice(1).forEach(m => { const x = this.x(m.p); if (x < -40 || x > w) return; g.fillStyle = css.accent; g.font = 'bold 9px ' + css.mono; g.fillText(`${m.n}/${m.d}`, x + 3, LS + 22); g.font = '10px ' + css.mono; });
     for (const B of barLines(this.pos(0), this.pos(w))) for (let s = B.p; s < B.p + B.spb - 1e-6; s += Math.min(gs, B.spb)) {
-      const x = Math.round(this.x(s)) + 0.5, bar = B.bar, spb = B.spb;
+      const x = px(this.x(s)), bar = B.bar, spb = B.spb;
       if (s === B.p) { g.fillStyle = css.dim; g.fillRect(x, LS, 1, h - LS); if ((bar) % every === 0) { g.fillStyle = css.fg; g.fillText(String(bar + 1), x + 3, LS + 11); } }
       else { const bt = B.bt, isBeat = Math.abs((s - B.p) % bt) < 1e-6; g.fillStyle = isBeat ? css.dim : css.gridBeat; g.fillRect(x, h - (isBeat ? 8 : 5), 1, isBeat ? 8 : 5); if (isBeat && bt * V.pps >= 34) { g.fillStyle = css.dim; g.font = '9px ' + css.mono; g.fillText(`${bar + 1}.${Math.round((s - B.p) / bt) + 1}`, x + 3, LS + 11); g.font = '10px ' + css.mono; } }
     }
@@ -222,6 +222,12 @@ const arr = {
   },
 
   /* ---------- lane interaction ---------- */
+  // warp markers: a yellow handle at the top of the clip body and a faint line down through it
+  drawWarp(g, c, y, rh) {
+    if (!hasWm(c) || rh < 34) return; const x0 = this.x(c.start), x1 = this.x(c.start + c.len); g.save();
+    c.wm.forEach(m => { const X = px(this.x(c.start + m.x - c.offset)); if (X < x0 || X > x1) return; g.fillStyle = 'rgba(242,193,78,.45)'; g.fillRect(X, y + 14, 1, rh - 14); g.fillStyle = '#f2c14e'; g.beginPath(); g.moveTo(X - 4, y + 14); g.lineTo(X + 4, y + 14); g.lineTo(X, y + 20); g.fill(); });
+    g.restore();
+  },
   hitClip(r, x, y) {
     if (!r || r.kind !== 'track') return null; const yy = y + V.scrollY - r.y;
     for (let i = r.b.clips.length - 1; i >= 0; i--) {
@@ -229,6 +235,7 @@ const arr = {
       let zone = 'body'; const edge = Math.min(6, cw / 4);
       if (c.type === 'audio' && V.selClips.has(c.id) && yy < 10 && r.h >= 34) { if (Math.abs(x - (cx + c.fadeIn * V.pps)) < 6) zone = 'fadeIn'; else if (Math.abs(x - (cx + cw - c.fadeOut * V.pps)) < 6) zone = 'fadeOut'; }
       if (c.type === 'audio' && yy > r.h - 9 && leftOf(r.b, c) && Math.abs(x - cx) < Math.max(6, xfHalf(r.b, c) * V.pps)) zone = 'xf';
+      if (hasWm(c) && r.h >= 34 && yy >= 13 && yy <= 24) { const m = c.wm.find(q => Math.abs(this.x(c.start + q.x - c.offset) - x) < 5); if (m) return { c, zone: 'wm', m }; }
       if (zone === 'body') { if (x < cx + edge) zone = 'left'; else if (x > cx + cw - edge) zone = 'right'; else if (yy > (r.h >= 34 ? 15 : r.h / 2)) zone = 'range'; }
       return { c, zone };
     }
@@ -248,7 +255,7 @@ const arr = {
     cv.addEventListener('pointerleave', () => { if (this.hoverClip) { this.hoverClip = null; this.draw(); } });
     cv.addEventListener('pointermove', e => { if (this.drag) return; { const bb = cv.getBoundingClientRect(), rr = this.rowAt(e.clientY - bb.top), hh = this.hitClip(rr, e.clientX - bb.left, e.clientY - bb.top), id = hh ? hh.c.id : null; if (id !== this.hoverClip) { this.hoverClip = id; this.draw(); } } const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y);
       if (V.autoMode || (r && r.kind === 'auto')) { cv.style.cursor = this.envHit(r, x, y) ? 'grab' : e.altKey ? 'ns-resize' : 'crosshair'; return; }
-      const h = this.hitClip(r, x, y); cv.style.cursor = !h || h.zone === 'range' ? 'text' : h.zone === 'left' || h.zone === 'right' || h.zone === 'xf' ? 'ew-resize' : h.zone.startsWith('fade') ? 'col-resize' : 'grab'; });
+      const h = this.hitClip(r, x, y); cv.style.cursor = h && h.zone === 'wm' ? 'col-resize' : !h || h.zone === 'range' ? 'text' : h.zone === 'left' || h.zone === 'right' || h.zone === 'xf' ? 'ew-resize' : h.zone.startsWith('fade') ? 'col-resize' : 'grab'; });
     cv.addEventListener('dblclick', e => {
       const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y); if (!r || V.autoMode) return;
       const h = this.hitClip(r, x, y);
@@ -333,6 +340,7 @@ const arr = {
           sel.forEach(s => { let d = snapD(dx); d = Math.min(d, s.o.len - 0.25); if (s.c.type === 'audio') d = Math.max(d, -s.o.offset); s.c.start = Math.max(0, s.o.start + d); const real = s.c.start - s.o.start; s.c.len = s.o.len - real; s.c.offset = s.o.offset + real; if (s.c.type === 'midi' && s.c.offset < 0) s.c.offset = ((s.c.offset % (s.c.bars * 16)) + s.c.bars * 16) % (s.c.bars * 16); });
           showTip(ev, barsBeats(sel[0].c.start));
         } else if (hit.zone === 'xf') { c.xf = Math.max(0, Math.min(2 * Math.abs(this.pos(ev.clientX - b.left) - c.start), c.len, (leftOf(trackOf(c), c) || c).len)); showTip(ev, 'Crossfade ' + barsBeatsLen(c.xf)); }
+        else if (hit.zone === 'wm') { const m = hit.m, i = c.wm.indexOf(m), lo = i > 0 ? c.wm[i - 1].x + 0.05 : -Infinity, hi = i < c.wm.length - 1 ? c.wm[i + 1].x - 0.05 : Infinity; m.x = clamp((ev.altKey ? this.pos(ev.clientX - b.left) : this.snap(this.pos(ev.clientX - b.left))) - c.start + c.offset, lo, hi); showTip(ev, 'Warp ' + barsBeats(c.start + m.x - c.offset)); }
         else if (hit.zone === 'fadeIn') { c.fadeIn = clamp((ev.clientX - b.left - this.x(c.start)) / V.pps, 0, c.len - c.fadeOut); }
         else if (hit.zone === 'fadeOut') { c.fadeOut = clamp((this.x(c.start + c.len) - (ev.clientX - b.left)) / V.pps, 0, c.len - c.fadeIn); }
         this.draw();
@@ -375,11 +383,14 @@ const arr = {
       ];
       items.push({ label: 'Crop', key: 'Ctrl+Shift+J', run: () => cropClips() });
       if (c.type === 'audio') items.push({ label: c.revOf ? 'Un-reverse' : 'Reverse', key: 'R', run: () => reverseClips() });
-      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) });
+      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) }, ...(c.groove ? [{ label: 'Commit groove', run: () => commitGroove(c) }] : []));
+      items.push({ label: 'Extract groove to the pool', run: () => extractGroove(c) });
+      if (c.type === 'audio') items.push('-', ...convertMenu(c));
       items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') });
       if (c.type === 'midi') items.push( { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
       if (c.type === 'audio' && (leftOf(trackOf(c), c) || rightOf(trackOf(c), c))) items.push({ label: 'Crossfade with neighbor', key: 'Ctrl+Alt+F', run: () => createCrossfades() });
       if (c.type === 'audio' && c.xf) items.push({ label: 'Remove crossfade', run: () => { pushUndo(); c.xf = 0; this.draw(); } }, ...['linear', 'equal', 'slow', 'fast'].map(sh => ({ label: `Crossfade shape: ${{ linear: 'Linear', equal: 'Equal power', slow: 'Slow', fast: 'Fast' }[sh]}${(c.xfShape || 'linear') === sh ? ' ✓' : ''}`, run: () => { pushUndo(); c.xfShape = sh; this.draw(); } })));
+      if (c.type === 'audio') items.push('-', ...(hit.zone === 'wm' ? [{ label: 'Delete this warp marker', danger: true, run: () => { pushUndo('Delete warp marker'); c.wm = c.wm.filter(m => m !== hit.m); this.draw(); if (T.playing) play(nowPos()); } }] : []), ...warpMenu(c, this.pos(x)), '-');
       if (c.type === 'audio') items.push({ label: c.loop ? 'Turn clip loop off' : 'Loop this clip', run: () => { pushUndo('Loop'); c.loop = !c.loop; if (c.loop && !c.loopLen) c.loopLen = Math.min(c.len, Math.max(1, clipNaturalLen(c) - c.offset)); this.draw(); ui.detail(); } });
       if (c.type === 'audio') items.push({ label: c.warp ? 'Turn warp off' : 'Turn warp on', run: () => { pushUndo(); c.warp = !c.warp; if (c.warp) c.srcBpm = c.srcBpm || S.bpm; this.draw(); ui.detail(); } }, { label: 'Slice to new MIDI track', run: () => sliceToMidi(c) }, { label: 'Crop to clip length', run: () => toast('The clip already plays only its region; the file stays untouched.') });
       items.push('-', { label: 'Delete', danger: true, run: () => cmd('delete') });
@@ -399,6 +410,8 @@ const arr = {
   },
 };
 // Smooth zoom: proportional to the scroll distance, capped per event (mouse wheel notch ≈ 12%).
+// line positions rounded to physical pixels, so grid lines glide evenly on Retina screens as the view scrolls
+const px = v => Math.round(v * (devicePixelRatio || 1)) / (devicePixelRatio || 1);
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // A collapsed track is a thin strip: its clips still show, with their names.
 const rowH = b => (b.collapsed ? 22 : b.h || 40);

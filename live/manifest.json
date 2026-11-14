@@ -1,8 +1,8 @@
 {
- "version": "0.2.20",
+ "version": "0.2.21",
  "shell": 2,
- "date": "2026-11-14T18:40:03.266Z",
- "notes": "Groove pool (swing library, extract, apply, commit, global amount), convert audio to MIDI (drums, melody, harmony), stem separation, MPE pitch-bend lane and MPE input recording; docs: large items done",
+ "date": "2026-11-14T18:50:51.575Z",
+ "notes": "Follow playhead: the grid glides continuously past a fixed playhead; grid lines on physical pixels",
  "files": [
   {
    "path": "css/base.css",
@@ -21,8 +21,8 @@
   },
   {
    "path": "js/arrange.js",
-   "size": 49117,
-   "sha256": "e2c179fd472d55eb58fd5053723a57d011228d0d7b920a9e486ea886d5d1a97d"
+   "size": 49227,
+   "sha256": "9fbb81ffc29be5a7b5aed1db63b42242aafe5286bb5b9f05b64db6870520708b"
   },
   {
    "path": "js/browser.js",
@@ -96,8 +96,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 33797,
-   "sha256": "9b35d3e32cde6f850976a56247331a3510cd53571220a2c93d2fe03c3526261f"
+   "size": 33859,
+   "sha256": "92cb69fe813dd7d667f5e1810b17dfc16812ec4c7fca3157f036073f5347b583"
   },
   {
    "path": "js/mapping.js",
@@ -157,7 +157,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "cac0d0fa9e03e7777c888f5e9549a22a2bb0c1a64639af7b74a2285aaf0d76b9"
+   "sha256": "755b09b53dcf27752d5f927f5da0b8f5fd94abde83eae3d035d35db21e68d7a2"
   }
  ]
 }

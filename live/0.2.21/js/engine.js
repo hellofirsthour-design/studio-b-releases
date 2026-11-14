@@ -20,6 +20,7 @@ function newTrack(kind, instType = 'synth', name) {
   return t;
 }
 function newInst(type) {
+  if (typeof INST2_DEF !== 'undefined' && INST2_DEF[type]) return INST2_DEF[type]();
   if (type === 'drums') return { type, pads: ['Kick', 'Snare', 'Clap', 'Closed Hat', 'Open Hat', 'Tom', 'Rim', 'Shaker'].map(k => ({ kind: k, tune: 0, decay: 1, level: 0.85, pan: 0, sampleId: null })) };
   if (type === 'sampler') return { type, sampleId: null, cues: [], semis: 0, sync: true, stretch: true, srcBpm: 0, mode: 'pads', keyCue: 0, oneShot: 'cue', choke: true, gain: 0.8, attack: 0.002, release: 0.02, filter: 0 };
   return { type: 'synth', ...SYNTH_DEFAULT, ...SYNTH_PRESETS.Keys, preset: 'Keys' };
@@ -98,7 +99,7 @@ function wireSidechains() {
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
-function rewire(b) { if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
+function rewire(b) { if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
 const anySolo = () => S.tracks.some(t => t.solo);
 // A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
 const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
@@ -162,7 +163,7 @@ const autoActive = (b, k) => !!(b.auto[k] && b.auto[k].length && !OVERRIDES.has(
 const AUTO_WRITE = new Map();
 // Called whenever a control changes. With Automation Arm on during playback it records; otherwise it overrides.
 function autoTouch(b, key, v) {
-  if (!b || !autoParams(b).some(p => p.key === key)) return;
+  if (!b || b._rack || !autoParams(b).some(p => p.key === key)) return;
   if (T.playing && V.autoArm && !T.busy) {
     const now = nowPos(), w = AUTO_WRITE.get(ovKey(b, key)), pts = b.auto[key] || (b.auto[key] = []);
     if (!w || now < w.last - 0.01 || now - w.last > 2) { if (!w) pushUndo('Record automation'); const prev = pts.length ? autoValue(pts, now) : currentParam(b, key); b.auto[key] = pts.filter(p => Math.abs(p.t - now) > 0.05); b.auto[key].push({ t: Math.max(0, now - 0.01), v: prev }); }
@@ -211,6 +212,7 @@ function clipPlayback(c, bpm = S.bpm) {
   const s = SAMPLES.get(c.sampleId); if (!s) return null;
   if (c.frozen || c.timebase === 'song') return { buf: s.buf, rate: 1, secAt: x => songSec(c.start - c.offset + x) - songSec(c.start - c.offset) };
   const P = clipPitch(c);
+  if (c.warp && c.wmode === 'repitch') return { buf: s.buf, rate: P * bpm / c.srcBpm, secAt: x => x * 15 / c.srcBpm }; // speed and pitch together
   if (c.warp) {
     const ratio = (c.srcBpm / bpm) * P, w = getWarped(c.sampleId, ratio);
     if (w) return { buf: w, rate: P, secAt: x => x * 15 / bpm * P };
@@ -219,7 +221,7 @@ function clipPlayback(c, bpm = S.bpm) {
   return { buf: s.buf, rate: P, secAt: x => x * 15 / bpm * P };
 }
 const clipPitch = c => Math.pow(2, ((c.semis || 0) + (c.cents || 0) / 100) / 12);
-const srcSecAt = (c, x) => (c.timebase === 'song' ? songSec(c.start - c.offset + x) - songSec(c.start - c.offset) : c.warp ? x * 15 / c.srcBpm : x * 15 / S.bpm * clipPitch(c)); // original-file seconds, for drawing
+const srcSecAt = (c, x) => (hasWm(c) ? secOfX(c, x) : c.timebase === 'song' ? songSec(c.start - c.offset + x) - songSec(c.start - c.offset) : c.warp ? x * 15 / c.srcBpm : x * 15 / S.bpm * clipPitch(c)); // original-file seconds, for drawing
 function clipNaturalLen(c) { const s = SAMPLES.get(c.sampleId); if (!s) return c.len; return c.warp ? s.buf.duration * c.srcBpm / 15 : s.buf.duration / clipPitch(c) * S.bpm / 15; }
 // Crossfades: a clip's `xf` is the crossfade length with the clip that ends exactly where it starts.
 const leftOf = (t, c) => t.clips.find(k => k !== c && k.type === 'audio' && Math.abs(k.start + k.len - c.start) < 1e-4);
@@ -275,7 +277,7 @@ function startAudio(t, c, pos, when) {
 }
 // What a track plays from the timeline: its clips, or its frozen render.
 const frozenClip = t => (t.frozen ? { id: 'frz-' + t.id, type: 'audio', frozen: true, sampleId: t.frozen.sid, start: 0, len: t.frozen.len, offset: 0, gain: 0, semis: 0, warp: false, srcBpm: S.bpm, fadeIn: 0, fadeOut: 0 } : null);
-const audioClipsOf = t => (t.frozen ? [frozenClip(t)] : t.kind === 'audio' ? t.clips : []);
+const audioClipsOf = t => (t.frozen ? [frozenClip(t)] : t.kind === 'audio' ? t.clips.flatMap(expandWarp) : []);
 function startAudioAt(pos, when) {
   S.tracks.forEach(t => audioClipsOf(t).forEach(c => { const sp = c.frozen ? { a: c.start, b: c.start + c.len } : clipEffSpan(t, c); if (sp.a <= pos && pos < sp.b) startAudio(t, c, pos, when); }));
 }
@@ -283,7 +285,7 @@ function stopSources(at) { T.srcs.forEach(h => { try { hold(h.g.gain, at); h.g.g
 
 /* ---------- scheduler ---------- */
 function scheduleWindow(from, to) {
-  const first = from === T.firstPos;
+  const first = from === T.firstPos; runModulators(Math.max(ctx.currentTime, timeAt(from)), from);
   for (const t of S.tracks) {
     if (t.kind === 'midi' && !t.frozen) {
       const inst = RT.get(t.id) && RT.get(t.id).inst; if (!inst) continue;
@@ -297,8 +299,9 @@ function scheduleWindow(from, to) {
             const p = base + n.s + k * L; if (p >= to - 1e-9 || p >= end - 1e-9) break; if (p < from - 1e-9 || p < c.start - 1e-9) continue;
             if (n.c != null && n.c < 1 && Math.random() > n.c) continue;
             const dur = Math.min(n.l, end - p, L - n.s);
-            const vel = n.vr ? clamp(n.v + (Math.random() * 2 - 1) * n.vr, 0.01, 1) : n.v; // velocity range: a random spread around the note's velocity
-            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p)), vel, durSec(p, dur) * 0.98, n.rv);
+            const gv = c.groove ? grooveAt(grooveById(c.groove), p) : null; // groove: shift and accent from the groove pool
+            const vel = clamp((n.vr ? n.v + (Math.random() * 2 - 1) * n.vr : n.v) * (gv ? gv.vel : 1), 0.01, 1); // velocity range: a random spread around the note's velocity
+            inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p + (gv ? gv.shift : 0))), vel, durSec(p, dur) * 0.98, n.rv, n.mpe);
           }
         }
       }
@@ -509,17 +512,23 @@ function punchIn(t, c) { clearRange(t, c.start, c.start + c.len); }
 /* ---------- live notes (computer keyboard / MIDI) ---------- */
 const held = new Map();
 function liveTarget() { const t = S.tracks.find(x => x.arm && x.kind === 'midi') || S.tracks.find(x => V.selTracks.has(x.id) && x.kind === 'midi'); return t; }
-function liveNoteOn(key, note, vel = 0.85, t = liveTarget()) {
+function liveNoteOn(key, note, vel = 0.85, t = liveTarget(), ch = 0) {
   if (!t || t.kind !== 'midi') return; if (ctx.state !== 'running') ctx.resume();
   const v = RT.get(t.id).inst.noteOn(note, ctx.currentTime, vel, null);
-  const h = { v, t, note, vel, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
+  const h = { v, t, note, vel, ch, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
   if (T.recording) T.recording.held.set(key, h);
 }
 function liveNoteOff(key, rv) {
   const h = held.get(key); if (!h) return; held.delete(key);
   RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime, rv);
-  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at }); }
+  const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); const dur = Math.max(0.01, ctx.currentTime - h.at); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at, mpe: h.pb && h.pb.length ? { pb: [{ t: 0, v: h.pb0 || 0 }, ...h.pb.map(q => ({ t: clamp((q.at - h.at) / dur, 0, 1), v: q.v }))] } : undefined }); }
   if (!R) { CAPTURE.push({ t: h.t.id, p: h.note, t0: h.at, t1: ctx.currentTime, vel: h.vel, rv, pos: h.pos, end: T.playing && h.pos != null ? posAt(ctx.currentTime) : null }); if (CAPTURE.length > 4000) CAPTURE.splice(0, 1000); }
+}
+// Pitch bend: on a member channel (MPE) it bends only that note; on channel 1 it bends everything held.
+function liveBend(ch, x) {
+  const semis = x * (ch === 0 ? (GP.pbRange || 2) : (GP.mpeRange || 48));
+  held.forEach(h => { if (ch !== 0 && h.ch !== ch) return; h.pb = h.pb || []; if (!h.pb.length) h.pb0 = 0; h.pb.push({ at: ctx.currentTime, v: semis });
+    const nodes = (h.v && (h.v.oscs || h.v.srcs)) || []; nodes.forEach(o => { if (!o.detune) return; if (o._b0 == null) o._b0 = o.detune.value; o.detune.setTargetAtTime(o._b0 + semis * 100, ctx.currentTime, 0.005); }); });
 }
 /* Capture MIDI: everything you play while not recording is remembered, so you can turn it into a clip afterwards. */
 const CAPTURE = [];

@@ -38,14 +38,14 @@ function toggleEl(label, on, onChange) {
   const b = document.createElement('button'); b.className = 'tog' + (on ? ' on' : ''); b.textContent = label; b.setAttribute('aria-pressed', on);
   b.onclick = () => { on = !on; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); onChange(on); }; return b;
 }
-function paramGrid(defs, obj, onChange) {
+function paramGrid(defs, obj, onChange, mapPre) {
   const g = document.createElement('div'); g.className = 'pgrid';
   for (const d of defs) {
     if (d.group) { const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = d.group; g.appendChild(h); continue; }
     let el;
     if (d.options) { el = document.createElement('label'); el.className = 'psel'; el.innerHTML = `<span>${esc(d.label)}</span>`; el.appendChild(selectEl(d.options, obj[d.k], v => { obj[d.k] = v; onChange(d.k, v); }, d.label)); }
     else if (d.toggle) el = toggleEl(d.label, !!obj[d.k], v => { obj[d.k] = v; onChange(d.k, v); });
-    else el = knob({ label: d.label, value: obj[d.k], min: d.min, max: d.max, scale: d.scale, fmt: d.fmt, step: d.step, onInput: v => { obj[d.k] = v; onChange(d.k, v); } });
+    else { el = knob({ label: d.label, value: obj[d.k], min: d.min, max: d.max, scale: d.scale, fmt: d.fmt, step: d.step, onInput: v => { obj[d.k] = v; onChange(d.k, v); } }); if (mapPre) el.dataset.map = mapPre + d.k; }
     g.appendChild(el);
   }
   return g;
@@ -112,14 +112,16 @@ function deviceCard(o, d, i) {
   c.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('gw/dev')) { e.preventDefault(); c.classList.add('dropl'); } });
   c.addEventListener('dragleave', () => c.classList.remove('dropl'));
   c.addEventListener('drop', e => { const f = e.dataTransfer.getData('gw/dev'); if (f === '') return; e.preventDefault(); const [x] = o.devices.splice(+f, 1); o.devices.splice(i, 0, x); rewire(o); ui.detail(); markDirty(); });
-  c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [{ label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
+  c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [...(o._rack ? [] : d.type === 'rack' ? [{ label: 'Ungroup rack (keeps the selected chain)', run: () => ungroupRack(o, i) }] : [{ label: 'Group into a rack', key: 'Ctrl+G', run: () => groupIntoRack(o, i) }]), { label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
   if (d.type === 'plugin') { body.innerHTML = `<p class="plugnote">Studio B can't run ${esc(d.p.format)} plug-ins yet, so this slot passes audio straight through.${d.p.role === 'instrument' ? ' The notes are playing on a built-in synth for now.' : ''}</p><p class="plugnote muted">To hear the real sound: in Ableton, right-click the track and choose <b>Freeze Track</b>, save, then open the set here again. Studio B brings frozen tracks in as audio.</p>`; return c; }
+  if (d.type === 'rack') { rackView(body, o, d, r); return c; }
+  if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (d.type === 'eq') eqEditor(body, d, r, changed);
-  else if (d.type === 'tune') { tuneView(body, d, r); body.appendChild(paramGrid(def.params, d.p, changed)); }
+  else if (d.type === 'tune') { tuneView(body, d, r); body.appendChild(paramGrid(def.params, d.p, changed, `${o.id}|dev:${d.id}:`)); }
   else {
     if (d.type === 'comp' || d.type === 'limit' || d.type === 'gate') grMeter(body, r);
     if (d.type === 'comp') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
-    body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }));
+    body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`));
   }
   return c;
 }
@@ -244,6 +246,7 @@ function applyInstPreset(t, p) {
   removeBus(t); buildBus(t, 'track'); routeOut(t); rewire(t); applyMix(t); connectInputs(); ui.detail(); markDirty();
 }
 function instrumentCard_(t) {
+  if (INST2_CLS[t.inst.type]) return inst2Card(t);
   const inst = RT.get(t.id).inst;
   if (t.inst.type === 'synth') {
     const c = cardShell('Contour', 'Synth', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);

@@ -33,9 +33,9 @@ const mixer = {
   },
   bindStrip(el) {
     const b = busById(el.dataset.id);
-    $$('[data-k]', el).forEach(slot => { const k = slot.dataset.k, si = sendIndex(k); slot.appendChild(knob({ label: k === 'pan' ? 'Pan' : 'Send ' + RET_LETTERS[si], value: si >= 0 ? sendOf(b, si) : b[k], min: k === 'pan' ? -1 : 0, max: 1, def: 0, small: true, fmt: k === 'pan' ? v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R') : v => v < 0.005 ? '-inf' : gainToDb(v).toFixed(1), onInput: v => { if (si >= 0) setSend(b, si, v); else b[k] = v; applyMix(b); markDirty(); autoTouch(b, k, v); } })); });
+    $$('[data-k]', el).forEach(slot => { const k = slot.dataset.k, si = sendIndex(k); slot.appendChild(knob({ label: k === 'pan' ? 'Pan' : 'Send ' + RET_LETTERS[si], value: si >= 0 ? sendOf(b, si) : b[k], min: k === 'pan' ? -1 : 0, max: 1, def: 0, small: true, fmt: k === 'pan' ? v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R') : v => v < 0.005 ? '-inf' : gainToDb(v).toFixed(1), onInput: v => { if (si >= 0) setSend(b, si, v); else b[k] = v; applyMix(b); markDirty(); autoTouch(b, k, v); } })); slot.lastChild.dataset.map = b.id + '|' + k; });
     const dl = el.querySelector('[data-act=delay]'); if (dl) { dl.onkeydown = e => e.stopPropagation(); dl.onchange = () => { pushUndo('Track delay'); b.delayMs = clamp(+dl.value || 0, -500, 500); applyAllMix(); markDirty(); }; }
-    const vol = $('.mxvol', el), dbIn = $('.mxdb', el);
+    const vol = $('.mxvol', el), dbIn = $('.mxdb', el); vol.dataset.map = b.id + '|vol'; $$('[data-act=mute],[data-act=solo],[data-act=arm]', el).forEach(x => (x.dataset.map = b.id + '|' + x.dataset.act)); vol.dataset.map = b.id + '|vol'; $$('[data-act=mute],[data-act=solo],[data-act=arm]', el).forEach(x => (x.dataset.map = b.id + '|' + x.dataset.act));
     vol.onpointerdown = () => pushUndo('Volume');
     vol.oninput = () => { b.vol = +vol.value; autoTouch(b, 'vol', b.vol); applyMix(b); dbIn.value = faderDb(b.vol); markDirty(); };
     vol.ondblclick = () => { b.vol = 0.79; vol.value = b.vol; applyMix(b); dbIn.value = faderDb(b.vol); };

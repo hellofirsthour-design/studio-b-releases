@@ -29,7 +29,8 @@ function frame(now) {
     if (T.playing && hasTempoChanges() && document.activeElement !== $('#bpm')) $('#bpm').value = Math.round(bpmAt(p) * 100) / 100;
     const beat = Math.floor((((pp % SPB()) + SPB()) % SPB()) / BEAT()); if (T.playing && beat !== frame.lastBeat && !REDUCED) { const pb = $('#play'); pb.classList.remove('pulse'); void pb.offsetWidth; pb.classList.add('pulse'); } frame.lastBeat = beat; $$('#beats i').forEach((b, i) => b.classList.toggle('on', T.playing && i === beat));
     document.body.classList.toggle('blink', T.playing ? (p % 4) < 2 : (now % 1000) < 500);
-    if (T.playing && V.follow && !arr.drag) { const w = arr.lanes.clientWidth / V.pps; if (p < V.scrollX || p > V.scrollX + w) V.scrollX = Math.max(0, p - w * 0.3); else if (p > V.scrollX + w * 0.7) V.scrollX += ((p - w * 0.3) - V.scrollX) * (REDUCED ? 1 : 0.08); }
+    if (T.playing && V.follow && !arr.drag && !ZOOM.t) { const w = arr.lanes.clientWidth / V.pps, anchor = w * 0.45; // the playhead stays put and the grid glides past at playback speed
+      if (p < V.scrollX || p > V.scrollX + w) V.scrollX = Math.max(0, p - anchor); else if (p > V.scrollX + anchor) V.scrollX = p - anchor; }
     // automated faders follow their envelopes
     if (T.playing && now - lastFrame > 60) { lastFrame = now; allBuses().forEach(b => { if (b.auto.vol && b.auto.vol.length) { const v = autoValue(b.auto.vol, p), el = document.querySelector(`.hdr[data-id="${b.id}"] .hvol`); if (el && document.activeElement !== el) el.value = v; const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(v); } }); }
     if (T.playing || arr.dirty || T.recording || now % 1000 < 20 || Math.abs((now % 1000) - 560) < 20) { arr.dirty = false; arr.render(); }
@@ -152,7 +153,7 @@ function bindKeys() {
       if (k === 'x' && !e.repeat) { KB.oct = clamp(KB.oct + 1, 0, 8); toast('Computer MIDI keyboard: C' + KB.oct); e.preventDefault(); return; }
       if (k === 'c' && !e.repeat) { KB.vel = clamp(KB.vel - 0.1, 0.1, 1); toast('Velocity ' + Math.round(KB.vel * 127)); return; }
       if (k === 'v' && !e.repeat) { KB.vel = clamp(KB.vel + 0.1, 0.1, 1); toast('Velocity ' + Math.round(KB.vel * 127)); return; }
-      if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
+      if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = isPitched(t) ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
     }
     if (k === ' ') { e.preventDefault(); if (e.repeat) return; e.shiftKey ? (T.playing ? stop() : continuePlay()) : togglePlay(); return; }
     if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec) { if (T.playing) startRecording(nowPos()); else play(); } else if (T.recording) finishRecording(); ui.transport(); return; }
@@ -170,6 +171,7 @@ function bindKeys() {
       if (k === 'g') { e.preventDefault(); return e.shiftKey ? ungroupTrack() : groupTracks(); }
       if (k === '3') { e.preventDefault(); V.triplet = !V.triplet; arr.draw(); return toast(V.triplet ? 'Triplet grid' : 'Straight grid'); }
       if (e.shiftKey && k === 'c') { e.preventDefault(); return cmd('capture'); }
+      if (!e.shiftKey && (k === 'm' || k === 'k')) { e.preventDefault(); return toggleMap(k === 'm' ? 'midi' : 'key'); }
       const map = { z: e.shiftKey ? 'redo' : 'undo', y: 'redo', s: e.shiftKey ? 'saveAs' : 'save', o: 'open', n: 'new', c: 'copy', x: 'cut', v: 'paste', d: 'duplicate', e: 'split', j: 'consolidate', u: 'quantize', l: 'loopSel', a: 'selectAll', r: 'rename', t: e.shiftKey ? 'newMidi' : 'newAudio', i: 'importAudio', m: e.shiftKey ? 'newClip' : null, '=': 'zoomIn', '+': 'zoomIn', '-': 'zoomOut', ',': 'prefs' };
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
       if (e.shiftKey && k === 'f') { e.preventDefault(); return cmd('toggleFollow'); }
@@ -206,7 +208,7 @@ function bindKeys() {
   document.addEventListener('keyup', e => liveNoteOff(e.key.toLowerCase()));
   window.addEventListener('blur', () => [...held.keys()].forEach(liveNoteOff));
   if (navigator.requestMIDIAccess) navigator.requestMIDIAccess().then(acc => {
-    const hook = inp => (inp.onmidimessage = m => { if (GP.midiOff && GP.midiOff[inp.id]) return; const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n, c === 0x80 ? v / 127 : undefined); });
+    const hook = inp => (inp.onmidimessage = m => { if (GP.midiOff && GP.midiOff[inp.id]) return; if (midiMapIn(m.data)) return; const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0xe0) { liveBend(st & 15, ((v << 7) | n) / 8192 - 1); return; } if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t, st & 15); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n, c === 0x80 ? v / 127 : undefined); });
     acc.inputs.forEach(hook); acc.onstatechange = () => acc.inputs.forEach(hook);
   }).catch(() => { });
 }
@@ -226,6 +228,7 @@ function bindBar() {
   $('#snapBtn').onclick = () => { V.snap = !V.snap; ui.transport(); };
   $('#autoArm').onclick = () => { V.autoArm = !V.autoArm; ui.transport(); toast(V.autoArm ? 'Automation Arm on: move controls while playing to record them' : 'Automation Arm off'); };
   $('#reAuto').onclick = () => reenableAutomation();
+  $('#mapMidi').onclick = () => toggleMap('midi'); $('#mapKey').onclick = () => toggleMap('key');
   $('#kbBtn').onclick = () => { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); };
   applyLook(); applyOutputMono(); if (GP.outId) applyOutputDevice();
   $('#bpm').onchange = e => setBpm(+e.target.value || S.bpm);
