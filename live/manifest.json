@@ -1,8 +1,8 @@
 {
- "version": "0.2.22",
+ "version": "0.2.23",
  "shell": 2,
- "date": "2026-11-14T18:54:38.737Z",
- "notes": "Hide the clip and devices panel (▾ in its tab bar, Ctrl+Alt+L); a slim bar or opening a clip brings it back",
+ "date": "2026-11-14T19:02:16.001Z",
+ "notes": "Native audio engine (C++ Node addon): Core Audio / WASAPI / ALSA / JACK devices via miniaudio with clock-drift correction, shared-memory bridge to the Web Audio mixer, VST3 hosting (SDK, MIT) and Audio Unit hosting, built in CI",
  "files": [
   {
    "path": "css/base.css",
@@ -157,7 +157,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "e54d2c604282552ae3f9284216522d0f85dabe93a9f1d9c6ce577974c907dfc8"
+   "sha256": "54c480bd3e81c4501d85410eb0e0e044920fcc1da2ef2ed1eb6d3af42d8181e1"
   }
  ]
 }

@@ -246,6 +246,7 @@ function applyInstPreset(t, p) {
   removeBus(t); buildBus(t, 'track'); routeOut(t); rewire(t); applyMix(t); connectInputs(); ui.detail(); markDirty();
 }
 function instrumentCard_(t) {
+  if (INST2_CLS[t.inst.type]) return inst2Card(t);
   const inst = RT.get(t.id).inst;
   if (t.inst.type === 'synth') {
     const c = cardShell('Contour', 'Synth', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
