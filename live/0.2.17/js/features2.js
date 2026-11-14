@@ -93,7 +93,7 @@ async function offerRecovery() {
     d.onclick = async e => { const b = e.target.closest('[data-v]'); if (!b) return; d.hidden = true; if (b.dataset.v === 'yes') { await loadProjectObj(P, P.autosave.path); S.path = P.autosave.path; S.name = P.autosave.name; delete S.autosave; V.dirty = true; ui.title(); toast('Recovered your unsaved work. Save it to keep it.'); res(true); } else { await clearAutosave(); res(false); } };
   });
 }
-setInterval(() => autosaveNow(), 60000);
+let _lastAuto = Date.now(); setInterval(() => { if (GP.autosave === false) return; if (Date.now() - _lastAuto < (GP.autosaveMin || 1) * 60000 - 500) return; _lastAuto = Date.now(); autosaveNow(); }, 15000);
 
 /* ---------- automation shapes, copy and paste, extra lanes ---------- */
 let AUTO_CLIP = null;
@@ -116,6 +116,29 @@ function pasteAuto(b, key) { if (!AUTO_CLIP) return; pushUndo('Paste automation'
 function addAutoLane(b) { b.lanes = b.lanes || []; const used = new Set([b.autoShow, ...b.lanes]); const p = autoParams(b).find(q => !used.has(q.key)) || autoParams(b)[0]; b.lanes.push(p.key); ui.headers(); }
 
 /* ---------- group tracks ---------- */
+/* ---------- reorder tracks ---------- */
+// Moves the selected tracks (groups bring their members) before or after a track, or into a group.
+function moveTracks(ids, target, where) {
+  const sel = S.tracks.filter(t => ids.has(t.id)); if (!sel.length || !target) return false;
+  let moving = []; sel.forEach(t => { [t, ...(t.kind === 'group' ? descendants(t) : [])].forEach(x => { if (!moving.includes(x)) moving.push(x); }); });
+  moving = S.tracks.filter(t => moving.includes(t)); if (moving.includes(target)) return false;
+  const tops = moving.filter(t => !ancestors(t).some(g => moving.includes(g)));
+  let parent, rest = S.tracks.filter(t => !moving.includes(t)), at;
+  const lastOf = g => { const d = descendants(g).filter(x => rest.includes(x)); return d.length ? rest.indexOf(d[d.length - 1]) : rest.indexOf(g); };
+  if (where === 'into' && target.kind === 'group') { parent = target.id; at = lastOf(target) + 1; }
+  else if (where === 'before') { parent = target.group || null; at = rest.indexOf(target); }
+  else if (target.kind === 'group' && !target.fold && where !== 'afterGroup') { parent = target.id; at = rest.indexOf(target) + 1; }
+  else { parent = target.group || null; at = (target.kind === 'group' ? lastOf(target) : rest.indexOf(target)) + 1; }
+  pushUndo('Move track'); rest.splice(at, 0, ...moving); S.tracks = rest; tops.forEach(t => (t.group = parent));
+  S.tracks.forEach(routeOut); applyAllMix(); ui.all(); return true;
+}
+function nudgeTrack(dir) {
+  const t = S.tracks.find(x => V.selTracks.has(x.id)); if (!t) return;
+  const vis = S.tracks.filter(x => !hiddenByFold(x) && (x.group || null) === (t.group || null) && x !== t), i = S.tracks.indexOf(t);
+  const nb = dir < 0 ? [...vis].reverse().find(x => S.tracks.indexOf(x) < i) : vis.find(x => S.tracks.indexOf(x) > i);
+  if (nb) moveTracks(new Set([t.id]), nb, dir < 0 ? 'before' : (nb.kind === 'group' ? 'afterGroup' : 'after'));
+}
+
 function groupTracks() {
   const sel = S.tracks.filter(t => V.selTracks.has(t.id)); if (!sel.length) return toast('Select the tracks to group (Shift-click headers)');
   pushUndo('Group'); const parent = sel.every(t => t.group === sel[0].group) ? sel[0].group || null : null;

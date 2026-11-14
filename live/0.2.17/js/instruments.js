@@ -63,7 +63,7 @@ class Synth {
     this.update();
   }
   update() { const p = this.t.inst; this.lfo.frequency.value = p.lfoRate; this.lfoG.gain.value = p.lfoAmt; this.out.gain.value = p.gain; }
-  noteOn(note, time, vel, dur) {
+  noteOn(note, time, vel, dur, rv) {
     const p = this.t.inst, f = mtof(note);
     if (p.mono) { this.voices.forEach(v => this.release(v, time, 0.01)); }
     const v = { note, oscs: [] };
@@ -86,17 +86,17 @@ class Synth {
     mix.connect(filt); filt.connect(amp); amp.connect(this.out);
     Object.assign(v, { amp, filt });
     this.voices.push(v); this.lastF = f; if (!isOffline()) flashPadAt(this.t.id, -1, time);
-    if (dur != null) this.release(v, time + dur);
+    if (dur != null) this.release(v, time + dur, null, rv);
     if (this.voices.length > 24) this.release(this.voices[0], time, 0.01);
     return v;
   }
-  release(v, time, fast) {
-    if (v.done) return; v.done = true; const R = fast || this.t.inst.R;
+  release(v, time, fast, rv) { // release velocity: harder releases (rv near 1) cut faster, soft ones ring longer
+    if (v.done) return; v.done = true; const R = fast || this.t.inst.R * (rv == null ? 1 : 1.5 - clamp(rv, 0, 1));
     hold(v.amp.gain, time); v.amp.gain.setTargetAtTime(0, time, R / 4 + 0.001);
     v.oscs.forEach(o => { try { o.stop(time + R * 1.6 + 0.05); } catch (e) { } });
     setTimeout(() => { this.voices = this.voices.filter(x => x !== v); try { this.lfoG.disconnect(v.filt.detune); } catch (e) { } }, Math.max(0, (time - ctx.currentTime + R * 1.6 + 0.2) * 1000));
   }
-  noteOff(v, time) { if (v) this.release(v, time); }
+  noteOff(v, time, rv) { if (v) this.release(v, time, null, rv); }
   allOff(time) { this.voices.forEach(v => this.release(v, time, 0.03)); }
   dispose() { try { this.lfo.stop(); this.lfo.disconnect(); } catch (e) { } }
 }

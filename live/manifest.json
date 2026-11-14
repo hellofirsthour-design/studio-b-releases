@@ -1,13 +1,13 @@
 {
- "version": "0.2.16",
+ "version": "0.2.17",
  "shell": 2,
- "date": "2026-11-14T18:18:18.534Z",
- "notes": "Settings window with sections (look, audio, tempo/MIDI, files, library, plug-ins, record/warp, updates): input/output device, channel config, sample rate, buffer size, latency, test tone, CPU simulator; smoother zoom with a speed setting; collapsible tracks; remove duplicated clip editor controls",
+ "date": "2026-11-14T18:24:24.382Z",
+ "notes": "Audio Effect Rack: parallel chains with volume, pan, mute and solo, 8 macros with parameter mapping and ranges, variations, randomize; group a device into a rack and ungroup",
  "files": [
   {
    "path": "css/base.css",
-   "size": 24105,
-   "sha256": "f097046a7cfef33428806aa79e572969c46680c832156c391a1dcbd3b52f396f"
+   "size": 25077,
+   "sha256": "47f7767d18f02d949e8f7fd1e0b6e4d2e772f8435eb80eac23bd86a9ce8302cc"
   },
   {
    "path": "css/studio.css",
@@ -16,23 +16,23 @@
   },
   {
    "path": "index.html",
-   "size": 18385,
-   "sha256": "eded296e1597b847f87f7e5fa3e83d39f9f2fbc16d6a9f8af914dcfc8d689f31"
+   "size": 18456,
+   "sha256": "cc6ea7726cc9afb39d27b592c6d0f13f97e4a077d44f566fd873689dba069753"
   },
   {
    "path": "js/arrange.js",
-   "size": 47408,
-   "sha256": "24269ac44330303cada93fc5590160c4c37b592516db5c3a4cee9fc6f1e4e645"
+   "size": 48884,
+   "sha256": "242c59f24bc1574d8833328a65645cd00c1c812a4c9a182941164aa35b90bb7f"
   },
   {
    "path": "js/browser.js",
-   "size": 29524,
-   "sha256": "6595c1d190c818d709937d22049e8c59b5864db6bfad9e2f9334db55035db59a"
+   "size": 29532,
+   "sha256": "484f613c96f882827a54027af55b73a9af6aab68e34e44c32515cdff37ced609"
   },
   {
    "path": "js/cards.js",
-   "size": 37409,
-   "sha256": "f7b16c07db75962d6a03c7bb4ec893e8190bb74f3eedf7ecd0013672d30e4396"
+   "size": 37681,
+   "sha256": "38395d12f02e68a3ecf23633a3b21208b2a571096138db5c2528f949cdc9303e"
   },
   {
    "path": "js/core.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 49478,
-   "sha256": "d02422a0438326dff57cc3182bd26ba0d4fd05fdd11ed38952aa76d72dfecf9b"
+   "size": 49729,
+   "sha256": "fdc7803c776da1fd4ab59dbe1f409faa2c1fe4ff15dd98c0f5c8ae085b6eb047"
   },
   {
    "path": "js/features.js",
@@ -95,6 +95,11 @@
    "sha256": "ac3107ae86156df1c8c21fe724d9fd5418482e17e39d86145d3d3f041bf88811"
   },
   {
+   "path": "js/racks.js",
+   "size": 11339,
+   "sha256": "432661ed1ec453c491fc255abacb23db6df83cebbc91a77b32d09cd920fc7430"
+  },
+  {
    "path": "js/roll.js",
    "size": 34618,
    "sha256": "b0ef547c3b9805ed33272a33d70a0ef5de73fd03e31bc11fe371d388e56a5f70"
@@ -106,8 +111,13 @@
   },
   {
    "path": "js/ui.js",
-   "size": 35964,
-   "sha256": "77357b95fae88737233ff431901748bb0d6f3e4fbeabc85cd6e211358d729b39"
+   "size": 36946,
+   "sha256": "4f864352dde648148d8ab8ac316897e3cce0bf6f43300a355d3ec9baedbb910d"
+  },
+  {
+   "path": "js/warp.js",
+   "size": 5662,
+   "sha256": "a8ade3e7c0540eb54d30bee5a376cc21b1543a6c375e8b4af3062932a630ece8"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -122,7 +132,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "18269a93aa88d37df3e65f2e9108bb95a4f59e0614b25ee11bd08856864c0bb2"
+   "sha256": "b7791fd4d4576e159fc8c349b16b60ba94fcddf34117c03da2deb7b160fdf46d"
   }
  ]
 }
