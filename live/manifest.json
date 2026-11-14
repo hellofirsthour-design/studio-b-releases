@@ -1,8 +1,8 @@
 {
- "version": "0.2.24",
- "shell": 2,
- "date": "2026-11-14T19:38:16.130Z",
- "notes": "Native engine in the app: page worker bridge, output/input/plug-in worklets, VST3 and AU plug-in devices and instruments, plug-in editors, crash-safe scanning, delay compensation, external I/O routing, Ableton plug-in linking with saved VST3 state; shell 3",
+ "version": "0.2.25",
+ "shell": 3,
+ "date": "2026-11-14T19:42:31.607Z",
+ "notes": "Settings for the native engine (engine, driver, devices, main and cue outputs, sample rate, buffer, latency, status; plug-in sources, folders, rescan, delay compensation, plug-in buffer); Audio From / Audio To on mixer strips and track menus; app requires shell 3; docs",
  "files": [
   {
    "path": "css/base.css",
@@ -111,8 +111,8 @@
   },
   {
    "path": "js/mixer.js",
-   "size": 10403,
-   "sha256": "50e00bc7a86e0eeb657de8cdb601dde1b1188a35e00069891cff0845a5a3734c"
+   "size": 10708,
+   "sha256": "29ca8e35204dbad2ad634b54ce5626ababcdce2510c1cd235df2b2487c6b1e5c"
   },
   {
    "path": "js/mods.js",
@@ -121,18 +121,18 @@
   },
   {
    "path": "js/native.js",
-   "size": 14606,
-   "sha256": "c3bce4f028c0cc863ebec711797c28b454b653f1375f5ec9e8ab2f52e12e642e"
+   "size": 15667,
+   "sha256": "37eb33f7427fc03ec1776c108fc0dd8694b84cb0ef4e667d5ec4c5d106e52c29"
   },
   {
    "path": "js/plugins.js",
-   "size": 8654,
-   "sha256": "a5807150212c1b403902357015cd28384138675c2988d8650d0a2042aee367a2"
+   "size": 8666,
+   "sha256": "0dda99c363541555c62bca07868280fdd46fc6c7f2ddeae285518ecdc4243d52"
   },
   {
    "path": "js/prefs.js",
-   "size": 19857,
-   "sha256": "be90415929f52e74bda3ab1cef8687f41fad48f427f46726594ab046a8014a63"
+   "size": 29350,
+   "sha256": "0e5bead59fb378062f9e2a14268087a91442f92ecd2b2af8c4e553b2c662e16a"
   },
   {
    "path": "js/racks.js",
@@ -151,8 +151,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 36996,
-   "sha256": "3d90213cb5b445a4f5b4d5c31b8f8fc8fd591cd2d5df4325f6122fb1b9d50553"
+   "size": 38141,
+   "sha256": "1234b426af358d693e6c49bf6a5acb20fdacdcab7e71ea3b01829be674ebbfac"
   },
   {
    "path": "js/warp.js",
@@ -172,7 +172,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "c0f88cede75e3a8661c17b2dc542e4d2918244bd89a5165e3e861fd6b05cb19e"
+   "sha256": "5148e1b3f9c8875f5aac1c8b3423a2047fab3f6f679dcdd4baf81206c48341ce"
   }
  ]
 }

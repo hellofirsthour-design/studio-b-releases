@@ -29,7 +29,8 @@ function frame(now) {
     if (T.playing && hasTempoChanges() && document.activeElement !== $('#bpm')) $('#bpm').value = Math.round(bpmAt(p) * 100) / 100;
     const beat = Math.floor((((pp % SPB()) + SPB()) % SPB()) / BEAT()); if (T.playing && beat !== frame.lastBeat && !REDUCED) { const pb = $('#play'); pb.classList.remove('pulse'); void pb.offsetWidth; pb.classList.add('pulse'); } frame.lastBeat = beat; $$('#beats i').forEach((b, i) => b.classList.toggle('on', T.playing && i === beat));
     document.body.classList.toggle('blink', T.playing ? (p % 4) < 2 : (now % 1000) < 500);
-    if (T.playing && V.follow && !arr.drag) { const w = arr.lanes.clientWidth / V.pps; if (p < V.scrollX || p > V.scrollX + w) V.scrollX = Math.max(0, p - w * 0.3); else if (p > V.scrollX + w * 0.7) V.scrollX += ((p - w * 0.3) - V.scrollX) * (REDUCED ? 1 : 0.08); }
+    if (T.playing && V.follow && !arr.drag && !ZOOM.t) { const w = arr.lanes.clientWidth / V.pps, anchor = w * 0.45; // the playhead stays put and the grid glides past at playback speed
+      if (p < V.scrollX || p > V.scrollX + w) V.scrollX = Math.max(0, p - anchor); else if (p > V.scrollX + anchor) V.scrollX = p - anchor; }
     // automated faders follow their envelopes
     if (T.playing && now - lastFrame > 60) { lastFrame = now; allBuses().forEach(b => { if (b.auto.vol && b.auto.vol.length) { const v = autoValue(b.auto.vol, p), el = document.querySelector(`.hdr[data-id="${b.id}"] .hvol`); if (el && document.activeElement !== el) el.value = v; const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(v); } }); }
     if (T.playing || arr.dirty || T.recording || now % 1000 < 20 || Math.abs((now % 1000) - 560) < 20) { arr.dirty = false; arr.render(); }
@@ -66,6 +67,7 @@ function cmd(name) {
     case 'newMidi': return addInstrumentTrack('synth', null);
     case 'newReturn': { if (S.returns.length >= 12) return toast('Studio B supports up to 12 returns'); pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + RET_LETTERS[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast(`Added return ${RET_LETTERS[S.returns.length - 1]}. Every track has a send to it (Mixer view).`); return; }
     case 'addMarker': return addMarker(nowPos());
+    case 'toggleDetailPane': setDetailShown($('#app').classList.contains('nodetail')); return;
     case 'toggleBrowser': V.browser = !V.browser; ui.transport(); arr.draw(); return;
     case 'toggleDetail': V.detail = V.detail === 'clip' ? 'devices' : V.detail === 'devices' ? 'clip' : 'clip'; ui.detail(); return;
     case 'crossfade': return createCrossfades();
@@ -134,6 +136,8 @@ function cmd(name) {
 }
 const clipSpan = () => { const sc = selectedClips(); return { a: Math.min(...sc.map(x => x.c.start)), b: Math.max(...sc.map(x => x.c.start + x.c.len)) }; };
 function zoomBy(k) { const cx = V.insert >= V.scrollX && V.insert <= arr.pos(arr.lanes.clientWidth) ? V.insert : arr.pos(arr.lanes.clientWidth / 2); const x = arr.x(cx); zoomSmooth((ZOOM.t ? ZOOM.t.pps : V.pps) * k, cx, x); }
+// the clip and devices panel at the bottom can be hidden; a slim bar brings it back
+function setDetailShown(on) { const app = $('#app'); app.classList.toggle('nodetail', !on); lsSet('sb-detailHidden', on ? '0' : '1'); $('#split').title = on ? 'Drag to resize' : 'Show clip and devices (Ctrl+Alt+L)'; arr.draw(); if (on) { ui.detail(); roll.draw_ && roll.draw_(); } }
 function confirmLeave(fn) { if (!V.dirty) return fn(); const d = $('#leave'); d.hidden = false; d.onclick = async e => { const b = e.target.closest('[data-v]'); if (!b) return; d.hidden = true; if (b.dataset.v === 'save') { if (await saveProject()) fn(); } else if (b.dataset.v === 'discard') fn(); }; }
 
 /* ---------- keyboard ---------- */
@@ -175,6 +179,7 @@ function bindKeys() {
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
       if (e.shiftKey && k === 'f') { e.preventDefault(); return cmd('toggleFollow'); }
       if (e.altKey && k === 'b') { e.preventDefault(); return cmd('toggleBrowser'); }
+      if (e.altKey && k === 'l') { e.preventDefault(); return cmd('toggleDetailPane'); }
       if (e.altKey && k === 'm') { e.preventDefault(); return cmd('toggleMixer'); }
       if (e.altKey && k === 'f') { e.preventDefault(); return cmd('crossfade'); }
       if (k === 'f' && !e.shiftKey) { e.preventDefault(); if (!V.browser) cmd('toggleBrowser'); $('#bsearch').focus(); return; }
@@ -250,7 +255,8 @@ function bindBar() {
   // splitter between arrangement and detail
   const spl = $('#split'), app = $('#app'); const setH = h => { h = clamp(h, 160, innerHeight - 260); app.style.setProperty('--detailH', h + 'px'); lsSet('sb-detailH', h); arr.draw(); roll.draw_(); };
   const sv = +lsGet('sb-detailH'); if (sv) setH(sv);
-  spl.onpointerdown = e => { spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
+  setDetailShown(lsGet('sb-detailHidden') !== '1'); $('#dHide').onclick = () => setDetailShown(false);
+  spl.onpointerdown = e => { if (app.classList.contains('nodetail')) { setDetailShown(true); return; } spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { if (e.defaultPrevented) return; e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && /\.(als|sbproj|json)$/i.test(f.name)) f.arrayBuffer().then(data => confirmLeave(() => openProjectFile({ name: f.name, path: IS_DESKTOP && f.path ? f.path : null, data }))); });
 }
@@ -311,7 +317,7 @@ async function demoProject() {
 /* ---------- boot ---------- */
 (async function boot() {
   await audioReady; PITCH_OK = PITCH_OK || false;
-  S = emptyProject(); buildMaster(); rebuildAll();
+  ioInit(); S = emptyProject(); buildMaster(); rebuildAll();
   arr.init(); bindHeaders(); bindBar(); bindKeys(); await browser.init();
   const pending = IS_DESKTOP ? await NATIVE.pendingOpen() : null;
   if (pending) await openPath(pending); else if (!(await offerRecovery())) await loadProjectObj(await demoProject());
@@ -320,4 +326,5 @@ async function demoProject() {
   requestAnimationFrame(frame);
   const resume = () => { if (ctx.state !== 'running') ctx.resume(); }; document.addEventListener('pointerdown', resume, { once: true }); document.addEventListener('keydown', resume, { once: true });
   window.SB_ready = true;
+  neInit().then(on => { if (on) { ui.all(); toast(`Native audio: ${NE.dev.outputName} at ${NE.dev.sampleRate} Hz, ${NE.dev.buffer} samples`); } });
 })();

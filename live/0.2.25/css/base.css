@@ -297,3 +297,12 @@ body.map-midi [data-mapped]::after,body.map-key [data-mapped]::after{content:att
 .zones{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}.zone{display:flex;gap:10px;align-items:center;padding:4px 8px;background:var(--lane);border-radius:5px;font-size:12px}.zone b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zone input{width:48px}
 
 .grvamt{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px}.grvamt input{flex:1}.grvamt b{font-family:var(--mono);min-width:38px;text-align:right}
+
+#app.nodetail{grid-template-rows:auto minmax(120px,1fr) 16px 0}
+#app.nodetail #detail{display:none}
+#app.nodetail #split{cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--panel);border-top:1px solid var(--line)}
+#app.nodetail #split::after{content:"▴  Clip · Devices";font:600 10px var(--ui);color:var(--dim);letter-spacing:.04em}
+#app.nodetail #split:hover::after{color:var(--accent)}
+.dhide{margin-left:auto;background:none;border:0;color:var(--dim);font-size:14px;padding:0 8px;cursor:pointer}.dhide:hover{color:var(--accent)}
+
+.bscan{padding:6px 10px;gap:8px;align-items:center}

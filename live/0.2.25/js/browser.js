@@ -120,8 +120,13 @@ const browser = {
       title = 'MIDI Effects'; h = this.empty('MIDI effects are next', 'Arpeggiator, Chord, Scale, Note Length, Random and Velocity are on the roadmap. Until then, the piano roll’s <b>Transform</b> tools arpeggiate, strum, build chords and fit notes to the scale.');
     } else if (sel === 'plugins') {
       title = 'Plug-Ins';
-      const seen = S.tracks.flatMap(t => t.devices.filter(d => d.type === 'plugin').map(d => ({ name: d.p.name, meta: `${d.p.format} · ${t.name}`, icon: 'plugins', key: '' })));
-      h = this.empty('VST and AU plug-ins can’t load yet', 'Hosting third-party plug-ins needs Studio B’s native audio engine, which is on the roadmap. To bring a plug-in’s sound over from Ableton now, freeze the track there, save, and open the set in Studio B.') + (seen.length ? `<div class="bsub">In this project</div>` + seen.map(o => this.row(o)).join('') : '');
+      const pi = x => ({ name: x.name, meta: `${x.vendor ? x.vendor + ' · ' : ''}${x.format}`, drag: 'sb/plugin', val: JSON.stringify({ ref: refOf(x), instrument: !!x.instrument }), act: 'plugin', key: 'plug:' + x.format + x.uid, icon: x.instrument ? 'instruments' : 'plugins', title: x.instrument ? 'Click for a new MIDI track with this instrument, or drag onto a MIDI track' : 'Click to add to the selected track, or drag onto a track' });
+      if (!NE.avail || !NE.avail.ok) h = this.empty('Plug-ins need the native engine', !IS_DESKTOP ? 'VST3 and Audio Unit plug-ins run in the desktop app.' : !NE.avail ? 'This copy of Studio B is older than the native engine. Download the newest installer once; after that, updates arrive on their own.' : 'The native engine did not load on this computer: ' + esc(NE.avail.error || '') + '.');
+      else {
+        const all = nePlugins().filter(x => m(x.name) || m(x.vendor || '')), ins = all.filter(x => x.instrument), fx = all.filter(x => !x.instrument);
+        h = `<div class="row tight bscan"><button class="btn ghostb tiny" data-act="scan">${nePlugins().length ? 'Rescan plug-ins' : 'Scan for plug-ins'}</button><span class="muted small">${nePlugins().length} found${NE.on ? '' : ' · turn on the native engine in Settings → Audio to use them'}</span></div>`
+          + this.staticFolderOpen('Instruments', ins.map(pi)) + this.staticFolderOpen('Audio Effects', fx.map(pi)) + ((NE.catalog.failed || []).length ? this.staticFolder('failed', `Could not load (${NE.catalog.failed.length})`, NE.catalog.failed.map(f => ({ name: basename(f.path), meta: f.error, icon: 'file' }))) : '');
+      }
     } else if (sel === 'clips') {
       title = 'Clips';
       const inProj = S.tracks.flatMap(t => t.clips.filter(c => c.type === 'midi').map(c => ({ name: c.name, meta: t.name, icon: 'clips', act: 'showClip', key: '', val: c.id, path: c.id }))).filter(o => m(o.name));
@@ -206,6 +211,8 @@ const browser = {
       this.renderList(); return;
     }
     if (act === 'addPlace') return this.addPlace();
+    if (act === 'scan') return neScan();
+    if (act === 'plugin') { const o = JSON.parse(a.dataset.val || '{}'); if (!NE.on) return toast('Turn on the native engine in Settings → Audio to use plug-ins'); return addPlugin(o.ref, o.instrument, o.instrument ? null : undefined); }
     if (act === 'groove') return applyGroove(a.dataset.val || (a.dataset.key || '').slice(7));
     if (act === 'tpl') { const t = (this.tpls || []).find(x => x.name === a.dataset.name); if (t) confirmLeave(() => newFromTemplate(t)); return; }
     if (act === 'prev') { $$('.brow.sel', $('#blist')).forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) this.previewItem(a); return; }

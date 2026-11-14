@@ -94,7 +94,7 @@ function cardShell(title, sub, opts = {}) {
 }
 function deviceCard(o, d, i) {
   const def = DEVICES[d.type];
-  const c = cardShell(d.type === 'plugin' ? d.p.name : def.name, d.type === 'plugin' ? `${d.p.format} ${d.p.role === 'instrument' ? 'instrument' : 'effect'} · not loaded` : def.blurb, { power: true, off: !d.on, wide: def.wide, tools: `${d.type === 'plugin' ? '' : `<button class="ic dtool" data-pre title="Presets" aria-label="Presets">☰</button><button class="ic dtool ab ${d.ab ? 'on' : ''}" data-ab title="A/B compare: switch between two settings">${d.ab && d.ab.cur === 'b' ? 'B' : 'A'}</button><button class="ic dtool" data-swap title="Swap for another device" aria-label="Swap device">⇄</button>`}<button class="ic dtool" data-fold title="Collapse" aria-label="Collapse">${d.fold ? '▸' : '▾'}</button><button class="ic" data-mv="-1" aria-label="Move left">‹</button><button class="ic" data-mv="1" aria-label="Move right">›</button><button class="ic" data-rm aria-label="Remove device">✕</button>` });
+  const c = cardShell(d.type === 'plugin' ? d.p.name : def.name, d.type === 'plugin' ? `${d.p.ref ? d.p.ref.format : d.p.format} ${d.p.role === 'instrument' ? 'instrument' : 'effect'}${d.p.ref ? '' : ' · not linked'}` : def.blurb, { power: true, off: !d.on, wide: def.wide, tools: `${d.type === 'plugin' ? '' : `<button class="ic dtool" data-pre title="Presets" aria-label="Presets">☰</button><button class="ic dtool ab ${d.ab ? 'on' : ''}" data-ab title="A/B compare: switch between two settings">${d.ab && d.ab.cur === 'b' ? 'B' : 'A'}</button><button class="ic dtool" data-swap title="Swap for another device" aria-label="Swap device">⇄</button>`}<button class="ic dtool" data-fold title="Collapse" aria-label="Collapse">${d.fold ? '▸' : '▾'}</button><button class="ic" data-mv="-1" aria-label="Move left">‹</button><button class="ic" data-mv="1" aria-label="Move right">›</button><button class="ic" data-rm aria-label="Remove device">✕</button>` });
   c.draggable = true; c.dataset.di = i; if (d.fold) c.classList.add('folded');
   const r = devRT(d), body = $('.cb', c);
   const changed = () => { r.set(); markDirty(); };
@@ -113,7 +113,7 @@ function deviceCard(o, d, i) {
   c.addEventListener('dragleave', () => c.classList.remove('dropl'));
   c.addEventListener('drop', e => { const f = e.dataTransfer.getData('gw/dev'); if (f === '') return; e.preventDefault(); const [x] = o.devices.splice(+f, 1); o.devices.splice(i, 0, x); rewire(o); ui.detail(); markDirty(); });
   c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [...(o._rack ? [] : d.type === 'rack' ? [{ label: 'Ungroup rack (keeps the selected chain)', run: () => ungroupRack(o, i) }] : [{ label: 'Group into a rack', key: 'Ctrl+G', run: () => groupIntoRack(o, i) }]), { label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
-  if (d.type === 'plugin') { body.innerHTML = `<p class="plugnote">Studio B can't run ${esc(d.p.format)} plug-ins yet, so this slot passes audio straight through.${d.p.role === 'instrument' ? ' The notes are playing on a built-in synth for now.' : ''}</p><p class="plugnote muted">To hear the real sound: in Ableton, right-click the track and choose <b>Freeze Track</b>, save, then open the set here again. Studio B brings frozen tracks in as audio.</p>`; return c; }
+  if (d.type === 'plugin') { plugBody(body, o, d.id, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`); return c; }
   if (d.type === 'rack') { rackView(body, o, d, r); return c; }
   if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (d.type === 'eq') eqEditor(body, d, r, changed);
@@ -246,6 +246,7 @@ function applyInstPreset(t, p) {
   removeBus(t); buildBus(t, 'track'); routeOut(t); rewire(t); applyMix(t); connectInputs(); ui.detail(); markDirty();
 }
 function instrumentCard_(t) {
+  if (t.inst.type === 'plugin') { const c = cardShell(t.inst.name || 'Plug-in', 'Plug-in instrument', { wide: true }), body = $('.cb', c); plugBody(body, t, 'inst:' + t.id, t.inst, (k, v) => { t.inst[k] = v; const s = neSlotOf('inst:' + t.id); if (s) neParam(s.slot, +k.slice(2), v); markDirty(); }); return c; }
   if (INST2_CLS[t.inst.type]) return inst2Card(t);
   const inst = RT.get(t.id).inst;
   if (t.inst.type === 'synth') {

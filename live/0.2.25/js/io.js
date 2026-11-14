@@ -73,6 +73,7 @@ async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = 
   S.tracks.forEach(t => [...t.clips, ...(t.takes || []).flatMap(l => l.clips)].forEach(c => { if (c.type === 'audio' && c.warp && !c.timebase && SAMPLES.get(c.sampleId)) tempos.forEach(bpm => { const r = (c.srcBpm / bpm) * clipPitch(c); if (Math.abs(r - 1) > 0.002) jobs.push(requestWarp(c.sampleId, r)); }); }));
   await Promise.all(jobs);
   const off = new OfflineAudioContext(2, Math.max(1, Math.ceil(secs * sr)), sr);
+  if (NE.on) { await neRenderBegin(); NE.slots.forEach(s => Atomics.store(NE.I, neSlotBase(s.slot) + 5, 1)); }   // live plug-in nodes pause; the render's nodes use the slots
   const live = ctx; setCtx(off); await loadWorklets(off);
   const saved = { anchorTime: T.anchorTime, anchorPos: T.anchorPos }, loopWas = S.loop.on;
   try {
@@ -87,7 +88,9 @@ async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = 
     }
     return await off.startRendering();
   } finally {
-    S.loop.on = loopWas; T.render = null; T.playing = false; T.srcs = []; setCtx(live); Object.assign(T, saved); buildMaster(); rebuildAll(); applyAllMix(); T.busy = false; document.body.classList.remove('busy');
+    S.loop.on = loopWas; T.render = null; T.playing = false; T.srcs = []; setCtx(live); Object.assign(T, saved);
+    if (NE.on) { NE.slots.forEach(s => Atomics.store(NE.I, neSlotBase(s.slot) + 5, 0)); await neRenderEnd(); }
+    buildMaster(); rebuildAll(); applyAllMix(); T.busy = false; document.body.classList.remove('busy');
   }
 }
 // Silence everything except one bus. For a return, tracks still feed its send but not the main output.
@@ -136,6 +139,7 @@ async function writeRecordings(projPath) {
 }
 async function saveProject(as) {
   try {
+    await neSaveStates();
     let p = S.path;
     if (!IS_DESKTOP) { await writeRecordings(); await saveBytes('sbproj', `${slug(S.name)}.sbproj`, JSON.stringify(serialise())); V.dirty = false; ui.title(); return true; }
     if (as || !p || !/\.sbproj$/i.test(p)) { p = await NATIVE.saveDialog('sbproj', joinPath((await NATIVE.paths()).music, `${slug(S.name)}.sbproj`)); if (!p) return false; S.path = p; S.name = basename(p).replace(/\.sbproj$/i, ''); }
@@ -175,7 +179,7 @@ async function loadProjectObj(P, sourcePath) {
 async function openProjectDialog() { const [f] = await pickFile('project', '.sbproj,.als,.json'); if (f) await openProjectFile(f); }
 async function openProjectFile(f) {
   try {
-    if (/\.als$/i.test(f.name)) { const P = await importALS(f); const rep = P._report; delete P._report; await loadProjectObj(P, null); S.name = f.name.replace(/\.als$/i, ''); ui.title(); V.dirty = true; toast(rep, 7000); return; }
+    if (/\.als$/i.test(f.name)) { const P = await importALS(f); const rep = P._report; delete P._report; await loadProjectObj(P, null); S.name = f.name.replace(/\.als$/i, ''); ui.title(); V.dirty = true; const linked = linkPlaceholders(); toast(rep + (linked ? ` Linked ${linked} plug-in${linked > 1 ? 's' : ''} to the ones installed on this computer.` : ''), 8000); return; }
     const P = JSON.parse(new TextDecoder().decode(f.data)); if (!P.tracks) throw new Error('This is not a Studio B project.');
     await loadProjectObj(P, f.path); toast('Opened ' + (P.name || f.name));
   } catch (err) { console.error(err); toast('That file could not be opened. ' + (err.message || '')); }
@@ -328,7 +332,12 @@ async function importALS(file) {
     });
     return out;
   };
-  const plugInfo = d => ({ name: val(d, 'PluginDesc PlugName') || val(d, 'PluginDesc Vst3PluginInfo Name') || val(d, 'PluginDesc AuPluginInfo Name') || val(d, 'PluginDesc VstPluginInfo PlugName') || val(d, 'PlugName') || 'Plug-in', format: d.tagName === 'AuPluginDevice' ? 'AU' : d.querySelector('Vst3PluginInfo') ? 'VST3' : 'VST' });
+  const hexToB64 = el => { const h = el ? el.textContent.replace(/\s+/g, '') : ''; if (!h || h.length % 2) return null; const u = new Uint8Array(h.length / 2); for (let i = 0; i < u.length; i++) u[i] = parseInt(h.substr(i * 2, 2), 16); return u; };
+  const alsState = d => { // our state format: [u32 len][processor state][u32 len][controller state]
+    const p = hexToB64(d.querySelector('Vst3Preset ProcessorState')), c = hexToB64(d.querySelector('Vst3Preset ControllerState'));
+    if (p) { const out = new Uint8Array(8 + p.length + (c ? c.length : 0)), v = new DataView(out.buffer); v.setUint32(0, p.length, true); out.set(p, 4); v.setUint32(4 + p.length, c ? c.length : 0, true); if (c) out.set(c, 8 + p.length); return b64(out.buffer); }
+    const a = hexToB64(d.querySelector('AuPreset Buffer')); return a ? b64(a.buffer) : null; };
+  const plugInfo = d => ({ alsState: alsState(d), name: val(d, 'PluginDesc PlugName') || val(d, 'PluginDesc Vst3PluginInfo Name') || val(d, 'PluginDesc AuPluginInfo Name') || val(d, 'PluginDesc VstPluginInfo PlugName') || val(d, 'PlugName') || 'Plug-in', format: d.tagName === 'AuPluginDevice' ? 'AU' : d.querySelector('Vst3PluginInfo') ? 'VST3' : 'VST' });
   const warpBpm = scope => { const wm = [...scope.querySelectorAll('WarpMarkers > WarpMarker')].map(w => ({ sec: +w.getAttribute('SecTime'), beat: +w.getAttribute('BeatTime') })).sort((a, b) => a.beat - b.beat); if (wm.length < 2) return null; const a = wm[0], z = wm[wm.length - 1]; const spb = (z.sec - a.sec) / ((z.beat - a.beat) || 1); return spb > 0 ? clamp(60 / spb, 20, 400) : null; };
   // Simpler / Sampler / Drum Sampler: the loaded file, its region, slices, playback mode and root key.
   const readSampler = async dev => {

@@ -137,7 +137,8 @@ function bindHeaders() {
     if (isT) items.push({ label: 'Move up', key: 'Ctrl+Alt+↑', run: () => { V.selTracks = new Set([b.id]); nudgeTrack(-1); } }, { label: 'Move down', key: 'Ctrl+Alt+↓', run: () => { V.selTracks = new Set([b.id]); nudgeTrack(1); } });
     if (isT) items.push(b.kind === 'group' ? { label: 'Ungroup', key: 'Ctrl+Shift+G', run: () => ungroupTrack(b) } : { label: 'Group selected tracks', key: 'Ctrl+G', run: () => { V.selTracks.add(b.id); groupTracks(); } });
     if (isT && b.takes && b.takes.length) items.push({ label: b.showTakes ? 'Hide take lanes' : 'Show take lanes', run: () => { b.showTakes = !b.showTakes; ui.headers(); } });
-    if (isT && b.kind === 'audio') items.push('-', { label: 'Choose input…', run: () => chooseInput(b) });
+    if (isT && b.kind === 'audio') items.push('-', { label: `Audio from: ${inLabel(b)}…`, run: () => chooseInput(b) });
+    if (b !== S.master) items.push({ label: `Audio to: ${outLabel(b)}…`, run: () => chooseOutput(b) });
     if (S.returns.includes(b)) items.push({ label: 'Delete return', danger: true, run: () => { if (S.returns.length <= 1) return toast('Keep at least one return'); pushUndo(); S.returns = S.returns.filter(r => r !== b); rebuildAll(); ui.all(); } });
     items.push('-', { label: 'Show automation', run: () => { V.autoMode = true; ui.all(); } }, { label: 'Show automation in new lane', run: () => addAutoLane(b) }, { label: 'Show automation in new lane', run: () => addAutoLane(b) }, { label: b.collapsed ? 'Expand track' : 'Collapse track', run: () => { b.collapsed = !b.collapsed; ui.all(); } }, { label: 'Collapse all tracks', run: () => { [...S.tracks.filter(x => x.kind !== 'group'), ...S.returns, S.master].forEach(x => (x.collapsed = true)); ui.all(); } }, { label: 'Expand all tracks', run: () => { [...S.tracks, ...S.returns, S.master].forEach(x => (x.collapsed = false)); ui.all(); } }, { label: 'Make tall', run: () => { b.h = 110; ui.headers(); } });
     popMenu(e, items);
@@ -157,6 +158,12 @@ function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler" o
   V.detail = 'devices'; ui.all();
 }
 async function chooseInput(t) {
+  if (IO.native) { // the device's own channels, plus the internal sources
+    const set = v => { pushUndo('Input'); t.input = v; connectInputs(); ui.headers(); if (V.view === 'mix') mixer.render(); };
+    const others = S.tracks.filter(x => x !== t && x.kind !== 'group').map(x => ({ label: (t.input === 'track:' + x.id ? '✓ ' : '') + 'Track: ' + x.name, run: () => set('track:' + x.id) }));
+    if (!IO.inCh) return popMenu(lastPointer, [{ label: 'The audio device has no inputs. Choose one in Settings → Audio.', run: () => showPrefs() }, '-', { label: (t.input === 'resample' ? '✓ ' : '') + 'Resampling (the main output)', run: () => set('resample') }, ...others]);
+    return popMenu(lastPointer, [...inChoices().map(([v, l]) => ({ label: ((t.input || 'default') === v || (v === 'ext:1' && (t.input || 'default') === 'default') ? '✓ ' : '') + 'Ext. ' + l, run: () => set(v) })), '-', { label: (t.input === 'resample' ? '✓ ' : '') + 'Resampling (the main output)', run: () => set('resample') }, ...others]);
+  }
   let devs = []; try { if (!internalInput(t)) await getInput(t.input); devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) { return toast('No audio input is available. Check microphone permission.'); }
   const others = S.tracks.filter(x => x !== t && x.kind !== 'group').map(x => ({ label: (t.input === 'track:' + x.id ? '✓ ' : '') + 'Track: ' + x.name, run: () => { pushUndo('Input'); t.input = 'track:' + x.id; connectInputs(); ui.headers(); toast(`Records ${x.name}'s output`); } }));
   popMenu(lastPointer, [...devs.map(d => ({ label: (d.deviceId === t.input ? '✓ ' : '') + (d.label || 'Input ' + d.deviceId.slice(0, 5)), run: async () => { t.input = d.deviceId; try { await getInput(d.deviceId); connectInputs(); toast('Input: ' + d.label); } catch (e) { toast('That input could not be opened'); } } })), '-', { label: (t.input === 'resample' ? '✓ ' : '') + 'Resampling (the main output)', run: () => { pushUndo('Input'); t.input = 'resample'; connectInputs(); ui.headers(); toast('Records the main output'); } }, ...others]);
