@@ -44,6 +44,7 @@ const songEnd = () => Math.max(64, ...S.tracks.flatMap(t => t.clips.map(c => c.s
 
 /* ---------- audio graph ---------- */
 function buildMaster() {
+  [M.out, M.click, M.cue, M.loud].forEach(n => { if (n) try { n.disconnect(); } catch (e) { } });
   M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = 2048;
   M.rec = !isOffline() && ctx.createMediaStreamDestination ? ctx.createMediaStreamDestination() : null;
   M.out.connect(ctx.destination); M.out.connect(M.an); if (M.rec) M.out.connect(M.rec);
@@ -59,19 +60,35 @@ function chain(src, devices, dest) {
   prev.connect(dest);
 }
 function rewireMaster() { chain(M.in, S.master.devices, M.out); M.out.gain.value = faderGain(S.master.vol); }
+/* sends: any number of returns (up to 12). Sends A and B keep their old field names. */
+const sendOf = (b, i) => (b.sends && b.sends[i] != null ? b.sends[i] : i === 0 ? b.sendA || 0 : i === 1 ? b.sendB || 0 : 0);
+function setSend(b, i, v) { b.sends = b.sends || [b.sendA || 0, b.sendB || 0]; while (b.sends.length <= i) b.sends.push(0); b.sends[i] = v; if (i === 0) b.sendA = v; if (i === 1) b.sendB = v; }
+const sendKey = i => (i === 0 ? 'sendA' : i === 1 ? 'sendB' : 'send:' + i);
+const sendIndex = k => (k === 'sendA' ? 0 : k === 'sendB' ? 1 : k.startsWith('send:') ? +k.slice(5) : -1);
+const RET_LETTERS = 'ABCDEFGHIJKL';
+/* groups */
+const groupOf = b => (b && b.group ? S.tracks.find(t => t.id === b.group && t.kind === 'group') : null);
+const ancestors = b => { const out = []; let g = groupOf(b); while (g && !out.includes(g)) { out.push(g); g = groupOf(g); } return out; };
+const descendants = g => S.tracks.filter(t => ancestors(t).includes(g));
+const depthOf = b => ancestors(b).length;
+const hiddenByFold = b => ancestors(b).some(g => g.fold);
+function routeOut(b) {
+  const r = RT.get(b.id); if (!r || b === S.master) return; const g = groupOf(b), dest = g && RT.get(g.id) ? RT.get(g.id).in : M.in;
+  if (r.outDest === dest) return; if (r.outDest) try { r.mute.disconnect(r.outDest); } catch (e) { } r.mute.connect(dest); r.outDest = dest;
+}
 function buildBus(b, kind) {
-  const r = { fader: ctx.createGain(), pan: ctx.createStereoPanner(), mute: ctx.createGain(), an: ctx.createAnalyser(), kind };
-  r.an.fftSize = 1024; r.fader.connect(r.pan); r.pan.connect(r.mute); r.mute.connect(M.in); r.mute.connect(r.an);
+  const r = { fader: ctx.createGain(), pan: ctx.createStereoPanner(), dly: ctx.createDelay(1), mute: ctx.createGain(), an: ctx.createAnalyser(), pre: ctx.createGain(), preMute: ctx.createGain(), kind };
+  r.an.fftSize = 1024; r.pre.connect(r.fader); r.fader.connect(r.pan); r.pan.connect(r.dly); r.dly.connect(r.mute); r.mute.connect(r.an); r.pre.connect(r.preMute);
+  RT.set(b.id, r); routeOut(b);
   r.split = ctx.createChannelSplitter(2); r.anL = ctx.createAnalyser(); r.anR = ctx.createAnalyser(); r.anL.fftSize = r.anR.fftSize = 1024; r.mute.connect(r.split); r.split.connect(r.anL, 0); r.split.connect(r.anR, 1);
-  if (kind === 'return') r.in = ctx.createGain();
-  else {
-    if (b.kind === 'midi') { r.inst = makeInstrument(b); r.in = r.inst.out; }
-    else { r.in = ctx.createGain(); r.mon = ctx.createGain(); r.mon.gain.value = 0; r.mon.connect(r.in); }
-    r.sA = ctx.createGain(); r.sB = ctx.createGain(); r.mute.connect(r.sA); r.mute.connect(r.sB);
-    const ra = S.returns[0] && RT.get(S.returns[0].id), rb = S.returns[1] && RT.get(S.returns[1].id);
-    if (ra) r.sA.connect(ra.in); if (rb) r.sB.connect(rb.in);
+  if (kind === 'return' || b.kind === 'group') r.in = ctx.createGain();
+  else if (b.kind === 'midi') { r.inst = makeInstrument(b); r.in = r.inst.out; }
+  else { r.in = ctx.createGain(); r.mon = ctx.createGain(); r.mon.gain.value = 0; r.mon.connect(r.in); }
+  if (kind !== 'return') {
+    r.sends = S.returns.map(ret => { const g = ctx.createGain(); g.gain.value = 0; (ret.pre ? r.preMute : r.mute).connect(g); const rr = RT.get(ret.id); if (rr) g.connect(rr.in); return g; });
+    r.sA = r.sends[0]; r.sB = r.sends[1];
   }
-  r.frz = ctx.createGain(); r.frz.connect(r.fader);
+  r.frz = ctx.createGain(); r.frz.connect(r.pre);
   RT.set(b.id, r); rewire(b); applyMix(b);
   return r;
 }
@@ -81,16 +98,19 @@ function wireSidechains() {
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
-function rewire(b) { if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.fader); }
+function rewire(b) { if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
 const anySolo = () => S.tracks.some(t => t.solo);
+// A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
+const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
 function applyMix(b) {
   if (b === S.master) { if (M.out) sm(M.out.gain, faderGain(b.vol)); return; }
   const r = RT.get(b.id); if (!r) return;
-  if (!b.auto.vol || !b.auto.vol.length) sm(r.fader.gain, faderGain(b.vol));
-  if (!b.auto.pan || !b.auto.pan.length) sm(r.pan.pan, b.pan);
-  if (r.sA) { sm(r.sA.gain, b.sendA); sm(r.sB.gain, b.sendB); }
-  const isTrack = S.tracks.includes(b), audible = !b.mute && (!isTrack || !anySolo() || b.solo);
-  sm(r.mute.gain, audible ? 1 : 0, 0.008);
+  if (!autoActive(b, 'vol')) sm(r.fader.gain, faderGain(b.vol));
+  if (!autoActive(b, 'pan')) sm(r.pan.pan, b.pan);
+  if (r.sends) r.sends.forEach((g, i) => { const k = sendKey(i); if (!autoActive(b, k)) sm(g.gain, sendOf(b, i)); });
+  const isTrack = S.tracks.includes(b), audible = !b.mute && !ancestors(b).some(g => g.mute) && (!isTrack || !anySolo() || soloPath(b));
+  sm(r.mute.gain, audible ? 1 : 0, 0.008); sm(r.preMute.gain, audible ? 1 : 0, 0.008);
+  const off = Math.max(0, ...S.tracks.map(t => -(t.delayMs || 0))) / 1000; sm(r.dly.delayTime, clamp(((isTrack ? b.delayMs || 0 : 0) / 1000) + off, 0, 0.99), 0.02);
   if (r.mon) sm(r.mon.gain, monitorOn(b) ? 1 : 0, 0.01);
 }
 const applyAllMix = () => allBuses().forEach(applyMix);
@@ -99,17 +119,17 @@ const gainToFader = g => Math.sqrt(Math.max(0, g) / 1.6);
 const faderDb = v => (v <= 0 ? '-inf' : gainToDb(faderGain(v)).toFixed(1));
 function rebuildAll() {
   stopSources(ctx.currentTime);
-  for (const r of RT.values()) { try { r.mute.disconnect(); r.in.disconnect(); } catch (e) { } if (r.inst) r.inst.allOff(ctx.currentTime); }
+  for (const r of RT.values()) { try { r.mute.disconnect(); r.in.disconnect(); } catch (e) { } if (r.inst) { r.inst.allOff(ctx.currentTime); if (r.inst.dispose) r.inst.dispose(); } }
   RT.clear(); DEV_RT.forEach(d => d.dispose()); DEV_RT.clear();
   try { M.in.disconnect(); } catch (e) { }
   rewireMaster();
   S.returns.forEach(r => buildBus(r, 'return'));
   S.tracks.forEach(t => buildBus(t, 'track'));
-  connectInputs(); wireSidechains();
+  S.tracks.forEach(routeOut); connectInputs(); wireSidechains();
 }
 function removeBus(b) {
-  const r = RT.get(b.id); if (!r) return; if (r.inst) r.inst.allOff(ctx.currentTime);
-  try { r.mute.disconnect(); } catch (e) { }
+  const r = RT.get(b.id); if (!r) return; if (r.inst) { r.inst.allOff(ctx.currentTime); if (r.inst.dispose) r.inst.dispose(); }
+  try { r.mute.disconnect(); } catch (e) { } METER.delete(b.id);
   b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) { x.dispose(); DEV_RT.delete(d.id); } });
   RT.delete(b.id);
 }
@@ -120,22 +140,42 @@ function autoParams(b) {
   const out = [{ key: 'vol', label: 'Volume', min: 0, max: 1, fmt: v => faderDb(v) + ' dB' }];
   if (b === S.master) out.push({ key: 'tempo', label: 'Song Tempo', min: 40, max: 220, steps: true, fmt: v => v.toFixed(1) + ' BPM' });
   if (b !== S.master) out.push({ key: 'pan', label: 'Pan', min: -1, max: 1, fmt: v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R') });
-  if (S.tracks.includes(b)) out.push({ key: 'sendA', label: 'Send A', min: 0, max: 1, fmt: fPct }, { key: 'sendB', label: 'Send B', min: 0, max: 1, fmt: fPct });
+  if (S.tracks.includes(b)) S.returns.forEach((ret, i) => out.push({ key: sendKey(i), label: `Send ${RET_LETTERS[i]} (${ret.name})`, min: 0, max: 1, fmt: fPct }));
   if (b.kind === 'midi' && b.inst.type === 'synth') [['cutoff', 'Synth Cutoff', 40, 16000, 'log', fHz], ['res', 'Synth Reso', 0.3, 20, null, v => v.toFixed(1)], ['fenv', 'Synth Env', 0, 8000, null, fHz], ['gain', 'Synth Volume', 0, 1, null, fPct]].forEach(([k, l, a, z, sc, f]) => out.push({ key: 'inst:' + k, label: l, min: a, max: z, scale: sc, fmt: f }));
   if (b.kind === 'midi' && b.inst.type === 'sampler') out.push({ key: 'inst:filter', label: 'Sampler Filter', min: -1, max: 1, fmt: v => v.toFixed(2) });
   b.devices.forEach(d => (DEVICES[d.type].params || []).filter(p => p.min != null).forEach(p => out.push({ key: `dev:${d.id}:${p.k}`, label: `${DEVICES[d.type].name}: ${p.label}`, min: p.min, max: p.max, scale: p.scale, fmt: p.fmt })));
   b.devices.filter(d => d.type === 'eq').forEach(d => d.p.bands.forEach((band, i) => { out.push({ key: `eqf:${d.id}:${i}`, label: `Prism EQ ${i + 1} Freq`, min: 20, max: 20000, scale: 'log', fmt: fHz }); out.push({ key: `eqg:${d.id}:${i}`, label: `Prism EQ ${i + 1} Gain`, min: -18, max: 18, fmt: fDb }); }));
   return out;
 }
+// A point's `c` (-1..1) bends the segment that starts at it: 0 is straight, positive starts slow, negative starts fast.
+const curveF = (f, c) => (!c ? f : Math.pow(f, Math.pow(4, c)));
 function autoValue(pts, pos) {
   if (!pts || !pts.length) return null;
   if (pos <= pts[0].t) return pts[0].v; const last = pts[pts.length - 1]; if (pos >= last.t) return last.v;
-  for (let i = 1; i < pts.length; i++) if (pos < pts[i].t) { const a = pts[i - 1], b = pts[i]; return a.v + (b.v - a.v) * (pos - a.t) / (b.t - a.t || 1); }
+  for (let i = 1; i < pts.length; i++) if (pos < pts[i].t) { const a = pts[i - 1], b = pts[i]; return a.v + (b.v - a.v) * curveF((pos - a.t) / (b.t - a.t || 1), a.c); }
   return last.v;
 }
+/* Overrides: touching an automated control holds your value until Re-enable Automation. */
+const OVERRIDES = new Set();
+const ovKey = (b, k) => b.id + '|' + k;
+const autoActive = (b, k) => !!(b.auto[k] && b.auto[k].length && !OVERRIDES.has(ovKey(b, k)));
+const AUTO_WRITE = new Map();
+// Called whenever a control changes. With Automation Arm on during playback it records; otherwise it overrides.
+function autoTouch(b, key, v) {
+  if (!b || !autoParams(b).some(p => p.key === key)) return;
+  if (T.playing && V.autoArm && !T.busy) {
+    const now = nowPos(), w = AUTO_WRITE.get(ovKey(b, key)), pts = b.auto[key] || (b.auto[key] = []);
+    if (!w || now < w.last - 0.01 || now - w.last > 2) { if (!w) pushUndo('Record automation'); const prev = pts.length ? autoValue(pts, now) : currentParam(b, key); b.auto[key] = pts.filter(p => Math.abs(p.t - now) > 0.05); b.auto[key].push({ t: Math.max(0, now - 0.01), v: prev }); }
+    const arr0 = b.auto[key], from = w && now >= w.last ? w.last : now; b.auto[key] = arr0.filter(p => p.t <= from + 1e-6 || p.t > now + 1e-6); b.auto[key].push({ t: now, v }); b.auto[key].sort((x, y) => x.t - y.t);
+    AUTO_WRITE.set(ovKey(b, key), { last: now }); OVERRIDES.delete(ovKey(b, key)); markDirty(); arr.draw(); return;
+  }
+  if (b.auto[key] && b.auto[key].length && !OVERRIDES.has(ovKey(b, key))) { OVERRIDES.add(ovKey(b, key)); ui.transport(); arr.draw(); }
+}
+function reenableAutomation() { if (!OVERRIDES.size) return; OVERRIDES.clear(); AUTO_WRITE.clear(); ui.transport(); arr.draw(); if (T.playing) play(nowPos()); else releaseAutomation(); }
 function currentParam(b, key) {
   if (key === 'tempo') return bpmAt(nowPos());
-  if (key === 'vol' || key === 'pan' || key === 'sendA' || key === 'sendB') return b[key];
+  if (sendIndex(key) >= 0) return sendOf(b, sendIndex(key));
+  if (key === 'vol' || key === 'pan') return b[key];
   const [kind, id, k] = key.split(':');
   if (kind === 'inst') return b.inst[id];
   const d = b.devices.find(x => x.id === id); if (!d) return 0;
@@ -145,16 +185,15 @@ function currentParam(b, key) {
 // Apply automation for one window. AudioParams ramp to the window end; device parameters are set at window start.
 function applyAutomation(b, from, to, first) {
   for (const key in b.auto) {
-    const pts = b.auto[key]; if (!pts || !pts.length || key === 'tempo') continue;
-    if (T.render && T.render.only === b.id && (key === 'sendA' || key === 'sendB' || (T.render.prefader && (key === 'vol' || key === 'pan')))) continue;
+    const pts = b.auto[key]; if (!pts || !pts.length || key === 'tempo' || OVERRIDES.has(ovKey(b, key)) || (V.autoArm && T.playing && AUTO_WRITE.has(ovKey(b, key)))) continue;
+    if (T.render && T.render.only === b.id && (sendIndex(key) >= 0 || (T.render.prefader && (key === 'vol' || key === 'pan')))) continue;
     if (T.render && T.render.only && b === S.master && key === 'vol') continue;
     const r = b === S.master ? { fader: M.out } : RT.get(b.id); if (!r) continue;
     const vEnd = autoValue(pts, to), tEnd = timeAt(to);
     const ramp = (param, val) => { if (first) { param.cancelScheduledValues(0); param.setValueAtTime(val(autoValue(pts, from)), Math.max(0, timeAt(from))); } param.linearRampToValueAtTime(val(vEnd), Math.max(ctx.currentTime, tEnd)); };
     if (key === 'vol') ramp(r.fader.gain, faderGain);
     else if (key === 'pan' && r.pan) ramp(r.pan.pan, v => v);
-    else if (key === 'sendA' && r.sA) ramp(r.sA.gain, v => v);
-    else if (key === 'sendB' && r.sB) ramp(r.sB.gain, v => v);
+    else if (sendIndex(key) >= 0) { const g = r.sends && r.sends[sendIndex(key)]; if (g) ramp(g.gain, v => v); }
     else {
       const v = autoValue(pts, from), [kind, id, k] = key.split(':');
       if (kind === 'inst') { if (b.inst[id] !== v) { b.inst[id] = v; r.inst.update(); } }
@@ -193,12 +232,14 @@ function xfInfo(t, c) {
   const ext = Math.max(0, Math.min(half, avail)); return { ext, fade: ext + half };
 }
 const xfHalf = (t, c) => { const i = xfInfo(t, c); return i ? i.fade / 2 : 0; };
-function clipEffSpan(t, c) { const i = xfInfo(t, c), R = rightOf(t, c), o = R && !R.muted ? xfInfo(t, R) : null; return { a: c.start - (i ? i.ext : 0), b: c.start + c.len + (o ? o.ext : 0), hin: i ? i.ext : 0, hout: o ? o.ext : 0, fin: i ? i.fade : 0, fout: o ? o.fade : 0 }; }
+function clipEffSpan(t, c) { const i = xfInfo(t, c), R = rightOf(t, c), o = R && !R.muted ? xfInfo(t, R) : null; return { a: c.start - (i ? i.ext : 0), b: c.start + c.len + (o ? o.ext : 0), hin: i ? i.ext : 0, hout: o ? o.ext : 0, fin: i ? i.fade : 0, fout: o ? o.fade : 0, outShape: o ? R.xfShape : null }; }
 // Clip gain at song position p (piecewise linear in p): user fades, crossfades and clip gain.
+const SHAPES = { linear: x => x, equal: x => Math.sin(x * Math.PI / 2), slow: x => x * x, fast: x => Math.sqrt(x) };
+const shapeF = (name, x) => (SHAPES[name] || SHAPES.linear)(clamp(x, 0, 1));
 function clipGainAt(c, p, sp) {
   const base = dbToGain(c.gain), end = c.start + c.len; let g = 1;
-  if (sp.fin > 0) g = Math.min(g, clamp((p - (c.start - sp.hin)) / sp.fin, 0, 1)); else if (c.fadeIn > 0) g = Math.min(g, clamp((p - c.start) / c.fadeIn, 0, 1));
-  if (sp.fout > 0) g = Math.min(g, clamp(((end + sp.hout) - p) / sp.fout, 0, 1)); else if (c.fadeOut > 0) g = Math.min(g, clamp((end - p) / c.fadeOut, 0, 1));
+  if (sp.fin > 0) g = Math.min(g, shapeF(c.xfShape, (p - (c.start - sp.hin)) / sp.fin)); else if (c.fadeIn > 0) g = Math.min(g, shapeF(c.fadeShape, (p - c.start) / c.fadeIn));
+  if (sp.fout > 0) g = Math.min(g, shapeF(sp.outShape, ((end + sp.hout) - p) / sp.fout)); else if (c.fadeOut > 0) g = Math.min(g, shapeF(c.fadeShape, (end - p) / c.fadeOut));
   return base * g;
 }
 function startAudio(t, c, pos, when) {
@@ -207,7 +248,7 @@ function startAudio(t, c, pos, when) {
   if (pos >= b - 1e-9) return; pos = Math.max(pos, a);
   const pb = clipPlayback(c, bpmAt(pos)); if (!pb) return;
   const segEnd = c.frozen ? b : Math.min(b, nextTempoChange(pos));      // tempo changes restart the source with the new stretch
-  const off = pb.secAt(pos - c.start + c.offset); if (off >= pb.buf.duration || off < -1e-3) return;
+  const local = pos - c.start, off = pb.secAt(c.loop && c.loopLen > 0.25 && local >= 0 ? c.offset + (local % c.loopLen) : local + c.offset); if (off >= pb.buf.duration || off < -1e-3) return;
   const r = RT.get(t.id); if (!r) return;
   const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = pb.buf; src.playbackRate.value = pb.rate;
   const w0 = Math.max(ctx.currentTime, when), at = p => w0 + durSec(pos, p - pos), dur = durSec(pos, segEnd - pos);
@@ -215,12 +256,19 @@ function startAudio(t, c, pos, when) {
   g.gain.setValueAtTime(startsClip ? 0 : clipGainAt(c, pos, sp), w0);
   if (startsClip) g.gain.linearRampToValueAtTime(clipGainAt(c, Math.min(segEnd, pos + 0.01), sp), at(Math.min(segEnd, pos + 0.01)));
   const end = c.start + c.len;
-  [c.start - hin, sp.fin ? c.start - hin + sp.fin : c.start + c.fadeIn, sp.fout ? end + hout - sp.fout : end - c.fadeOut, end + hout]
-    .filter(p => p > pos + 0.01 && p < segEnd - 1e-6).sort((x, y) => x - y)
+  const bps = [c.start - hin, sp.fin ? c.start - hin + sp.fin : c.start + c.fadeIn, sp.fout ? end + hout - sp.fout : end - c.fadeOut, end + hout];
+  const regs = [[c.start - hin, bps[1]], [bps[2], end + hout]]; if ((c.xfShape && c.xfShape !== 'linear') || (c.fadeShape && c.fadeShape !== 'linear') || (sp.outShape && sp.outShape !== 'linear')) regs.forEach(([a0, b0]) => { for (let k = 1; k < 8; k++) bps.push(a0 + (b0 - a0) * k / 8); });
+  bps.filter(p => p > pos + 0.01 && p < segEnd - 1e-6).sort((x, y) => x - y)
     .forEach(p => g.gain.linearRampToValueAtTime(clipGainAt(c, p, sp), at(p)));
   g.gain.linearRampToValueAtTime(endsClip ? 0 : clipGainAt(c, segEnd, sp), w0 + dur);
-  src.connect(g); g.connect(c.frozen ? r.frz : r.in);
-  src.start(w0, Math.max(0, off), dur * pb.rate + 0.01); src.stop(w0 + dur + 0.02);
+  let last = g;
+  // clip envelopes: gain (dB) and pan drawn in the clip, relative to the clip start
+  const env = c.env || {};
+  if (env.gain && env.gain.length) { const eg = ctx.createGain(); const gv = x => dbToGain(autoValue(env.gain, x)); eg.gain.setValueAtTime(gv(pos - c.start), w0); env.gain.forEach(q => { const p = c.start + q.t; if (p > pos && p < segEnd) eg.gain.linearRampToValueAtTime(gv(q.t), at(p)); }); eg.gain.linearRampToValueAtTime(gv(segEnd - c.start), w0 + dur); last.connect(eg); last = eg; }
+  if (env.pan && env.pan.length) { const ep = ctx.createStereoPanner(); ep.pan.setValueAtTime(autoValue(env.pan, pos - c.start), w0); env.pan.forEach(q => { const p = c.start + q.t; if (p > pos && p < segEnd) ep.pan.linearRampToValueAtTime(q.v, at(p)); }); ep.pan.linearRampToValueAtTime(autoValue(env.pan, segEnd - c.start), w0 + dur); last.connect(ep); last = ep; }
+  src.connect(g); last.connect(c.frozen ? r.frz : r.in);
+  if (c.loop && c.loopLen > 0.25 && !c.frozen) { src.loop = true; src.loopStart = Math.max(0, pb.secAt(c.offset)); src.loopEnd = Math.min(pb.buf.duration, pb.secAt(c.offset + c.loopLen)); }
+  src.start(w0, Math.max(0, off), c.loop ? undefined : dur * pb.rate + 0.01); src.stop(w0 + dur + 0.02);
   const h = { src, g, clip: c }; T.srcs.push(h); src.onended = () => { T.srcs = T.srcs.filter(x => x !== h); };
   T.started.add(c.id);
 }
@@ -294,8 +342,10 @@ function click(time, accent) {
   o.connect(g); g.connect(M.click); o.start(time); o.stop(time + dec + 0.01);
 }
 
+function unfreezeForTempo() { const fz = S.tracks.filter(t => t.frozen); if (!fz.length) return; fz.forEach(t => { delete t.frozen; rewire(t); applyMix(t); }); toast(`Unfroze ${fz.map(t => t.name).join(', ')} because the tempo changed. Freeze again to re-render.`, 5000); }
 /* ---------- transport ---------- */
 function play(from = V.insert) {
+  if (isOffline() || T.busy) return;
   if (ctx.state !== 'running') ctx.resume();
   if (T.playing) stop(true);
   const count = T.rec && S.prefs && S.prefs.countIn ? S.prefs.countIn * SPB() : 0;
@@ -306,7 +356,8 @@ function play(from = V.insert) {
   tick(); ui.transport();
 }
 function stop(silent) {
-  const now = ctx.currentTime; T.stopPos = posAt(now);
+  if (isOffline()) return;
+  const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
   T.playing = false; stopSources(now);
   S.tracks.forEach(t => { const r = RT.get(t.id); if (r && r.inst) r.inst.allOff(now); });
@@ -315,12 +366,13 @@ function stop(silent) {
 }
 function togglePlay() { T.playing ? stop() : play(); }
 function continuePlay() { play(T.playing ? nowPos() : T.stopPos || V.insert); }
-function seek(pos) { pos = Math.max(0, pos); V.insert = pos; if (T.playing) play(pos); else arr.draw(); }
+function seek(pos) { if (T.busy) return; pos = Math.max(0, pos); V.insert = pos; if (T.playing) play(pos); else arr.draw(); }
 function setBpm(b) {
-  b = clamp(Math.round(b * 100) / 100, 20, 300); if (b === S.bpm) return;
+  b = clamp(Math.round(b * 100) / 100, 20, 300); const pts = tempoPoints(), first = pts.length && pts[0].t <= 1e-9 ? pts[0] : null, old = first ? first.v : S.bpm; if (b === old) return;
+  if (!T.busy) pushUndo('Tempo');
   const was = T.playing, p = nowPos(); if (was) stop(true);
-  S.tracks.forEach(t => t.clips.forEach(c => { if (c.type === 'audio' && !c.warp) { const k = b / S.bpm; c.start = c.start; c.len *= k; c.offset *= k; c.fadeIn *= k; c.fadeOut *= k; } }));
-  S.bpm = b; DEV_RT.forEach(d => d.onTempo());
+  const k = b / old; S.tracks.forEach(t => t.clips.forEach(c => { if (c.type === 'audio' && !c.warp && c.timebase !== 'song') { c.len *= k; c.offset *= k; c.fadeIn *= k; c.fadeOut *= k; } }));
+  if (first) first.v = b; S.bpm = b; unfreezeForTempo(); DEV_RT.forEach(d => d.onTempo());
   S.tracks.forEach(t => { const r = RT.get(t.id); if (r && r.inst && r.inst.prepare) r.inst.prepare(); });
   if (was) play(p);
   markDirty(); ui.transport(); arr.draw();
@@ -334,20 +386,27 @@ async function getInput(deviceId = 'default') {
   const inp = { stream, src: LIVE_CTX.createMediaStreamSource(stream) }; INPUTS.set(deviceId, inp); connectInputs(); return inp;
 }
 const monitorOn = t => t.kind === 'audio' && (t.monitor === 'in' || (t.monitor === 'auto' && t.arm));
+const internalInput = t => t.input === 'resample' || String(t.input || '').startsWith('track:');
+function inputNode(t) {
+  if (t.input === 'resample') return M.out;
+  if (String(t.input || '').startsWith('track:')) { const r = RT.get(t.input.slice(6)); return r ? r.mute : null; }
+  const inp = INPUTS.get(t.input || 'default'); return inp ? inp.src : null;
+}
 function connectInputs() {
   if (isOffline()) return;
-  INPUTS.forEach(inp => { try { inp.src.disconnect(); } catch (e) { } });
-  S.tracks.forEach(t => { if (t.kind !== 'audio') return; const inp = INPUTS.get(t.input || 'default'); const r = RT.get(t.id); if (inp && r && r.mon) inp.src.connect(r.mon); });
+  S.tracks.forEach(t => { const r = RT.get(t.id); if (!r || !r.mon) return; if (r.monSrc) { try { r.monSrc.disconnect(r.mon); } catch (e) { } r.monSrc = null; }
+    if (t.kind !== 'audio' || internalInput(t)) return; // internal sources are recorded, not monitored (that would feed back)
+    const src = inputNode(t); if (src) { src.connect(r.mon); r.monSrc = src; } });
 }
 async function armTrack(t, on) {
   t.arm = on;
-  if (on && t.kind === 'audio') { try { await getInput(t.input); } catch (e) { t.arm = false; toast('Studio B could not open the audio input. Check the microphone permission and input device in Settings.'); } }
+  if (on && t.kind === 'audio' && !internalInput(t)) { try { await getInput(t.input); } catch (e) { t.arm = false; toast('Studio B could not open the audio input. Check the microphone permission and input device in Settings.'); } }
   applyMix(t); ui.headers();
 }
 function startRecording(from) {
   const R = { from, startTime: timeAt(from), audio: [], midi: [], passes: 0, wraps: [], held: new Map(), loop: { ...S.loop }, punch: { ...(S.punch || {}) } };
   S.tracks.filter(t => t.arm && t.kind === 'audio' && !t.frozen).forEach(t => {
-    const inp = INPUTS.get(t.input || 'default'); if (!inp || !PITCH_OK) return;
+    const srcNode = inputNode(t); if (!srcNode || !PITCH_OK) return; const inp = { src: srcNode };
     const node = new AudioWorkletNode(LIVE_CTX, 'gw-rec', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 2, channelCountMode: 'explicit' });
     const sink = LIVE_CTX.createGain(); sink.gain.value = 0; node.connect(sink); sink.connect(LIVE_CTX.destination);
     inp.src.connect(node);
@@ -408,7 +467,8 @@ function finishRecording() {
   }
   for (const m of R.midi) {
     R.held.forEach(h => { if (h.t === m.t) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, endPos - h.pos), vel: h.vel }); });
-    const notes = m.notes.filter(x => x.abs >= pa - 1e-6 && x.abs < pb); if (!notes.length) continue;
+    m.notes.forEach(x => { if (x.abs < R.from && x.abs > R.from - BEAT()) { x.l -= R.from - x.abs; x.abs = R.from; } });
+    const notes = m.notes.filter(x => x.abs >= Math.max(pa, R.from) - 1e-6 && x.abs < pb && x.l > 0); if (!notes.length) continue;
     const bar = SPB(), a = Math.floor(Math.min(...notes.map(x => x.abs)) / bar) * bar, b = Math.ceil(Math.max(...notes.map(x => x.abs + x.l)) / bar) * bar;
     const c = newMidiClip(a, Math.max(bar, b - a), 'Recorded'); c.bars = Math.max(bar, b - a) / 16;
     const q = (S.prefs && S.prefs.recQuant) || 0.0625;
@@ -449,8 +509,9 @@ function clearRange(t, a, b) {
   for (const c of t.clips) {
     const e = c.start + c.len;
     if (e <= a || c.start >= b) { out.push(c); continue; }
-    if (c.start < a) { const l = deep(c); l.id = c.id; l.len = a - c.start; out.push(l); }
-    if (e > b) { const r = deep(c); r.id = uid(); r.offset = c.offset + (b - c.start); r.start = b; r.len = e - b; out.push(r); }
+    let right = null; if (e > b) { right = deep(c); right.id = uid(); right.offset = c.offset + (b - c.start); right.start = b; right.len = e - b; if (right.type === 'audio') right.xf = 0; }
+    if (c.start < a) { c.len = a - c.start; if (c.type === 'audio') c.fadeOut = Math.min(c.fadeOut, c.len); out.push(c); }
+    if (right) out.push(right);
   }
   t.clips = out;
 }
@@ -463,21 +524,21 @@ function splitClip(t, c, at) {
 // Turn a MIDI clip's loop + offset into plain notes covering its whole length (used by consolidate and crop).
 function flattenMidi(c) {
   const L = c.bars * 16, out = [];
-  for (let k = Math.floor(c.offset / L) - 1; k * L - c.offset < c.len; k++) c.notes.forEach(n => { const s = n.s + k * L - c.offset; if (s >= -1e-9 && s < c.len - 1e-9) out.push({ ...n, s, l: Math.min(n.l, c.len - s) }); });
+  for (let k = Math.floor(c.offset / L) - 1; k * L - c.offset < c.len; k++) c.notes.forEach(n => { if (n.s >= L) return; const s = n.s + k * L - c.offset; if (s >= -1e-9 && s < c.len - 1e-9) out.push({ ...n, s, l: Math.min(n.l, c.len - s) }); });
   return out;
 }
 
 /* ---------- undo ---------- */
 const UNDO = [], REDO = [];
-const snapProject = () => JSON.stringify({ ...S, view: undefined });
+const snapProject = () => JSON.stringify({ ...S, view: undefined, path: undefined, name: undefined, _report: undefined });
 function pushUndo(label) { UNDO.push({ json: snapProject(), label: label || 'Edit' }); if (UNDO.length > 200) UNDO.shift(); REDO.length = 0; markDirty(); }
 function restore(json) {
   const was = T.playing, p = nowPos(); if (was) stop(true);
-  const keepView = S.view; S = JSON.parse(json); S.view = keepView;
+  const keep = { view: S.view, path: S.path, name: S.name }; S = JSON.parse(json); Object.assign(S, keep);
   rebuildAll(); V.selClips.clear(); if (V.editClip && !clipById(V.editClip)) V.editClip = null;
   ui.all(); if (was) play(p);
 }
-function undo() { if (!UNDO.length) return toast('Nothing to undo'); const e = UNDO.pop(); REDO.push({ json: snapProject(), label: e.label }); restore(e.json); markDirty(); toast('Undo: ' + e.label, 1400); }
-function redo() { if (!REDO.length) return; const e = REDO.pop(); UNDO.push({ json: snapProject(), label: e.label }); restore(e.json); markDirty(); toast('Redo: ' + e.label, 1400); }
+function undo() { if (T.busy || isOffline()) return; if (T.recording) return toast('Stop recording before undoing'); if (!UNDO.length) return toast('Nothing to undo'); const e = UNDO.pop(); REDO.push({ json: snapProject(), label: e.label }); restore(e.json); markDirty(); toast('Undo: ' + e.label, 1400); }
+function redo() { if (T.busy || isOffline() || T.recording) return; if (!REDO.length) return; const e = REDO.pop(); UNDO.push({ json: snapProject(), label: e.label }); restore(e.json); markDirty(); toast('Redo: ' + e.label, 1400); }
 function markDirty() { V.dirty = true; ui.title && ui.title(); }
 window.SB_isDirty = () => V.dirty;

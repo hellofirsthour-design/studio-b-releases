@@ -1,7 +1,9 @@
 /* ============ knobs ============ */
 function norm(v, min, max, scale) { return scale === 'log' ? Math.log(v / min) / Math.log(max / min) : (v - min) / (max - min); }
 function denorm(n, min, max, scale) { return scale === 'log' ? min * Math.pow(max / min, n) : min + n * (max - min); }
-function knob({ label, value, min, max, scale, fmt, step, def, onInput, small }) {
+let _kGest = 0;
+function knob({ label, value, min, max, scale, fmt, step, def, onInput, small, onStart }) {
+  const gesture = () => { const n = performance.now(); if (n - _kGest > 700 && !T.busy) (onStart || (() => pushUndo(label)))(); _kGest = n; };
   const el = document.createElement('div'); el.className = 'knob' + (small ? ' sm' : '');
   el.innerHTML = `<svg viewBox="0 0 40 40" aria-hidden="true"><path class="kt" d="M9.4 30.6 A15 15 0 1 1 30.6 30.6"/><path class="kv"/><line class="kp" x1="20" y1="20" x2="20" y2="7"/></svg><span class="kl">${esc(label)}</span><span class="kx"></span>`;
   el.tabIndex = 0; el.setAttribute('role', 'slider'); el.setAttribute('aria-label', label);
@@ -15,14 +17,14 @@ function knob({ label, value, min, max, scale, fmt, step, def, onInput, small })
   };
   const set = n => { let nv = denorm(clamp(n, 0, 1), min, max, scale); if (step) nv = Math.round(nv / step) * step; if (nv !== v) { v = nv; draw(); onInput(v); } };
   el.addEventListener('pointerdown', e => {
-    if (e.button !== 0) return; e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('drag');
+    if (e.button !== 0) return; e.preventDefault(); gesture(); el.setPointerCapture(e.pointerId); el.classList.add('drag');
     let y = e.clientY, n = norm(v, min, max, scale);
     const mv = ev => { n = clamp(n + (y - ev.clientY) / (ev.shiftKey ? 700 : 160), 0, 1); y = ev.clientY; set(n); };
     const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.classList.remove('drag'); markDirty(); };
     el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up);
   });
-  el.addEventListener('dblclick', () => { v = d0; draw(); onInput(v); });
-  el.addEventListener('wheel', e => { e.preventDefault(); set(norm(v, min, max, scale) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)); }, { passive: false });
+  el.addEventListener('dblclick', () => { gesture(); v = d0; draw(); onInput(v); });
+  el.addEventListener('wheel', e => { e.preventDefault(); gesture(); set(norm(v, min, max, scale) - Math.sign(e.deltaY) * (e.shiftKey ? 0.005 : 0.03)); }, { passive: false });
   el.addEventListener('keydown', e => { const d = { ArrowUp: 0.02, ArrowRight: 0.02, ArrowDown: -0.02, ArrowLeft: -0.02 }[e.key]; if (d) { e.preventDefault(); e.stopPropagation(); set(norm(v, min, max, scale) + d); } });
   el.setValue = x => { v = x; draw(); };
   draw(); return el;
@@ -89,7 +91,7 @@ function deviceCard(o, d, i) {
   else {
     if (d.type === 'comp' || d.type === 'limit' || d.type === 'gate') grMeter(body, r);
     if (d.type === 'comp') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
-    body.appendChild(paramGrid(def.params, d.p, changed));
+    body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }));
   }
   return c;
 }

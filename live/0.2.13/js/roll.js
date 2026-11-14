@@ -238,7 +238,7 @@ function transform(k) {
     case 'half2': { const s0 = Math.min(...ns.map(n => n.s)); ns.forEach(n => { n.s = s0 + (n.s - s0) / 2; n.l = Math.max(0.1, n.l / 2); }); break; }
     case 'chop': { const add = []; ns.forEach(n => { const parts = Math.floor(n.l / g - 1e-6); if (parts < 1) return; const l0 = n.l; n.l = g; for (let i = 1; i <= parts; i++) { const s = n.s + i * g; if (s < n.s + l0 - 1e-6) add.push({ ...n, s, l: Math.min(g, n.s + l0 - s) }); } }); c.notes.push(...add); add.forEach(n => roll.sel.add(n)); break; }
     case 'join': { const byP = new Map(); [...ns].sort((a, b) => a.s - b.s).forEach(n => { const prev = byP.get(n.p); if (prev && n.s <= prev.s + prev.l + 1e-6) { prev.l = Math.max(prev.l, n.s + n.l - prev.s); c.notes = c.notes.filter(x => x !== n); roll.sel.delete(n); } else byP.set(n.p, n); }); break; }
-    case 'quant': ns.forEach(n => (n.s = clamp(Math.round(n.s / g) * g, 0, L - g))); break;
+    case 'quant': ns.forEach(n => { if (n.s < L) n.s = clamp(Math.round(n.s / g) * g, 0, L - g); }); break;
     case 'human': ns.forEach(n => { n.s = clamp(n.s + (Math.random() - 0.5) * 0.18, 0, L - 0.05); n.v = clamp(n.v + (Math.random() - 0.5) * 0.2, 0.1, 1); }); break;
     case 'legato': { const st = [...new Set(c.notes.map(n => n.s))].sort((a, b) => a - b); ns.forEach(n => { const nx = st.find(s => s > n.s + 1e-6); n.l = (nx != null ? nx : L) - n.s; }); break; }
     case 'reverse': ns.forEach(n => (n.s = clamp(L - n.s - n.l, 0, L - 0.05))); break;
@@ -296,6 +296,8 @@ function generate(k) {
 }
 function rollKey(e) {
   if (!roll.clip || !roll.cv || document.activeElement !== roll.cv) return false;
+  { const live = clipById(V.editClip); if (live && live !== roll.clip) { roll.mount(); return true; } }
+  if (!roll.sel.size && ['Delete', 'Backspace', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return true;
   const c = roll.clip, mod = e.ctrlKey || e.metaKey, ns = [...roll.sel];
   if ((e.key === 'Delete' || e.key === 'Backspace') && ns.length) { pushUndo(); c.notes = c.notes.filter(n => !roll.sel.has(n)); roll.sel.clear(); roll.draw_(); return true; }
   if (mod && e.key.toLowerCase() === 'a') { roll.sel = new Set(c.notes); roll.draw_(); return true; }

@@ -45,8 +45,12 @@ function onWarpReady() { arr.draw(); }
 /* ---------- commands (menus + shortcuts) ---------- */
 function selectedClips() { return S.tracks.flatMap(t => t.clips.filter(c => V.selClips.has(c.id)).map(c => ({ t, c }))); }
 function cmd(name) {
+  if (T.busy) return;
   switch (name) {
-    case 'new': return confirmLeave(() => loadProjectObj(emptyProject()));
+    case 'new': return confirmLeave(() => newProject());
+    case 'importMidi': return importMidiDialog();
+    case 'exportMidi': return exportMidiClip();
+    case 'bounceSel': return bounceSelection();
     case 'open': return confirmLeave(openProjectDialog);
     case 'save': return saveProject(false);
     case 'saveAs': return saveProject(true);
@@ -59,7 +63,7 @@ function cmd(name) {
     case 'redo': return redo();
     case 'newAudio': return addTrack('audio');
     case 'newMidi': return addInstrumentTrack('synth', null);
-    case 'newReturn': { pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + 'ABCDEFGHIJKL'[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast('Added a return. Tracks send to A and B in this version.'); return; }
+    case 'newReturn': { if (S.returns.length >= 12) return toast('Studio B supports up to 12 returns'); pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + RET_LETTERS[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast(`Added return ${RET_LETTERS[S.returns.length - 1]}. Every track has a send to it (Mixer view).`); return; }
     case 'addMarker': return addMarker(nowPos());
     case 'toggleBrowser': V.browser = !V.browser; ui.transport(); arr.draw(); return;
     case 'toggleDetail': V.detail = V.detail === 'clip' ? 'devices' : V.detail === 'devices' ? 'clip' : 'clip'; ui.detail(); return;
@@ -85,7 +89,7 @@ function cmd(name) {
     case 'copy': case 'cut': {
       const sc = selectedClips(); if (!sc.length) return; const a = Math.min(...sc.map(x => x.c.start));
       CLIPBOARD = sc.map(x => ({ track: x.t.id, kind: x.t.kind, c: { ...deep(x.c), start: x.c.start - a } })); toast(`${sc.length} clip${sc.length > 1 ? 's' : ''} ${name === 'cut' ? 'cut' : 'copied'}`);
-      if (name === 'cut') { pushUndo('Cut'); sc.forEach(x => (x.t.clips = x.t.clips.filter(k => k !== x.c))); V.selClips.clear(); arr.draw(); } return;
+      if (name === 'cut') { pushUndo('Cut'); sc.forEach(x => (x.t.clips = x.t.clips.filter(k => k !== x.c))); V.selClips.clear(); if (V.editClip && !clipById(V.editClip)) V.editClip = null; ui.detail(); arr.draw(); } return;
     }
     case 'paste': {
       if (!CLIPBOARD) return; pushUndo('Paste'); const at = V.insert, sel = S.tracks.find(t => V.selTracks.has(t.id)), firstTrack = CLIPBOARD[0].track, ids = [];
@@ -115,13 +119,15 @@ function cmd(name) {
       if (!n) { UNDO.pop(); toast('Place the insert marker inside a clip to split it'); } arr.draw(); return;
     }
     case 'consolidate': {
-      const sc = selectedClips().filter(x => x.c.type === 'midi'); if (sc.length < 1) return toast('Select MIDI clips on one track to consolidate');
+      if (!V.selClips.size && V.time && V.time.b > V.time.a) { const t = S.tracks.find(x => V.time.tracks.has(x.id) && x.kind === 'audio'); if (t) return consolidateAudio(t, V.time.a, V.time.b); }
+      const au = selectedClips().filter(x => x.c.type === 'audio'); if (au.length) { const t = au[0].t; if (au.some(x => x.t !== t)) return toast('Consolidate works on clips from one track'); const a = V.time && V.time.b > V.time.a ? V.time.a : Math.min(...au.map(x => x.c.start)), b = V.time && V.time.b > V.time.a ? V.time.b : Math.max(...au.map(x => x.c.start + x.c.len)); return consolidateAudio(t, a, b, au[0].c.name); }
+      const sc = selectedClips().filter(x => x.c.type === 'midi'); if (sc.length < 1) return toast('Select clips on one track (or a time range) to consolidate');
       const t = sc[0].t; if (sc.some(x => x.t !== t)) return toast('Consolidate works on clips from one track');
       pushUndo('Consolidate'); const a = Math.min(...sc.map(x => x.c.start)), b = Math.max(...sc.map(x => x.c.start + x.c.len));
       const notes = sc.flatMap(x => flattenMidi(x.c).map(n => ({ ...n, s: n.s + x.c.start - a })));
       t.clips = t.clips.filter(c => !sc.some(x => x.c === c)); const c = newMidiClip(a, b - a, sc[0].c.name); c.bars = (b - a) / 16; c.len = b - a; c.notes = notes; t.clips.push(c); V.selClips = new Set([c.id]); openClip(c); return;
     }
-    case 'quantize': { const sc = selectedClips().filter(x => x.c.type === 'midi'); if (!sc.length) { if (roll.clip) transform('quant'); return; } pushUndo('Quantize'); const g = arr.gridStep() >= 1 ? 1 : arr.gridStep(); sc.forEach(x => x.c.notes.forEach(n => (n.s = Math.round(n.s / g) * g))); arr.draw(); ui.detail(); toast('Quantized to 1/16'); return; }
+    case 'quantize': { const sc = selectedClips().filter(x => x.c.type === 'midi'); if (!sc.length) { if (roll.clip) transform('quant'); return; } pushUndo('Quantize'); const g = arr.gridStep() >= 1 ? 1 : arr.gridStep(); sc.forEach(x => { const L = x.c.bars * 16; x.c.notes.forEach(n => { if (n.s < L) n.s = clamp(Math.round(n.s / g) * g, 0, L - g); }); }); arr.draw(); ui.detail(); toast('Quantized to 1/16'); return; }
     case 'deactivate': { const sc = selectedClips(); if (!sc.length) return; pushUndo('Deactivate'); const on = sc.some(x => !x.c.muted); sc.forEach(x => (x.c.muted = on)); arr.draw(); return; }
   }
 }
@@ -134,7 +140,9 @@ const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 
 const KB = { oct: 4, vel: 0.85, on: false };
 function bindKeys() {
   document.addEventListener('keydown', e => {
-    const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (T.busy) { e.preventDefault(); return; }
+    if (e.target.type === 'range') e.target.blur();
+    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
     if (!$('#ask').hidden) return;
     if (rollKey(e)) { e.preventDefault(); return; }
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
@@ -146,7 +154,7 @@ function bindKeys() {
       if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
     }
     if (k === ' ') { e.preventDefault(); if (e.repeat) return; e.shiftKey ? (T.playing ? stop() : continuePlay()) : togglePlay(); return; }
-    if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec && !T.playing) play(); else if (!T.rec && T.recording) finishRecording(); ui.transport(); return; }
+    if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec) { if (T.playing) startRecording(nowPos()); else play(); } else if (T.recording) finishRecording(); ui.transport(); return; }
     if (e.key === 'Home') { seek(0); V.scrollX = 0; return; }
     if (e.key === 'End') { seek(songEnd()); return; }
     if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); cmd('toggleDetail'); return; }
@@ -158,6 +166,7 @@ function bindKeys() {
       if (e.shiftKey && k === 'd') { e.preventDefault(); return V.time ? duplicateTime(V.time.a, V.time.b) : cmd('duplicate'); }
       if (e.shiftKey && k === 'j') { e.preventDefault(); return cropClips(); }
       if (e.altKey && k === 'z') { e.preventDefault(); return showUndoHistory(); }
+      if (k === 'g') { e.preventDefault(); return e.shiftKey ? ungroupTrack() : groupTracks(); }
       if (k === '3') { e.preventDefault(); V.triplet = !V.triplet; arr.draw(); return toast(V.triplet ? 'Triplet grid' : 'Straight grid'); }
       const map = { z: e.shiftKey ? 'redo' : 'undo', y: 'redo', s: e.shiftKey ? 'saveAs' : 'save', o: 'open', n: 'new', c: 'copy', x: 'cut', v: 'paste', d: 'duplicate', e: 'split', j: 'consolidate', u: 'quantize', l: 'loopSel', a: 'selectAll', r: 'rename', t: e.shiftKey ? 'newMidi' : 'newAudio', i: 'importAudio', m: e.shiftKey ? 'newClip' : null, '=': 'zoomIn', '+': 'zoomIn', '-': 'zoomOut', ',': 'prefs' };
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
@@ -188,7 +197,7 @@ function bindKeys() {
     if (k === 'z') { const r = V.time || (V.selClips.size ? clipSpan() : null); if (r) { rememberZoom(); V.pps = clamp(arr.lanes.clientWidth / (r.b - r.a) * 0.9, 0.08, 120); V.scrollX = Math.max(0, r.a - (r.b - r.a) * 0.05); arr.draw(); } return; }
     if (k === '+' || k === '=') return zoomBy(1.25);
     if (k === '-') return zoomBy(1 / 1.25);
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const g = arr.gridStep(), d = e.key === 'ArrowLeft' ? -g : g; const sc = selectedClips(); if (sc.length) { pushUndo('Nudge'); sc.forEach(x => (x.c.start = Math.max(0, x.c.start + d))); } else seek(Math.max(0, V.insert + d)); arr.draw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const g = arr.gridStep(), d = e.key === 'ArrowLeft' ? -g : g; const sc = selectedClips(); if (sc.length) { pushUndo('Nudge'); const lo = Math.min(...sc.map(x => x.c.start)); const dd = Math.max(d, -lo); sc.forEach(x => (x.c.start += dd)); settleClips(sc); } else seek(Math.max(0, V.insert + d)); arr.draw(); e.preventDefault(); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { const i = S.tracks.findIndex(t => V.selTracks.has(t.id)), j = clamp(i + (e.key === 'ArrowUp' ? -1 : 1), 0, S.tracks.length - 1); if (S.tracks[j]) { V.selTracks = new Set([S.tracks[j].id]); ui.headers(); ui.detail(); } e.preventDefault(); return; }
   });
   document.addEventListener('keyup', e => liveNoteOff(e.key.toLowerCase()));
@@ -210,6 +219,8 @@ function bindBar() {
   $('#follow').onclick = () => cmd('toggleFollow');
   $('#autoBtn').onclick = () => cmd('toggleAuto');
   $('#snapBtn').onclick = () => { V.snap = !V.snap; ui.transport(); };
+  $('#autoArm').onclick = () => { V.autoArm = !V.autoArm; ui.transport(); toast(V.autoArm ? 'Automation Arm on: move controls while playing to record them' : 'Automation Arm off'); };
+  $('#reAuto').onclick = () => reenableAutomation();
   $('#kbBtn').onclick = () => { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); };
   $('#bpm').onchange = e => setBpm(+e.target.value || S.bpm);
   $('#sig').onchange = e => { const m = String(e.target.value).match(/(\d+)\s*\/\s*(\d+)/); if (m) setSig(+m[1], +m[2]); else ui.transport(); };
@@ -222,7 +233,7 @@ function bindBar() {
   $('#root').onchange = e => { S.root = +e.target.value; markDirty(); DEV_RT.forEach(d => d instanceof TuneDev && d.set()); ui.detail(); };
   $('#scale').onchange = e => { S.scale = e.target.value; markDirty(); DEV_RT.forEach(d => d instanceof TuneDev && d.set()); ui.detail(); };
   $('#mclip').onclick = () => METER.forEach(m => (m.clip = false));
-  $('#saveBtn').onclick = () => cmd('save'); $('#openBtn').onclick = () => cmd('open'); $('#exportBtn').onclick = () => cmd('export'); $('#helpBtn').onclick = () => cmd('help');
+  $('#saveBtn').onclick = () => cmd('save'); $('#openBtn').onclick = () => cmd('open'); $('#fileBtn').onclick = e => templateMenu(e); $('#exportBtn').onclick = () => cmd('export'); $('#helpBtn').onclick = () => cmd('help');
   $('#prefsBtn').onclick = () => cmd('prefs'); $('#browserBtn').onclick = () => cmd('toggleBrowser');
   $$('#dtabs [data-d]').forEach(b => (b.onclick = () => { V.detail = b.dataset.d; ui.detail(); }));
   $('#viewBtn').onclick = () => cmd('toggleMixer');
@@ -240,9 +251,12 @@ function bindBar() {
 function showExport() {
   const d = $('#export'); d.hidden = false;
   $('#exRange').innerHTML = `<option value="song">Whole song (1.1.1 to ${barsBeats(songEnd())})</option><option value="loop" ${S.loop.on ? 'selected' : ''}>Loop brace (${barsBeats(S.loop.start)} to ${barsBeats(S.loop.end)})</option>${V.time ? `<option value="sel">Time selection</option>` : ''}`;
+  try { const m = JSON.parse(localStorage.getItem('sb-export') || '{}'); if (m.format) $('#exFmt').value = m.format; if (m.kbps) $('#exKbps').value = m.kbps; if (m.dither != null) $('#exDither').checked = m.dither; if (m.bits) $('#exBits').value = m.bits; if (m.sr) $('#exSr').value = m.sr; } catch (e) { }
+  const fmtUi = () => { const mp3 = $('#exFmt').value === 'mp3'; $('#exKbpsF').hidden = !mp3; $('#exBitsF').hidden = mp3; $('#exDitherF').hidden = mp3 || $('#exBits').value === '32'; }; $('#exFmt').onchange = fmtUi; $('#exBits').onchange = fmtUi; fmtUi();
   $('#exWhat').onchange = () => ($('#exStemOpts').hidden = $('#exWhat').value === 'mix'); $('#exStemOpts').hidden = $('#exWhat').value === 'mix'; $('#exProgText').textContent = '';
   $('#exGo').onclick = async () => {
-    const o = { range: $('#exRange').value, sr: +$('#exSr').value, bits: +$('#exBits').value, normalize: $('#exNorm').checked, tail: +$('#exTail').value }, what = $('#exWhat').value;
+    const o = { range: $('#exRange').value, sr: +$('#exSr').value, bits: +$('#exBits').value, normalize: $('#exNorm').checked, tail: +$('#exTail').value, format: $('#exFmt').value, kbps: +$('#exKbps').value, dither: $('#exDither').checked, loop: $('#exLoop').checked }, what = $('#exWhat').value;
+    try { localStorage.setItem('sb-export', JSON.stringify({ format: o.format, kbps: o.kbps, dither: o.dither, bits: o.bits, sr: o.sr })); } catch (e) { }
     $('#exGo').disabled = true;
     try { if (what === 'mix') await exportAudio(o); else await exportStems({ ...o, onlySelected: what === 'stemsSel', returns: $('#exReturns').checked, main: $('#exReturns').checked }); d.hidden = true; }
     catch (e) { console.error(e); toast('Export failed: ' + e.message); } finally { showBusy(null); }
@@ -314,7 +328,7 @@ async function demoProject() {
   const pending = IS_DESKTOP ? await NATIVE.pendingOpen() : null;
   if (pending) await openPath(pending); else if (!(await offerRecovery())) await loadProjectObj(await demoProject());
   V.selTracks = new Set([S.tracks[0].id]); ui.all(); V.dirty = false; ui.title();
-  if (IS_DESKTOP) { NATIVE.onMenu(c => cmd(c)); NATIVE.onOpenPath(p => confirmLeave(() => openPath(p))); if (NATIVE.onUpdate) { NATIVE.onUpdate(showUpdate); NATIVE.appInfo().then(i => i.update && showUpdate(i.update)); } }
+  if (IS_DESKTOP) { NATIVE.onMenu(c => { const a = document.activeElement, txt = a && (a.tagName === 'INPUT' && a.type !== 'range' || a.tagName === 'TEXTAREA'); const ed = { copy: 'copy', cut: 'cut', paste: 'paste', selectAll: 'selectAll', undo: 'undo', redo: 'redo', delete: 'delete' }[c]; if (txt && ed) { document.execCommand(ed); return; } cmd(c); }); NATIVE.onOpenPath(p => confirmLeave(() => openPath(p))); if (NATIVE.onUpdate) { NATIVE.onUpdate(showUpdate); NATIVE.appInfo().then(i => i.update && showUpdate(i.update)); } }
   requestAnimationFrame(frame);
   const resume = () => { if (ctx.state !== 'running') ctx.resume(); }; document.addEventListener('pointerdown', resume, { once: true }); document.addEventListener('keydown', resume, { once: true });
   window.SB_ready = true;

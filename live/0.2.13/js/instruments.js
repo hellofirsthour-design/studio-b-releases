@@ -98,6 +98,7 @@ class Synth {
   }
   noteOff(v, time) { if (v) this.release(v, time); }
   allOff(time) { this.voices.forEach(v => this.release(v, time, 0.03)); }
+  dispose() { try { this.lfo.stop(); this.lfo.disconnect(); } catch (e) { } }
 }
 
 /* Sampler: Serato-style cue chopping, key shift and tempo sync on one loaded sample. */

@@ -1,8 +1,8 @@
 {
- "version": "0.2.12",
+ "version": "0.2.13",
  "shell": 2,
- "date": "2026-11-14T17:44:15.619Z",
- "notes": "Scrub and zoom: middle ground between the old loose and the recent tight settings",
+ "date": "2026-11-14T17:49:32.779Z",
+ "notes": "Export to AIFF, FLAC and MP3 with dither and render-as-loop; MIDI file import and export; consolidate audio; bounce a selection to a new track; templates and a default set",
  "files": [
   {
    "path": "css/base.css",
@@ -16,13 +16,13 @@
   },
   {
    "path": "index.html",
-   "size": 17683,
-   "sha256": "3f9657fbf545d850051810d91981f515666d904075a0d10bea81b4c993e427b8"
+   "size": 18719,
+   "sha256": "935fc0b49bfc3aff0f6f3a13580e4cdb974f85b2e55c59916a22b7c9bd50421e"
   },
   {
    "path": "js/arrange.js",
-   "size": 44004,
-   "sha256": "d9ea98955d126e8b67d6e1e5a044a7ec65d342f9ca29bef5b92e221ecc6ea704"
+   "size": 44459,
+   "sha256": "289797c17d2b9e0e48fe102b9766b32ea843bbef1ed92997662c3f96a004d657"
   },
   {
    "path": "js/browser.js",
@@ -56,13 +56,18 @@
   },
   {
    "path": "js/features.js",
-   "size": 5922,
-   "sha256": "f8c871f47d3a9b4cdb1f76b10e797f433823d37cfc781cc3e30c9236dd5a8770"
+   "size": 5992,
+   "sha256": "fa822b5f2bdfb5abed8d79ea516fb6914e36d26a04298dd06d7a3c9bde4819a1"
   },
   {
    "path": "js/features2.js",
    "size": 12449,
    "sha256": "bb9b2f54902f9cf667dcebecb15ba6670ba267e708dae0d0433a722f9e85b1df"
+  },
+  {
+   "path": "js/files.js",
+   "size": 20946,
+   "sha256": "fbe1ad5cdf29f671b8884291aa6d3d56217e96b4b19f5066464a9620cdebe8a2"
   },
   {
    "path": "js/instruments.js",
@@ -71,13 +76,13 @@
   },
   {
    "path": "js/io.js",
-   "size": 44664,
-   "sha256": "dcd3a9a765ec94a6970d90b1be8e492491af25b9ba3eb0fa76542412776666d5"
+   "size": 44829,
+   "sha256": "8565485ff9e83165b4372f9d16515415fe100e957bdff237ee80177191d60329"
   },
   {
    "path": "js/main.js",
-   "size": 33989,
-   "sha256": "dc17bea8d948f52bcdcf5ccda3e91e7d750cf51755eb5d1a0b5fe65bf13cfe74"
+   "size": 35631,
+   "sha256": "2b4396bf6afdaf4e88375f95e3af78dc1e973f2fd5f6613994d94ae078197c89"
   },
   {
    "path": "js/mixer.js",
@@ -100,9 +105,19 @@
    "sha256": "9dbec2119836bebd701f718467836d84cc33d5e27bfdb21479ad7e02ade7aff0"
   },
   {
+   "path": "vendor/lamejs/lame.min.js",
+   "size": 156043,
+   "sha256": "15d285e2587b3bdbfd18a68de6ce07cc074f7480a82c3815da2dc1c348ec6df4"
+  },
+  {
+   "path": "vendor/lamejs/LICENSE",
+   "size": 424,
+   "sha256": "cd144ca132e3842b01f5ed2d6f3a32141e24a1cc15e115aa5f19a2294ce0a379"
+  },
+  {
    "path": "version.json",
    "size": 38,
-   "sha256": "09017b7b18b78c15df6c83ac915cc0210ee9b46172ab3932f09c58a544e9b3c2"
+   "sha256": "c765aff46bee1498a2904621b18e0d3ad57888d8894f7240339a7a08c975587d"
   }
  ]
 }

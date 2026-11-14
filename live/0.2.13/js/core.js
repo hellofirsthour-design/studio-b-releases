@@ -176,7 +176,7 @@ class GWLoud extends AudioWorkletProcessor {
   report(){
     const lu=ms=>ms>0? -0.691+10*Math.log10(ms) : -Infinity, mean=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
     const mom=mean(this.blocks.slice(-4)), st=mean(this.blocks), mLU=lu(mom);
-    if(this.blocks.length>=4 && mLU>-70) this.gated.push(mom);
+    if(this.blocks.length>=4 && mLU>-70){ this.gated.push(mom); if(this.gated.length>36000) this.gated.shift(); }
     let I=-Infinity; if(this.gated.length){ const rel=lu(mean(this.gated))-10; const g=this.gated.filter(v=>lu(v)>rel); I=lu(mean(g)); }
     this.port.postMessage({m:mLU,s:lu(st),i:I,peak:this.peak});
   }

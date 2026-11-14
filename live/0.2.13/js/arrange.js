@@ -4,9 +4,10 @@ const arr = {
   dirty: true,
   layout() {
     let y = 0; const rows = [];
-    S.tracks.forEach(b => { rows.push({ b, kind: 'track', y, h: b.h }); y += b.h + 1; if (b.showTakes && b.takes && b.takes.length) b.takes.forEach(lane => { rows.push({ b, kind: 'take', lane, y, h: 30 }); y += 31; }); });
-    y += 10; S.returns.forEach(b => { rows.push({ b, kind: 'return', y, h: b.h || 40 }); y += (b.h || 40) + 1; });
-    rows.push({ b: S.master, kind: 'master', y, h: S.master.h || 40 }); y += (S.master.h || 40) + 1;
+    S.tracks.forEach(b => { if (hiddenByFold(b)) return; rows.push({ b, kind: 'track', y, h: b.h }); y += b.h + 1; if (b.showTakes && b.takes && b.takes.length) b.takes.forEach(lane => { rows.push({ b, kind: 'take', lane, y, h: 30 }); y += 31; }); (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; }); });
+    const lanesOf = b => (b.lanes || []).forEach((key, li) => { rows.push({ b, kind: 'auto', key, li, y, h: 40 }); y += 41; });
+    y += 10; S.returns.forEach(b => { rows.push({ b, kind: 'return', y, h: b.h || 40 }); y += (b.h || 40) + 1; lanesOf(b); });
+    rows.push({ b: S.master, kind: 'master', y, h: S.master.h || 40 }); y += (S.master.h || 40) + 1; lanesOf(S.master);
     this.rows = rows; this.totalH = y + 80; return rows;
   },
   rowAt(y) { y += V.scrollY; return this.rows.find(r => y >= r.y && y < r.y + r.h + 1) || null; },
@@ -42,7 +43,7 @@ const arr = {
     // row backgrounds
     this.rows.forEach(r => {
       const y = r.y - V.scrollY; if (y > h || y + r.h < 0) return;
-      g.fillStyle = r.kind === 'take' ? css.laneBus : V.selTracks.has(r.b.id) ? css.laneSel : r.kind === 'track' ? css.laneRow : css.laneBus; g.fillRect(0, y, w, r.h);
+      g.fillStyle = r.kind === 'take' || r.kind === 'auto' ? css.laneBus : V.selTracks.has(r.b.id) ? css.laneSel : r.kind === 'track' ? css.laneRow : css.laneBus; g.fillRect(0, y, w, r.h);
       g.fillStyle = css.line; g.fillRect(0, y + r.h, w, 1);
     });
     // grid
@@ -66,6 +67,7 @@ const arr = {
         return;
       }
       if (r.kind !== 'track') return;
+      if (r.b.kind === 'group') { const ms = descendants(r.b).filter(t => t.kind !== 'group'), lh = Math.max(2, (r.h - 6) / Math.max(1, ms.length)); ms.forEach((t, i) => t.clips.forEach(c => { const x0 = this.x(c.start), cw = c.len * V.pps; if (x0 > w || x0 + cw < 0) return; g.fillStyle = c.muted ? css.muted : t.color; g.globalAlpha = 0.7; g.fillRect(x0, y + 3 + i * lh, cw, Math.max(1.5, lh - 1)); g.globalAlpha = 1; })); return; }
       r.b.clips.forEach(c => { const x = this.x(c.start), cw = c.len * V.pps; if (x > w || x + cw < 0) return; this.drawClip(g, r.b, c, x, y, cw, r.h, css); });
       r.b.clips.forEach(c => { const xi = xfInfo(r.b, c); if (!xi) return; const x0 = this.x(c.start - xi.ext), x1 = this.x(c.start - xi.ext + xi.fade), yb = y + r.h - 2, yt = y + (r.h >= 34 ? 16 : 2);
         g.strokeStyle = css.fg; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, yt); g.lineTo(x1, yb); g.moveTo(x0, yb); g.lineTo(x1, yt); g.stroke(); g.fillStyle = css.fg; g.fillRect(this.x(c.start) - 3, yb - 5, 6, 6); });
@@ -84,7 +86,7 @@ const arr = {
     if (V.time && V.time.b > V.time.a) this.rows.forEach(r => { if (r.kind === 'take' || !V.time.tracks || !V.time.tracks.has(r.b.id)) return; selBand(this.x(V.time.a), r.y - V.scrollY + 1, this.x(V.time.b), r.h - 1); });
     if (this.compSel) { const r = this.compSel.r; selBand(this.x(this.compSel.a), r.y - V.scrollY + 1, this.x(this.compSel.b), r.h - 1); }
     // automation envelopes
-    if (V.autoMode) this.rows.forEach(r => r.kind !== 'take' && this.drawEnvelope(g, r, w, h, css));
+    this.rows.forEach(r => { if (r.kind === 'auto' || (V.autoMode && r.kind !== 'take')) this.drawEnvelope(g, r, w, h, css); });
     // insert marker (blinks) and playhead
     if (!T.playing || V.insert !== Math.floor(nowPos())) {
       const blink = (performance.now() % 1000) < 560; if (blink) { g.fillStyle = css.insert; const x = Math.round(this.x(V.insert)); this.rows.forEach(r => { if (V.selTracks.has(r.b.id)) g.fillRect(x, r.y - V.scrollY, 1.5, r.h); }); }
@@ -108,7 +110,7 @@ const arr = {
         g.fillStyle = c.muted ? css.dim : '#17151c';
         for (let k = Math.floor(c.offset / L); base + k * L < c.start + c.len; k++) {
           const lx = this.x(base + k * L); if (k > Math.floor(c.offset / L) && lx > x) { g.globalAlpha = 0.35; g.fillRect(lx, by, 1, bh); g.globalAlpha = 1; }
-          for (const n of ns) { const s = base + k * L + n.s; g.fillStyle = T.playing && nowPos() >= s && nowPos() < s + n.l ? '#ffffff' : (c.muted ? css.dim : '#17151c'); if (s + n.l <= c.start || s >= c.start + c.len) continue; const nx = this.x(s); g.fillRect(nx, by + (hi - n.p) / span * (bh - nh) , Math.max(1.5, Math.min(n.l * V.pps, (c.start + c.len - s) * V.pps) - 1), nh); }
+          for (const n of ns) { if (n.s >= L) continue; const s = base + k * L + n.s; g.fillStyle = T.playing && nowPos() >= s && nowPos() < s + n.l ? '#ffffff' : (c.muted ? css.dim : '#17151c'); if (s + n.l <= c.start || s >= c.start + c.len) continue; const nx = this.x(s); g.fillRect(nx, by + (hi - n.p) / span * (bh - nh) , Math.max(1.5, Math.min(n.l * V.pps, (c.start + c.len - s) * V.pps) - 1), nh); }
         }
       }
     } else if (c.type === 'audio' && bh > 4) {
@@ -116,7 +118,7 @@ const arr = {
         const wv = s.wave, mid = by + bh / 2, amp = bh / 2 - 1, gain = dbToGain(c.gain); g.fillStyle = c.muted ? css.dim : '#17151c';
         const x0 = Math.max(0, Math.floor(x)), x1 = Math.min(this.lanes.clientWidth, Math.ceil(x + cw));
         for (let px = x0; px < x1; px++) {
-          const a = this.pos(px) - c.start + c.offset, b = this.pos(px + 1) - c.start + c.offset;
+          const lp = c.loop && c.loopLen > 0.25, la = this.pos(px) - c.start, a = (lp ? la % c.loopLen : la) + c.offset, b = a + 1 / V.pps;
           const i0 = Math.floor(srcSecAt(c, a) * wv.sr / PEAK_BLOCK), i1 = Math.max(i0 + 1, Math.floor(srcSecAt(c, b) * wv.sr / PEAK_BLOCK));
           if (i0 >= wv.mx.length || i0 < 0) continue;
           let lo = 0, hi = 0; for (let i = i0; i < i1 && i < wv.mx.length; i++) { if (wv.mn[i] < lo) lo = wv.mn[i]; if (wv.mx[i] > hi) hi = wv.mx[i]; }
@@ -136,15 +138,16 @@ const arr = {
     if (sel) { g.strokeStyle = css.fg; g.lineWidth = 1.5; g.strokeRect(x + 0.75, y + 1.75, cw - 1.5, rh - 3.5); }
     if (c.type === 'audio' && sel && th) { g.fillStyle = css.fg; g.fillRect(x + c.fadeIn * V.pps - 3, y + 1, 6, 6); g.fillRect(x + cw - c.fadeOut * V.pps - 3, y + 1, 6, 6); }
   },
-  envParam(b) { const key = b.autoShow || 'vol'; return autoParams(b).find(p => p.key === key) || autoParams(b)[0]; },
+  envParam(b, r) { const key = (r && r.key) || b.autoShow || 'vol'; return autoParams(b).find(p => p.key === key) || autoParams(b)[0]; },
   envY(r, p, v) { const n = p.scale === 'log' ? Math.log(v / p.min) / Math.log(p.max / p.min) : (v - p.min) / (p.max - p.min); return r.y - V.scrollY + 3 + (1 - clamp(n, 0, 1)) * (r.h - 6); },
   envV(r, p, y) { const n = 1 - clamp((y - (r.y - V.scrollY) - 3) / (r.h - 6), 0, 1); return p.scale === 'log' ? p.min * Math.pow(p.max / p.min, n) : p.min + n * (p.max - p.min); },
   drawEnvelope(g, r, w, h, css) {
-    const y = r.y - V.scrollY; if (y > h || y + r.h < 0) return; const p = this.envParam(r.b); if (!p) return;
+    const y = r.y - V.scrollY; if (y > h || y + r.h < 0) return; const p = this.envParam(r.b, r); if (!p) return;
     const pts = r.b.auto[p.key], has = pts && pts.length; const cur = has ? null : currentParam(r.b, p.key);
     g.strokeStyle = has ? css.env : css.envIdle; g.lineWidth = 1.5; g.beginPath();
     if (!has) { const yy = this.envY(r, p, cur); g.moveTo(0, yy); g.lineTo(w, yy); g.stroke(); return; }
-    g.moveTo(0, this.envY(r, p, pts[0].v)); pts.forEach((q, i) => { if (p.steps && i) g.lineTo(this.x(q.t), this.envY(r, p, pts[i - 1].v)); g.lineTo(this.x(q.t), this.envY(r, p, q.v)); }); g.lineTo(w, this.envY(r, p, pts[pts.length - 1].v)); g.stroke();
+    if (OVERRIDES.has(ovKey(r.b, p.key))) { g.strokeStyle = css.dim; g.setLineDash([4, 3]); }
+    g.moveTo(0, this.envY(r, p, pts[0].v)); pts.forEach((q, i) => { if (p.steps && i) g.lineTo(this.x(q.t), this.envY(r, p, pts[i - 1].v)); else if (i && pts[i - 1].c) { const a0 = pts[i - 1]; for (let k = 1; k < 16; k++) { const tt = a0.t + (q.t - a0.t) * k / 16; g.lineTo(this.x(tt), this.envY(r, p, autoValue(pts, tt))); } } g.lineTo(this.x(q.t), this.envY(r, p, q.v)); }); g.lineTo(w, this.envY(r, p, pts[pts.length - 1].v)); g.stroke(); g.setLineDash([]);
     if (p.steps) { g.fillStyle = css.env; g.font = '10px ' + css.mono; pts.forEach(q => { const x = this.x(q.t); if (x > -40 && x < w) g.fillText(q.v.toFixed(1), x + 5, this.envY(r, p, q.v) - 5); }); }
     pts.forEach(q => { const x = this.x(q.t); if (x < -6 || x > w + 6) return; g.fillStyle = this.envSel && this.envSel.pt === q ? css.fg : css.env; g.beginPath(); g.arc(x, this.envY(r, p, q.v), 3.5, 0, 7); g.fill(); });
   },
@@ -204,8 +207,8 @@ const arr = {
       const x0 = e.clientX, y0 = e.clientY, pps0 = V.pps, anchor = pos; let mode = null;
       rc.onpointermove = ev => {
         const dx = ev.clientX - x0, dy = ev.clientY - y0;
-        if (!mode && Math.hypot(dx, dy) > 7) mode = Math.abs(dy) > Math.abs(dx) * 1.6 ? 'zoom' : 'scroll';
-        if (mode === 'zoom') { V.pps = clamp(pps0 * Math.exp(dy * 0.0055), 0.08, 120); V.scrollX = Math.max(0, anchor - x / V.pps); }
+        if (!mode && Math.hypot(dx, dy) > 5) mode = Math.abs(dy) > Math.abs(dx) * 1.3 ? 'zoom' : 'scroll';
+        if (mode === 'zoom') { V.pps = clamp(pps0 * Math.exp(dy * 0.0085), 0.08, 120); V.scrollX = Math.max(0, anchor - x / V.pps); }
         if (mode === 'scroll') V.scrollX = Math.max(0, anchor - (ev.clientX - b.left) / V.pps);
         this.draw();
       };
@@ -242,7 +245,7 @@ const arr = {
     cv.addEventListener('pointerdown', e => this.down(e));
     cv.addEventListener('pointerleave', () => { if (this.hoverClip) { this.hoverClip = null; this.draw(); } });
     cv.addEventListener('pointermove', e => { if (this.drag) return; { const bb = cv.getBoundingClientRect(), rr = this.rowAt(e.clientY - bb.top), hh = this.hitClip(rr, e.clientX - bb.left, e.clientY - bb.top), id = hh ? hh.c.id : null; if (id !== this.hoverClip) { this.hoverClip = id; this.draw(); } } const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y);
-      if (V.autoMode) { cv.style.cursor = this.envHit(r, x, y) ? 'grab' : 'crosshair'; return; }
+      if (V.autoMode || (r && r.kind === 'auto')) { cv.style.cursor = this.envHit(r, x, y) ? 'grab' : e.altKey ? 'ns-resize' : 'crosshair'; return; }
       const h = this.hitClip(r, x, y); cv.style.cursor = !h || h.zone === 'range' ? 'text' : h.zone === 'left' || h.zone === 'right' || h.zone === 'xf' ? 'ew-resize' : h.zone.startsWith('fade') ? 'col-resize' : 'grab'; });
     cv.addEventListener('dblclick', e => {
       const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y); if (!r || V.autoMode) return;
@@ -257,7 +260,7 @@ const arr = {
     cv.addEventListener('dragleave', () => { this.dropHint = null; this.draw(); });
     cv.addEventListener('drop', e => { e.preventDefault(); this.dropHint = null; const b = cv.getBoundingClientRect(); dropOnTimeline(e, this.rowAt(e.clientY - b.top), this.snapFloor(this.pos(e.clientX - b.left))); });
   },
-  envHit(r, x, y) { if (!r) return null; const p = this.envParam(r.b), pts = r.b.auto[p.key] || []; const pt = pts.find(q => Math.hypot(this.x(q.t) - x, this.envY(r, p, q.v) - y) < 7); return pt ? { r, p, pt } : null; },
+  envHit(r, x, y) { if (!r) return null; const p = this.envParam(r.b, r), pts = r.b.auto[p.key] || []; const pt = pts.find(q => Math.hypot(this.x(q.t) - x, this.envY(r, p, q.v) - y) < 7); return pt ? { r, p, pt } : null; },
   down(e) {
     const cv = this.lanes, b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top, r = this.rowAt(y);
     if (e.button === 2) return; cv.setPointerCapture(e.pointerId); cv.focus();
@@ -273,14 +276,21 @@ const arr = {
       return;
     }
     // automation editing
-    if (V.autoMode) {
-      const p = this.envParam(r.b); if (!p) return; const hit = this.envHit(r, x, y);
+    if (V.autoMode || r.kind === 'auto') {
+      const p = this.envParam(r.b, r); if (!p) return; const hit = this.envHit(r, x, y);
+      if (e.altKey && !hit && r.b.auto[p.key] && r.b.auto[p.key].length > 1) { // bend the segment under the pointer
+        const pts = r.b.auto[p.key], pos0 = this.pos(x); let i = pts.findIndex((q, k) => k < pts.length - 1 && pos0 >= q.t && pos0 < pts[k + 1].t); if (i < 0) return;
+        pushUndo('Curve'); const a0 = pts[i], c0 = a0.c || 0, y0 = e.clientY; this.drag = true;
+        cv.onpointermove = ev => { a0.c = clamp(c0 + (ev.clientY - y0) / 80 * (pts[i + 1].v >= a0.v ? 1 : -1), -1, 1); this.draw(); showTip(ev, 'Curve ' + Math.round(a0.c * 100)); };
+        cv.onpointerup = () => { cv.onpointermove = null; this.drag = false; hideTip(); this.draw(); }; return;
+      }
+      if (e.button === 0 && !hit && e.shiftKey && false) return;
       if (hit && e.detail === 2) { pushUndo('Delete point'); r.b.auto[p.key] = r.b.auto[p.key].filter(q => q !== hit.pt); this.draw(); return; }
       pushUndo('Automation'); let pts = r.b.auto[p.key] || (r.b.auto[p.key] = []); let pt = hit && hit.pt;
       if (!pt) { pt = { t: e.shiftKey ? this.pos(x) : this.snap(this.pos(x)), v: this.envV(r, p, y) }; if (!pts.length) pts.push({ t: 0, v: currentParam(r.b, p.key) }); pts.push(pt); pts.sort((a, c) => a.t - c.t); }
       this.envSel = { pt, r }; this.drag = true;
       cv.onpointermove = ev => { const xx = ev.clientX - b.left, yy = ev.clientY - b.top; const i = pts.indexOf(pt); const lo = i > 0 ? pts[i - 1].t : 0, hi = i < pts.length - 1 ? pts[i + 1].t : 1e9; pt.t = clamp(ev.shiftKey ? this.pos(xx) : this.snap(this.pos(xx)), lo, hi); pt.v = this.envV(r, p, yy); this.draw(); showTip(ev, p.fmt ? p.fmt(pt.v) : pt.v.toFixed(2)); };
-      cv.onpointerup = () => { cv.onpointermove = null; this.drag = false; hideTip(); ui.headers(); if (p.key === 'tempo') { _tmKey = ''; if (T.playing) play(nowPos()); } this.draw(); };
+      cv.onpointerup = () => { cv.onpointermove = null; this.drag = false; hideTip(); ui.headers(); if (p.key === 'tempo') { _tmKey = ''; unfreezeForTempo(); if (T.playing) play(nowPos()); } this.draw(); };
       this.draw(); return;
     }
     let hit = this.hitClip(r, x, y); const pos = this.pos(x);
@@ -301,14 +311,14 @@ const arr = {
         if (hit.zone === 'body') {
           if ((ev.altKey || ev.ctrlKey || ev.metaKey) && !copied) { copied = true; sel.forEach(s => { const k = deep(s.o); k.id = uid(); s.t.clips.push(k); }); }
           const rr = this.rowAt(ev.clientY - b.top), dRow = rr && rr.kind === 'track' ? this.rows.indexOf(rr) - row0 : 0;
-          let d = snapD(dx);
+          let d = snapD(dx); const lo = Math.min(...sel.map(s => s.o.start)); d = Math.max(d, -lo);
           if (V.snap && !ev.altKey) { // magnetic edges: line up with other clips' starts and ends within a few pixels
             const tol = 6 / V.pps, moving = new Set(sel.map(s => s.c)), edges = []; S.tracks.forEach(t => t.clips.forEach(k => { if (!moving.has(k)) edges.push(k.start, k.start + k.len); }));
             let best = null; sel.forEach(s => [s.o.start + dx, s.o.start + s.o.len + dx].forEach((e, i) => edges.forEach(E => { const diff = E - e; if (Math.abs(diff) < tol && (!best || Math.abs(diff) < Math.abs(best))) best = diff; })));
             if (best != null) d = dx + best;
           }
           sel.forEach(s => {
-            s.c.start = Math.max(0, s.o.start + d);
+            s.c.start = s.o.start + d;
             const ti = this.rows.findIndex(q => q.b === s.t); const target = this.rows[ti + dRow];
             if (dRow && target && target.kind === 'track' && target.b.kind === s.t.kind && target.b !== s.t) { s.t.clips = s.t.clips.filter(k => k !== s.c); target.b.clips.push(s.c); s.t = target.b; }
             else if (!dRow) { const home = this.rows.find(q => q.b.clips && q.b.clips.includes(s.c)); if (home && home.b !== s.t) s.t = home.b; }
@@ -327,13 +337,7 @@ const arr = {
       };
       cv.onpointerup = () => {
         cv.onpointermove = null; this.drag = false; hideTip();
-        if (moved && hit.zone === 'body') { // moved clips overwrite what they land on
-          const moved = new Set(sel.map(s => s.c));
-          new Set(sel.map(s => s.t)).forEach(t => {
-            const mine = t.clips.filter(k => moved.has(k)); t.clips = t.clips.filter(k => !moved.has(k));
-            mine.forEach(k => clearRange(t, k.start, k.start + k.len)); t.clips.push(...mine);
-          });
-        }
+        if (moved && ['body', 'left', 'right'].includes(hit.zone)) settleClips(sel); // moved or resized clips overwrite what they land on
         if (moved) { markDirty(); if (T.playing) play(nowPos()); }
         ui.detail(); this.draw();
       };
@@ -364,18 +368,24 @@ const arr = {
       ];
       items.push({ label: 'Crop', key: 'Ctrl+Shift+J', run: () => cropClips() });
       if (c.type === 'audio') items.push({ label: c.revOf ? 'Un-reverse' : 'Reverse', key: 'R', run: () => reverseClips() });
-      if (c.type === 'midi') items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') }, { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
+      if (c.type === 'midi') items.push({ label: 'Export as MIDI file…', run: () => exportMidiClip(c) });
+      items.push({ label: 'Consolidate', key: 'Ctrl+J', run: () => cmd('consolidate') });
+      if (c.type === 'midi') items.push( { label: 'Quantize notes', key: 'Ctrl+U', run: () => cmd('quantize') });
       if (c.type === 'audio' && (leftOf(trackOf(c), c) || rightOf(trackOf(c), c))) items.push({ label: 'Crossfade with neighbor', key: 'Ctrl+Alt+F', run: () => createCrossfades() });
-      if (c.type === 'audio' && c.xf) items.push({ label: 'Remove crossfade', run: () => { pushUndo(); c.xf = 0; this.draw(); } });
+      if (c.type === 'audio' && c.xf) items.push({ label: 'Remove crossfade', run: () => { pushUndo(); c.xf = 0; this.draw(); } }, ...['linear', 'equal', 'slow', 'fast'].map(sh => ({ label: `Crossfade shape: ${{ linear: 'Linear', equal: 'Equal power', slow: 'Slow', fast: 'Fast' }[sh]}${(c.xfShape || 'linear') === sh ? ' ✓' : ''}`, run: () => { pushUndo(); c.xfShape = sh; this.draw(); } })));
+      if (c.type === 'audio') items.push({ label: c.loop ? 'Turn clip loop off' : 'Loop this clip', run: () => { pushUndo('Loop'); c.loop = !c.loop; if (c.loop && !c.loopLen) c.loopLen = Math.min(c.len, Math.max(1, clipNaturalLen(c) - c.offset)); this.draw(); ui.detail(); } });
       if (c.type === 'audio') items.push({ label: c.warp ? 'Turn warp off' : 'Turn warp on', run: () => { pushUndo(); c.warp = !c.warp; if (c.warp) c.srcBpm = c.srcBpm || S.bpm; this.draw(); ui.detail(); } }, { label: 'Slice to new MIDI track', run: () => sliceToMidi(c) }, { label: 'Crop to clip length', run: () => toast('The clip already plays only its region; the file stays untouched.') });
       items.push('-', { label: 'Delete', danger: true, run: () => cmd('delete') });
       popMenu(e, items); return;
     }
     const items = [];
+    if (r && (V.autoMode || r.kind === 'auto') && V.time && V.time.b > V.time.a) { const p = this.envParam(r.b, r); items.push(...['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Ramp up', 'Ramp down'].map(sh => ({ label: 'Insert ' + sh.toLowerCase() + ' shape', run: () => insertAutoShape(r.b, p, sh, V.time.a, V.time.b) })), { label: 'Copy automation', run: () => copyAuto(r.b, p.key) }, '-'); }
+    if (r && (V.autoMode || r.kind === 'auto') && AUTO_CLIP) items.push({ label: 'Paste automation at insert marker', run: () => pasteAuto(r.b, this.envParam(r.b, r).key) }, '-');
     if (r && r.kind === 'track' && r.b.kind === 'midi') items.push({ label: 'Insert MIDI clip', key: 'Ctrl+Shift+M', run: () => cmd('newClip') });
     if (CLIPBOARD) items.push({ label: 'Paste', key: 'Ctrl+V', run: () => cmd('paste') });
     if (r && r.kind === 'track') items.push(...trackRenderMenu(r.b), '-');
     if (V.time) items.push({ label: 'Delete Time', key: 'Ctrl+Shift+Del', run: () => deleteTime(V.time.a, V.time.b) }, { label: 'Insert Silence', key: 'Ctrl+Alt+I', run: () => insertSilence(V.time.a, V.time.b) }, { label: 'Duplicate Time', key: 'Ctrl+Shift+D', run: () => duplicateTime(V.time.a, V.time.b) }, { label: 'Crop to selection', key: 'Ctrl+Shift+J', run: () => cropClips() }, '-');
+    if (V.time) items.push({ label: 'Consolidate time to new clip', key: 'Ctrl+J', run: () => cmd('consolidate') }, { label: 'Bounce selection to new track', run: () => bounceSelection() });
     if (V.time) items.push({ label: 'Loop selection', key: 'Ctrl+L', run: () => cmd('loopSel') }, { label: 'Split at selection', key: 'Ctrl+E', run: () => cmd('split') }, { label: 'Delete time-range contents', run: () => cmd('delete') });
     items.push({ label: 'Add locator at insert marker', run: () => addMarker(V.insert) }, { label: 'Import audio file…', run: importAudioDialog });
     popMenu(e, items);
@@ -383,7 +393,9 @@ const arr = {
 };
 // Smooth zoom: proportional to the scroll distance, capped per event (mouse wheel notch ≈ 12%).
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; return clamp(Math.exp(-d * 0.0012), 0.88, 1.14); };
+const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; return clamp(Math.exp(-d * 0.0018), 0.85, 1.18); };
+// Clips that moved or changed length replace whatever they now overlap on their track.
+function settleClips(list) { const moved = new Set(list.map(s => s.c)); new Set(list.map(s => s.t)).forEach(t => { const mine = t.clips.filter(k => moved.has(k)); t.clips = t.clips.filter(k => !moved.has(k)); mine.forEach(k => clearRange(t, k.start, k.start + k.len)); t.clips.push(...mine); }); }
 const barsBeats = s => { const spb = SPB(), bt = BEAT(); if (s < 0) return '-' + barsBeatsLen(-s); return `${Math.floor(s / spb) + 1}.${Math.floor((s % spb) / bt) + 1}.${Math.floor(s % bt) + 1}`; };
 const barsBeatsLen = s => { const spb = SPB(), bt = BEAT(); return `${Math.floor(s / spb)}.${Math.floor((s % spb) / bt)}.${+(s % bt).toFixed(2)}`; };
 function mix(c1, c2, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const a = p(c1.length === 7 ? c1 : '#888888'), b = p(c2.length === 7 ? c2 : '#222222'); return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
@@ -409,7 +421,7 @@ async function dropOnTimeline(e, r, at) {
     let sid = null;
     if (f.sid) sid = f.sid; else if (f.path) sid = await loadAudioPath(f.path);
     else if (f.fileId) { const wf = WEB_FILES.get(f.fileId); if (wf) sid = await loadAudioFile({ name: wf.name, path: null, data: await wf.arrayBuffer() }); }
-    else if (f.file) { if (/\.(als|sbproj|json)$/i.test(f.file.name)) { openProjectFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); return; } sid = await loadAudioFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); }
+    else if (f.file) { if (/\.midi?$/i.test(f.file.name)) { await importMidiFile({ name: f.file.name, data: await f.file.arrayBuffer() }, at, track); return; } if (/\.(als|sbproj|json)$/i.test(f.file.name)) { openProjectFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); return; } sid = await loadAudioFile({ name: f.file.name, path: IS_DESKTOP && f.file.path ? f.file.path : null, data: await f.file.arrayBuffer() }); }
     if (!sid) continue; const res = placeAudio(sid, t, at); if (res) { V.selClips = new Set([res.clip.id]); V.editClip = res.clip.id; t = null; }
   }
   ui.all();

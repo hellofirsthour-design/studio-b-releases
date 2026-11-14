@@ -95,6 +95,40 @@ async function offerRecovery() {
 }
 setInterval(() => autosaveNow(), 60000);
 
+/* ---------- automation shapes, copy and paste, extra lanes ---------- */
+let AUTO_CLIP = null;
+function insertAutoShape(b, p, shape, a, z) {
+  pushUndo('Automation shape'); const lo = p.min, hi = p.max, len = z - a, per = ['Sine', 'Triangle', 'Square'].includes(shape) ? Math.max(BEAT(), Math.round(len / Math.max(1, Math.round(len / SPB()))) ) : len;
+  const pts = (b.auto[p.key] || []).filter(q => q.t < a - 1e-6 || q.t > z + 1e-6), out = [], val = f => lo + (hi - lo) * f;
+  const n = Math.max(1, Math.round(len / per));
+  for (let k = 0; k < n; k++) { const s = a + k * per, e = Math.min(z, s + per), m = (s + e) / 2;
+    if (shape === 'Sine') for (let j = 0; j <= 8; j++) out.push({ t: s + (e - s) * j / 8, v: val(0.5 + 0.5 * Math.sin(j / 8 * 2 * Math.PI)) });
+    if (shape === 'Triangle') out.push({ t: s, v: val(0) }, { t: m, v: val(1) }, { t: e - 0.01, v: val(0) });
+    if (shape === 'Square') out.push({ t: s, v: val(1) }, { t: m - 0.01, v: val(1) }, { t: m, v: val(0) }, { t: e - 0.01, v: val(0) });
+    if (shape === 'Saw up') out.push({ t: s, v: val(0) }, { t: e - 0.01, v: val(1) });
+    if (shape === 'Saw down') out.push({ t: s, v: val(1) }, { t: e - 0.01, v: val(0) });
+    if (shape === 'Ramp up' || shape === 'Ramp down') { out.push({ t: a, v: val(shape === 'Ramp up' ? 0 : 1) }, { t: z, v: val(shape === 'Ramp up' ? 1 : 0) }); break; }
+  }
+  b.auto[p.key] = [...pts, ...out].sort((x, y) => x.t - y.t); arr.draw();
+}
+function copyAuto(b, key) { if (!V.time) return; const pts = (b.auto[key] || []).filter(q => q.t >= V.time.a && q.t <= V.time.b); const v0 = autoValue(b.auto[key], V.time.a), v1 = autoValue(b.auto[key], V.time.b); AUTO_CLIP = { len: V.time.b - V.time.a, pts: [{ t: 0, v: v0 }, ...pts.map(q => ({ ...q, t: q.t - V.time.a })), { t: V.time.b - V.time.a, v: v1 }].filter(q => q.v != null) }; toast('Automation copied'); }
+function pasteAuto(b, key) { if (!AUTO_CLIP) return; pushUndo('Paste automation'); const a = V.insert, z = a + AUTO_CLIP.len; b.auto[key] = [...(b.auto[key] || []).filter(q => q.t < a - 1e-6 || q.t > z + 1e-6), ...AUTO_CLIP.pts.map(q => ({ ...q, t: q.t + a }))].sort((x, y) => x.t - y.t); arr.draw(); }
+function addAutoLane(b) { b.lanes = b.lanes || []; const used = new Set([b.autoShow, ...b.lanes]); const p = autoParams(b).find(q => !used.has(q.key)) || autoParams(b)[0]; b.lanes.push(p.key); ui.headers(); }
+
+/* ---------- group tracks ---------- */
+function groupTracks() {
+  const sel = S.tracks.filter(t => V.selTracks.has(t.id)); if (!sel.length) return toast('Select the tracks to group (Shift-click headers)');
+  pushUndo('Group'); const parent = sel.every(t => t.group === sel[0].group) ? sel[0].group || null : null;
+  const g = { id: uid(), kind: 'group', name: 'Group', color: sel[0].color, vol: 0.79, pan: 0, mute: false, solo: false, arm: false, sendA: 0, sendB: 0, h: 44, devices: [], clips: [], auto: {}, autoShow: 'vol', group: parent };
+  const at = Math.min(...sel.map(t => S.tracks.indexOf(t))); const members = [...sel, ...sel.flatMap(t => t.kind === 'group' ? descendants(t) : [])];
+  S.tracks = S.tracks.filter(t => !members.includes(t)); S.tracks.splice(Math.min(at, S.tracks.length), 0, g, ...members.filter((t, i) => members.indexOf(t) === i));
+  sel.forEach(t => (t.group = g.id)); V.selTracks = new Set([g.id]); rebuildAll(); ui.all(); toast(`Grouped ${sel.length} tracks. Double-click the name to rename it.`);
+}
+function ungroupTrack(g) {
+  if (!g || g.kind !== 'group') { g = S.tracks.find(t => V.selTracks.has(t.id) && t.kind === 'group'); if (!g) return toast('Select a group track first'); }
+  pushUndo('Ungroup'); S.tracks.forEach(t => { if (t.group === g.id) t.group = g.group || null; }); removeBus(g); S.tracks = S.tracks.filter(t => t !== g); rebuildAll(); ui.all();
+}
+
 /* ---------- undo history ---------- */
 function showUndoHistory() {
   if (!UNDO.length) return toast('Nothing to undo yet');

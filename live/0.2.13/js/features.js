@@ -30,7 +30,7 @@ async function bounceToNew(t) {
   try {
     const buf = await renderTrack(t); if (!buf) return;
     pushUndo('Bounce'); const sid = addSample(buf, `${t.name} (bounce)`, { recorded: true, path: null });
-    const n = newTrack('audio'); n.name = `${t.name} (bounce)`; n.color = t.color; n.vol = t.vol; n.pan = t.pan; n.sendA = t.sendA; n.sendB = t.sendB;
+    const n = newTrack('audio'); n.name = `${t.name} (bounce)`; n.color = t.color; n.vol = t.vol; n.pan = t.pan; n.sendA = t.sendA; n.sendB = t.sendB; if (t.sends) n.sends = [...t.sends]; n.group = t.group;
     n.clips = [songClip(sid, Math.min(songPos(buf.duration), trackEnd(t) + SPB()), n.name)];
     S.tracks.splice(S.tracks.indexOf(t) + 1, 0, n); buildBus(n, 'track'); t.mute = true; applyMix(t);
     V.selTracks = new Set([n.id]); ui.all(); toast(`Bounced to a new audio track. ${t.name} is switched off.`);
@@ -52,16 +52,16 @@ async function exportStems(opts) {
   if (opts.main) targets.push(S.master);
   if (!targets.length) return toast('Nothing to export');
   let dir = null; if (IS_DESKTOP) { dir = await NATIVE.folderDialog(); if (!dir) return; }
-  const pad = n => String(n).padStart(2, '0');
+  const pad = n => String(n).padStart(2, '0'); let last = '';
   for (let i = 0; i < targets.length; i++) {
     const tb = targets[i], name = tb === S.master ? 'Main' : tb.name;
     showBusy(`Rendering ${i + 1} of ${targets.length}: ${name}`); $('#exProgText') && ($('#exProgText').textContent = `${i + 1} of ${targets.length}: ${name}`);
-    const buf = await renderRange(a, b, { sr: opts.sr, tail: opts.tail, only: tb === S.master ? null : tb.id, prefader: false });
-    const file = `${slug(S.name)} - ${pad(i + 1)} ${slug(name)}.wav`, data = encodeWav(buf, opts.bits, opts.normalize);
-    if (dir) await NATIVE.write(joinPath(dir, file), data); else await saveBytes('wav', file, data);
+    const sr = exportSr(opts), buf = await renderRange(a, b, { sr, tail: opts.loop ? Math.max(opts.tail, 2) : opts.tail, only: tb === S.master ? null : tb.id, prefader: false });
+    const enc = await encodeAudio(buf, { ...opts, loopLen: opts.loop ? loopSamples(a, b, sr) : 0 }), file = `${slug(S.name)} - ${pad(i + 1)} ${slug(name)}.${enc.ext}`, data = enc.data; last = file;
+    if (dir) await NATIVE.write(joinPath(dir, file), data); else await saveBytes(enc.ext, file, data);
   }
   showBusy(null); toast(`Exported ${targets.length} stems${dir ? ' to ' + basename(dir) : ''}`);
-  if (dir) NATIVE.reveal(joinPath(dir, `${slug(S.name)} - 01 ${slug(targets[0] === S.master ? 'Main' : targets[0].name)}.wav`));
+  if (dir && last) NATIVE.reveal(joinPath(dir, last));
 }
 
 /* ---------- crossfades ---------- */
