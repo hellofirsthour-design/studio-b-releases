@@ -1,13 +1,13 @@
 {
- "version": "0.2.9",
+ "version": "0.2.10",
  "shell": 2,
- "date": "2026-11-14T17:30:59.879Z",
- "notes": "Fix bugs from the bug hunt",
+ "date": "2026-11-14T17:35:55.439Z",
+ "notes": "Routing: up to 12 sends with pre/post, group tracks, track delay, resampling",
  "files": [
   {
    "path": "css/base.css",
-   "size": 20183,
-   "sha256": "a97840a126dde8a278f05e716fbb69ef54306367c4a36d0a01516af963a633d6"
+   "size": 20764,
+   "sha256": "8506c502612fe3d2b7ae11928926e1fd841c82f3988e6b8101b6591ed06b8c6b"
   },
   {
    "path": "css/studio.css",
@@ -16,13 +16,13 @@
   },
   {
    "path": "index.html",
-   "size": 17055,
-   "sha256": "b1725ffbc39a5f4b5883ad3b62c58c56c45acb23ae1e3dbe4a9325740feb182a"
+   "size": 17171,
+   "sha256": "94b38074fa11ee36b246f323d15ff9f83960d81d0b75fe950b42c65eeae2acb9"
   },
   {
    "path": "js/arrange.js",
-   "size": 40909,
-   "sha256": "da9df5566d1765b2f24af78435cfe144b3d2300fb1a471398ed7d8ca94bed283"
+   "size": 41373,
+   "sha256": "0f1f167e9f7ff50469b39a47901aec24a92fb4ca46b3d42995169a70c12f0d74"
   },
   {
    "path": "js/browser.js",
@@ -51,18 +51,18 @@
   },
   {
    "path": "js/engine.js",
-   "size": 37845,
-   "sha256": "0862d5a441fab4e1033b802bcfe83f6070101dead6aef3e7e886345a8f9e7b13"
+   "size": 40451,
+   "sha256": "92a899e6919fc0dbe5ad1ef2ae465e3a4ba43c17727ab6f55a3364a3af39e5d6"
   },
   {
    "path": "js/features.js",
-   "size": 5866,
-   "sha256": "9628794f988db4253857c0589f262036305b27735aa5d142ca43cc947024f80d"
+   "size": 5922,
+   "sha256": "f8c871f47d3a9b4cdb1f76b10e797f433823d37cfc781cc3e30c9236dd5a8770"
   },
   {
    "path": "js/features2.js",
-   "size": 8681,
-   "sha256": "6a4fa964cdce9c041923699b878848317dff78e7b564e33deb8351fc0b08fe81"
+   "size": 10079,
+   "sha256": "d31176809d5e35a89bc00c767e1af8fb7968ac87ee24cab37fd3127d6e3c4ff7"
   },
   {
    "path": "js/instruments.js",
@@ -71,18 +71,18 @@
   },
   {
    "path": "js/io.js",
-   "size": 43350,
-   "sha256": "39ec404f3b62a88e5da707b50ce240616d403ee0d5f859bc4cad150414a6d1fc"
+   "size": 44664,
+   "sha256": "dcd3a9a765ec94a6970d90b1be8e492491af25b9ba3eb0fa76542412776666d5"
   },
   {
    "path": "js/main.js",
-   "size": 33540,
-   "sha256": "bd76e0f5a82dc1ee3c198a622241c121998da2fb18aca5d5bb87fcaa80b7faa0"
+   "size": 33752,
+   "sha256": "ef912242bfe3a6065f81fd742c9373eab116bddec7b0d0e88d36fb23feb31777"
   },
   {
    "path": "js/mixer.js",
-   "size": 8639,
-   "sha256": "0e57a86fd8f655472cddf7cfee371699d908e9035d5278cb3f4a605d1506ba8d"
+   "size": 10010,
+   "sha256": "45d88197170ffc8ee78365be74c9482372158544f4797735d68692779243be5c"
   },
   {
    "path": "js/roll.js",
@@ -96,13 +96,13 @@
   },
   {
    "path": "js/ui.js",
-   "size": 25299,
-   "sha256": "3e002a2c9d1b3d2f7d949c88b414d42f1b4d3d65c70b5f94bcb3d0da6a63ea05"
+   "size": 27017,
+   "sha256": "e3f60fc936a7b5c72eb7e065d307ae549cd431fc9d841000fa3976bbd0807d07"
   },
   {
    "path": "version.json",
-   "size": 37,
-   "sha256": "c48dcccd04b0874f1656993786a8a25e663acc54d175949ba926a0eab6a5311d"
+   "size": 38,
+   "sha256": "3325cae467c37be552b579c2805b1132bf7d5c1b878d8e1dc19a0fd71fee8289"
   }
  ]
 }

@@ -10,16 +10,17 @@ const mixer = {
     $$('.mxs', box).forEach(el => this.bindStrip(el));
   },
   strip(b, kind) {
-    const isT = kind === 'track', num = isT ? S.tracks.indexOf(b) + 1 : kind === 'return' ? 'AB'[S.returns.indexOf(b)] || 'R' : 'M', sel = V.selTracks.has(b.id);
+    const isT = kind === 'track', num = isT ? S.tracks.indexOf(b) + 1 : kind === 'return' ? RET_LETTERS[S.returns.indexOf(b)] || 'R' : 'M', sel = V.selTracks.has(b.id);
     const devs = b.devices.map((d, i) => `<button class="mxdev ${d.on ? '' : 'off'}" data-dev="${i}" title="Click to open. Alt-click turns it on or off."><i></i>${esc(d.type === 'plugin' ? d.p.name : DEVICES[d.type].name)}</button>`).join('');
-    const io = isT ? (b.kind === 'audio' ? `<div class="mxio"><span class="seg mon">${['in', 'auto', 'off'].map(m => `<button data-mon="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span></div>` : `<div class="mxio muted">${{ synth: 'Contour', drums: 'Kit', sampler: 'Cutline' }[b.inst.type]}</div>`) : `<div class="mxio muted">${kind === 'master' ? 'Main output' : 'Return'}</div>`;
+    const io = isT && b.kind === 'group' ? `<div class="mxio muted">Group · ${descendants(b).length} tracks</div>` : isT ? (b.kind === 'audio' ? `<div class="mxio"><span class="seg mon">${['in', 'auto', 'off'].map(m => `<button data-mon="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span></div>` : `<div class="mxio muted">${{ synth: 'Contour', drums: 'Kit', sampler: 'Cutline' }[b.inst.type]}</div>`) : `<div class="mxio muted">${kind === 'master' ? 'Main output' : 'Return'}</div>`;
     const scale = DB_MARKS.map(d => `<span style="bottom:${faderForDb(d) * 100}%">${d > 0 ? '+' + d : d}</span>`).join('');
     const loud = kind === 'master' ? `<div class="mxloud" title="Loudness (ITU-R BS.1770)"><div><span>Momentary</span><b data-l="m">–</b></div><div><span>Short-term</span><b data-l="s">–</b></div><div><span>Integrated</span><b data-l="i">–</b></div><div><span>Peak</span><b data-l="p">–</b></div><button class="btn ghostb tiny" data-act="lreset">Reset</button></div>` : '';
     return `<div class="mxs ${kind} ${sel ? 'sel' : ''}" data-id="${b.id}" style="--tc:${b.color || '#a7a3b8'}">
       <div class="mxname" title="Double-click to rename"><i></i><span>${esc(b.name)}</span></div>
       ${io}
       <div class="mxdevs">${devs}<button class="mxdev add" data-act="adddev">+ Effect</button></div>
-      <div class="mxknobs">${isT ? '<span data-k="sendA"></span><span data-k="sendB"></span>' : ''}${kind !== 'master' ? '<span data-k="pan"></span>' : ''}</div>
+      <div class="mxknobs">${isT ? S.returns.map((r, i) => `<span data-k="${sendKey(i)}"></span>`).join('') : ''}${kind !== 'master' ? '<span data-k="pan"></span>' : ''}</div>
+      ${isT ? `<div class="mxrow">${b.kind === 'audio' ? `<button class="btn ghostb tiny" data-act="input" title="Where this track records from">${b.input === 'resample' ? 'In: Main' : String(b.input || '').startsWith('track:') ? 'In: ' + esc((busById(b.input.slice(6)) || {}).name || 'track') : 'In: Mic'}</button>` : ''}<label class="mxdly" title="Track delay in milliseconds (negative plays earlier)"><span>Delay</span><input type="number" step="1" min="-500" max="500" value="${b.delayMs || 0}" data-act="delay"></label></div>` : kind === 'return' ? `<div class="mxrow"><button class="btn ghostb tiny ${b.pre ? 'on' : ''}" data-act="pre">${b.pre ? 'Pre fader' : 'Post fader'}</button></div>` : ''}
       ${loud}
       <div class="mxfader">
         <div class="mxscale">${scale}</div>
@@ -32,8 +33,10 @@ const mixer = {
   },
   bindStrip(el) {
     const b = busById(el.dataset.id);
-    $$('[data-k]', el).forEach(slot => { const k = slot.dataset.k; slot.appendChild(knob({ label: k === 'pan' ? 'Pan' : k === 'sendA' ? 'Send A' : 'Send B', value: b[k], min: k === 'pan' ? -1 : 0, max: 1, def: 0, small: true, fmt: k === 'pan' ? v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R') : v => v < 0.005 ? '-inf' : gainToDb(v).toFixed(1), onInput: v => { b[k] = v; applyMix(b); markDirty(); } })); });
+    $$('[data-k]', el).forEach(slot => { const k = slot.dataset.k, si = sendIndex(k); slot.appendChild(knob({ label: k === 'pan' ? 'Pan' : 'Send ' + RET_LETTERS[si], value: si >= 0 ? sendOf(b, si) : b[k], min: k === 'pan' ? -1 : 0, max: 1, def: 0, small: true, fmt: k === 'pan' ? v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R') : v => v < 0.005 ? '-inf' : gainToDb(v).toFixed(1), onInput: v => { if (si >= 0) setSend(b, si, v); else b[k] = v; applyMix(b); markDirty(); } })); });
+    const dl = el.querySelector('[data-act=delay]'); if (dl) { dl.onkeydown = e => e.stopPropagation(); dl.onchange = () => { pushUndo('Track delay'); b.delayMs = clamp(+dl.value || 0, -500, 500); applyAllMix(); markDirty(); }; }
     const vol = $('.mxvol', el), dbIn = $('.mxdb', el);
+    vol.onpointerdown = () => pushUndo('Volume');
     vol.oninput = () => { b.vol = +vol.value; applyMix(b); dbIn.value = faderDb(b.vol); markDirty(); };
     vol.ondblclick = () => { b.vol = 0.79; vol.value = b.vol; applyMix(b); dbIn.value = faderDb(b.vol); };
     vol.onchange = () => ui.headers();
@@ -49,6 +52,9 @@ const mixer = {
       if (act === 'mute') b.mute = !b.mute;
       if (act === 'solo') { if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; }
       if (act === 'arm') { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); }
+      if (act === 'input') { V.selTracks = new Set([b.id]); return chooseInput(b); }
+      if (act === 'pre') { pushUndo('Send position'); b.pre = !b.pre; rebuildAll(); this.render(); ui.headers(); return; }
+      if (act === 'delay') return;
       if (act === 'lreset') { if (M.loud) M.loud.port.postMessage({ reset: true }); M.loudData = null; this.peaks.clear(); return; }
       if (act === 'adddev') return popMenu(e, Object.entries(DEVICES).filter(([, v]) => !v.hidden).map(([k, v]) => ({ label: `${v.name}  ·  ${v.blurb}`, run: () => { pushUndo('Add device'); b.devices.push(newDevice(k)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.detail(); this.render(); } })));
       applyAllMix(); markDirty(); this.render(); ui.headers();
@@ -71,6 +77,6 @@ const mixer = {
   },
 };
 function setView(v) {
-  V.view = v; $('#mixer').hidden = v !== 'mix'; $('#arr').hidden = v === 'mix'; $('#viewBtn').classList.toggle('on', v === 'mix'); $('#viewBtn').textContent = v === 'mix' ? 'Arrangement' : 'Mixer';
+  V.view = v; $('#mixer').hidden = v !== 'mix'; $('#arr').hidden = v === 'mix'; $('#viewBtn').classList.toggle('on', v === 'mix'); $('#viewBtn').title = v === 'mix' ? 'Back to Arrangement (Tab)' : 'Mixer (Tab)'; $('#viewBtn').setAttribute('aria-label', v === 'mix' ? 'Switch to the Arrangement' : 'Switch to the Mixer');
   if (v === 'mix') mixer.render(); else { ui.headers(); arr.draw(); }
 }

@@ -24,12 +24,13 @@ const roll = {
     pane.innerHTML = `<div class="clipwrap">
       <aside class="clipside">
         <label class="fld"><span>Clip name</span><input id="cName" value="${esc(c.name)}"></label>
-        <div class="fld"><span>Loop length (bars)</span><div class="seg" id="cLen">${[1, 2, 4, 8, 16].map(b => `<button data-len="${b}" class="${c.bars === b ? 'on' : ''}">${b}</button>`).join('')}</div></div>
+        <div class="fld"><span>Loop length (bars)</span><div class="seg" id="cLen">${[1, 2, 4, 8, 16].map(b => `<button data-len="${b}" class="${Math.abs(c.bars * 16 - b * SPB()) < 1e-6 ? 'on' : ''}">${b}</button>`).join('')}</div></div>
         <div class="row tight"><button class="btn ghostb" data-ct="dup">Duplicate loop</button><button class="btn ghostb" data-ct="half">Halve</button></div>
         <div class="fld"><span>Notes · ${this.sel.size ? this.sel.size + ' selected' : 'all ' + c.notes.length}</span></div>
         <details data-det="tf" ${this.det.tf ? 'open' : ''}><summary>Transform</summary><div class="tools">
           <button data-tf="quant">Quantize</button><button data-tf="human">Humanize</button><button data-tf="legato">Legato</button><button data-tf="reverse">Reverse</button>
           <button data-tf="up1">+1 st</button><button data-tf="dn1">−1 st</button><button data-tf="up12">+Oct</button><button data-tf="dn12">−Oct</button>
+          <button data-tf="x2">×2 time</button><button data-tf="half2">÷2 time</button><button data-tf="chop">Chop at grid</button><button data-tf="join">Join</button>
           <button data-tf="fit">Fit to scale</button><button data-tf="invert">Invert</button><button data-tf="vramp">Vel ramp</button><button data-tf="strum">Strum</button>
           <label class="fld sm"><span>Chord</span><select id="chordType">${['triad', 'seventh', 'sus2', 'sus4', 'power', 'add9', 'stack 4ths'].map(x => `<option>${x}</option>`).join('')}</select></label><button data-tf="chord">Make chords</button>
           <label class="fld sm"><span>Arp</span><select id="arpStyle">${['up', 'down', 'up-down', 'random', 'converge'].map(x => `<option>${x}</option>`).join('')}</select></label><label class="fld sm"><span>Rate</span><select id="arpRate">${GRIDS.map(([l, v]) => `<option value="${v}" ${v === 1 ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button data-tf="arp">Arpeggiate</button>
@@ -48,6 +49,7 @@ const roll = {
           <button class="tog ${this.snap ? 'on' : ''}" id="rSnap">Snap</button>
           ${t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? `<button class="tog ${this.fold ? 'on' : ''}" id="rFold">Fold to scale</button>` : ''}
           <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button></div>
+          <button class="tog ${this.preview !== false ? 'on' : ''}" id="rPrev" title="Play notes as you add or move them">Preview</button>
           <span class="spacer"></span><span class="muted hint">Double-click to add · drag edges to resize · Alt-drag copies · Del removes · Ctrl+wheel zooms</span>
         </div>
         <div class="rollcv"><canvas id="roll" tabindex="0" aria-label="Piano roll"></canvas></div>
@@ -78,11 +80,12 @@ const roll = {
     const cv = this.cv, pane = $('#pane-clip');
     pane.querySelectorAll('details[data-det]').forEach(d => d.addEventListener('toggle', () => (this.det[d.dataset.det] = d.open)));
     pane.querySelector('#cName').onchange = e => { pushUndo(); this.clip.name = e.target.value || 'Clip'; arr.draw(); markDirty(); };
-    pane.querySelector('#cLen').onclick = e => { const b = e.target.closest('[data-len]'); if (!b) return; pushUndo(); this.clip.bars = +b.dataset.len; arr.draw(); this.mount(); };
+    pane.querySelector('#cLen').onclick = e => { const b = e.target.closest('[data-len]'); if (!b) return; pushUndo(); this.clip.bars = +b.dataset.len * SPB() / 16; arr.draw(); this.mount(); };
     pane.querySelectorAll('[data-mode]').forEach(b => (b.onclick = () => { this.draw = b.dataset.mode === 'draw'; this.mount(); }));
     pane.querySelectorAll('[data-lane]').forEach(b => (b.onclick = () => { this.lane = b.dataset.lane; this.mount(); }));
     pane.querySelector('#rGrid').onchange = e => { this.grid = +e.target.value; this.draw_(); };
     pane.querySelector('#rSnap').onclick = () => { this.snap = !this.snap; this.mount(); };
+    pane.querySelector('#rPrev').onclick = () => { this.preview = this.preview === false; this.mount(); };
     const fold = pane.querySelector('#rFold'); if (fold) fold.onclick = () => { this.fold = !this.fold; this.scrollY = null; this.mount(); };
     pane.querySelector('.clipside').onclick = e => {
       const ct = e.target.closest('[data-ct]'), tf = e.target.closest('[data-tf]'), gn = e.target.closest('[data-gn]');
@@ -139,7 +142,7 @@ const roll = {
     cv.onpointerup = () => { this.scrubbing = false; arr.draw(); if (drag) { drag = null; this.box = null; this.clip.notes.sort((a, b) => a.s - b.s || a.p - b.p); markDirty(); this.draw_(); this.sideCount(); } };
     cv.onwheel = e => {
       e.preventDefault(); const g = this.geo();
-      if (e.ctrlKey || e.metaKey) { const rc = cv.getBoundingClientRect(), x = e.clientX - rc.left, s = this.xs(g, x); this.zoom = clamp(this.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 16); const g2 = this.geo(); this.scrollX = s * g2.pps - (x - g2.keysW); }
+      if (e.ctrlKey || e.metaKey) { const rc = cv.getBoundingClientRect(), x = e.clientX - rc.left, s = this.xs(g, x); this.zoom = clamp(this.zoom * zoomFactor(e), 1, 16); const g2 = this.geo(); this.scrollX = s * g2.pps - (x - g2.keysW); }
       else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) this.scrollX += (e.deltaX || e.deltaY);
       else this.scrollY += e.deltaY;
       this.draw_();
@@ -173,10 +176,11 @@ const roll = {
       x.fillRect(g.keysW, y, g.gridW, g.rowH);
       x.fillStyle = V('--gridf'); x.fillRect(g.keysW, y + g.rowH - 1, g.gridW, pitched && p % 12 === 0 ? 1.5 : 0.6);
     });
-    // grid lines
+    // alternate bar shading, then grid lines
+    { const spb = SPB(); x.fillStyle = 'rgba(255,255,255,.022)'; for (let bs = 0; bs < g.len; bs += spb) if (Math.round(bs / spb) % 2 === 1) x.fillRect(this.sx(g, bs), g.rulerH, spb * g.pps, g.gridH); }
     for (let s = 0; s <= g.len + 1e-6; s += this.grid) {
       const X = Math.round(this.sx(g, s)) + 0.5; if (X < g.keysW || X > g.w) continue;
-      x.fillStyle = Math.abs(s % 16) < 1e-6 ? V('--gridb') : Math.abs(s % 4) < 1e-6 ? V('--gridm') : V('--gridf'); x.fillRect(X, g.rulerH, 1, g.gridH);
+      x.fillStyle = Math.abs(s % SPB()) < 1e-6 ? V('--gridb') : Math.abs(s % BEAT()) < 1e-6 ? V('--gridm') : V('--gridf'); x.fillRect(X, g.rulerH, 1, g.gridH);
     }
     // notes
     this.clip.notes.forEach(n => {
@@ -205,7 +209,7 @@ const roll = {
     x.restore();
     // ruler
     x.fillStyle = V('--panel'); x.fillRect(0, 0, g.w, g.rulerH); x.fillStyle = V('--dim'); x.font = '10px ' + V('--mono');
-    for (let b = 0; b < this.clip.bars; b++) for (let q = 0; q < 4; q++) { const X = this.sx(g, b * 16 + q * 4); if (X < g.keysW - 1 || X > g.w) continue; x.fillRect(X, q ? 14 : 6, 1, q ? 6 : 14); if (!q) x.fillText(String(b + 1), X + 4, 13); else if (g.pps * 4 > 34) x.fillText(`${b + 1}.${q + 1}`, X + 3, 13); }
+    { const spb = SPB(), bt = BEAT(), L = this.clip.bars * 16; for (let st = 0; st < L - 1e-6; st += bt) { const b = Math.floor(st / spb), q = Math.round((st % spb) / bt); const X = this.sx(g, st); if (X < g.keysW - 1 || X > g.w) continue; x.fillRect(X, q ? 14 : 6, 1, q ? 6 : 14); if (!q) x.fillText(String(b + 1), X + 4, 13); else if (g.pps * bt > 34) x.fillText(`${b + 1}.${q + 1}`, X + 3, 13); } }
     if (playing) { const X = this.sx(g, PH); x.fillStyle = V('--accent'); x.beginPath(); x.moveTo(X - 5, 0); x.lineTo(X + 5, 0); x.lineTo(X, 8); x.fill(); }
     // lane
     const ly = g.h - g.laneH; x.fillStyle = V('--panel'); x.fillRect(0, ly, g.w, g.laneH); x.fillStyle = V('--line'); x.fillRect(0, ly, g.w, 1);
@@ -215,7 +219,7 @@ const roll = {
     x.restore();
   },
 };
-function audition(t, p, l = 0.5) { if (ctx.state !== 'running') ctx.resume(); RT.get(t.id).inst.noteOn(p, ctx.currentTime, 0.8, Math.min(1, l * 15 / S.bpm)); }
+function audition(t, p, l = 0.5) { if (roll.preview === false) return; if (ctx.state !== 'running') ctx.resume(); RT.get(t.id).inst.noteOn(p, ctx.currentTime, 0.8, Math.min(1, l * 15 / S.bpm)); }
 function targetNotes() { return roll.sel.size ? [...roll.sel] : roll.clip.notes; }
 function clipCmd(k) {
   const c = roll.clip; pushUndo();
@@ -230,7 +234,11 @@ function transform(k) {
   const pitched = roll.track.inst.type === 'synth' || (roll.track.inst.type === 'sampler' && roll.track.inst.mode === 'keys');
   const groups = () => { const m = new Map(); ns.forEach(n => { const k = Math.round(n.s * 100); if (!m.has(k)) m.set(k, []); m.get(k).push(n); }); return [...m.values()]; };
   switch (k) {
-    case 'quant': ns.forEach(n => (n.s = clamp(Math.round(n.s / g) * g, 0, L - g))); break;
+    case 'x2': { const s0 = Math.min(...ns.map(n => n.s)); ns.forEach(n => { n.s = s0 + (n.s - s0) * 2; n.l *= 2; }); const need = Math.max(...ns.map(n => n.s + n.l)); if (need > L) c.bars = Math.min(64, Math.ceil(need / SPB()) * SPB() / 16); break; }
+    case 'half2': { const s0 = Math.min(...ns.map(n => n.s)); ns.forEach(n => { n.s = s0 + (n.s - s0) / 2; n.l = Math.max(0.1, n.l / 2); }); break; }
+    case 'chop': { const add = []; ns.forEach(n => { const parts = Math.floor(n.l / g - 1e-6); if (parts < 1) return; const l0 = n.l; n.l = g; for (let i = 1; i <= parts; i++) { const s = n.s + i * g; if (s < n.s + l0 - 1e-6) add.push({ ...n, s, l: Math.min(g, n.s + l0 - s) }); } }); c.notes.push(...add); add.forEach(n => roll.sel.add(n)); break; }
+    case 'join': { const byP = new Map(); [...ns].sort((a, b) => a.s - b.s).forEach(n => { const prev = byP.get(n.p); if (prev && n.s <= prev.s + prev.l + 1e-6) { prev.l = Math.max(prev.l, n.s + n.l - prev.s); c.notes = c.notes.filter(x => x !== n); roll.sel.delete(n); } else byP.set(n.p, n); }); break; }
+    case 'quant': ns.forEach(n => { if (n.s < L) n.s = clamp(Math.round(n.s / g) * g, 0, L - g); }); break;
     case 'human': ns.forEach(n => { n.s = clamp(n.s + (Math.random() - 0.5) * 0.18, 0, L - 0.05); n.v = clamp(n.v + (Math.random() - 0.5) * 0.2, 0.1, 1); }); break;
     case 'legato': { const st = [...new Set(c.notes.map(n => n.s))].sort((a, b) => a - b); ns.forEach(n => { const nx = st.find(s => s > n.s + 1e-6); n.l = (nx != null ? nx : L) - n.s; }); break; }
     case 'reverse': ns.forEach(n => (n.s = clamp(L - n.s - n.l, 0, L - 0.05))); break;
@@ -288,6 +296,8 @@ function generate(k) {
 }
 function rollKey(e) {
   if (!roll.clip || !roll.cv || document.activeElement !== roll.cv) return false;
+  { const live = clipById(V.editClip); if (live && live !== roll.clip) { roll.mount(); return true; } }
+  if (!roll.sel.size && ['Delete', 'Backspace', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return true;
   const c = roll.clip, mod = e.ctrlKey || e.metaKey, ns = [...roll.sel];
   if ((e.key === 'Delete' || e.key === 'Backspace') && ns.length) { pushUndo(); c.notes = c.notes.filter(n => !roll.sel.has(n)); roll.sel.clear(); roll.draw_(); return true; }
   if (mod && e.key.toLowerCase() === 'a') { roll.sel = new Set(c.notes); roll.draw_(); return true; }

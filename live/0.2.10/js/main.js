@@ -20,15 +20,16 @@ function meter(id, el, an, now, horiz) {
 let lastFrame = 0;
 function frame(now) {
   if (S) {
-    allBuses().forEach(b => { const r = b === S.master ? { an: M.an } : RT.get(b.id); if (r && r.an) meter(b.id, document.querySelector(`.hdr[data-id="${b.id}"] .hmeter`), r.an, now); });
+    allBuses().forEach(b => { const r = b === S.master ? { an: M.an } : RT.get(b.id); const an = b.arm && b.kind === 'audio' ? inputAnalyser(b) || (r && r.an) : r && r.an; if (an) meter(b.id, document.querySelector(`.hdr[data-id="${b.id}"]:not([data-lane]) .hmeter`), an, now); });
     const ms = meter('mainTop', $('#mmeter'), M.an, now, true);
     $('#mclip').classList.toggle('on', ms.clip);
     S.tracks.forEach(t => { const el = document.querySelector(`.hdr[data-id="${t.id}"] .hcol`); if (el) el.classList.toggle('on', now - (ACT.get(t.id) || 0) < 90); });
     const p = nowPos();
-    $('#pos').textContent = barsBeats(p); $('#clock').textContent = fmtTimeMs(p * stepSec());
-    const beat = Math.floor(p % 16 / 4); $$('#beats i').forEach((b, i) => b.classList.toggle('on', T.playing && i === beat));
+    const pp = T.playing ? posAt(ctx.currentTime) : p; $('#pos').textContent = inCountIn() ? 'Count ' + Math.ceil((T.countUntil - pp) / BEAT()) : barsBeats(p); $('#clock').textContent = fmtTimeMs(Math.max(0, songSec(p)));
+    if (T.playing && hasTempoChanges() && document.activeElement !== $('#bpm')) $('#bpm').value = Math.round(bpmAt(p) * 100) / 100;
+    const beat = Math.floor((((pp % SPB()) + SPB()) % SPB()) / BEAT()); if (T.playing && beat !== frame.lastBeat && !REDUCED) { const pb = $('#play'); pb.classList.remove('pulse'); void pb.offsetWidth; pb.classList.add('pulse'); } frame.lastBeat = beat; $$('#beats i').forEach((b, i) => b.classList.toggle('on', T.playing && i === beat));
     document.body.classList.toggle('blink', T.playing ? (p % 4) < 2 : (now % 1000) < 500);
-    if (T.playing && V.follow && !arr.drag) { const w = arr.lanes.clientWidth / V.pps; if (p > V.scrollX + w * 0.92 || p < V.scrollX) V.scrollX = Math.max(0, p - w * 0.08); }
+    if (T.playing && V.follow && !arr.drag) { const w = arr.lanes.clientWidth / V.pps; if (p < V.scrollX || p > V.scrollX + w) V.scrollX = Math.max(0, p - w * 0.3); else if (p > V.scrollX + w * 0.7) V.scrollX += ((p - w * 0.3) - V.scrollX) * (REDUCED ? 1 : 0.08); }
     // automated faders follow their envelopes
     if (T.playing && now - lastFrame > 60) { lastFrame = now; allBuses().forEach(b => { if (b.auto.vol && b.auto.vol.length) { const v = autoValue(b.auto.vol, p), el = document.querySelector(`.hdr[data-id="${b.id}"] .hvol`); if (el && document.activeElement !== el) el.value = v; const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(v); } }); }
     if (T.playing || arr.dirty || T.recording || now % 1000 < 20 || Math.abs((now % 1000) - 560) < 20) { arr.dirty = false; arr.render(); }
@@ -44,6 +45,7 @@ function onWarpReady() { arr.draw(); }
 /* ---------- commands (menus + shortcuts) ---------- */
 function selectedClips() { return S.tracks.flatMap(t => t.clips.filter(c => V.selClips.has(c.id)).map(c => ({ t, c }))); }
 function cmd(name) {
+  if (T.busy) return;
   switch (name) {
     case 'new': return confirmLeave(() => loadProjectObj(emptyProject()));
     case 'open': return confirmLeave(openProjectDialog);
@@ -58,28 +60,33 @@ function cmd(name) {
     case 'redo': return redo();
     case 'newAudio': return addTrack('audio');
     case 'newMidi': return addInstrumentTrack('synth', null);
-    case 'newReturn': { pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + 'ABCDEFGHIJKL'[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast('Added a return. Tracks send to A and B in this version.'); return; }
+    case 'newReturn': { if (S.returns.length >= 12) return toast('Studio B supports up to 12 returns'); pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + RET_LETTERS[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast(`Added return ${RET_LETTERS[S.returns.length - 1]}. Every track has a send to it (Mixer view).`); return; }
     case 'addMarker': return addMarker(nowPos());
     case 'toggleBrowser': V.browser = !V.browser; ui.transport(); arr.draw(); return;
     case 'toggleDetail': V.detail = V.detail === 'clip' ? 'devices' : V.detail === 'devices' ? 'clip' : 'clip'; ui.detail(); return;
+    case 'crossfade': return createCrossfades();
+    case 'freeze': case 'unfreeze': case 'flatten': case 'bounceInPlace': case 'bounceToNew': {
+      const t = S.tracks.find(x => V.selTracks.has(x.id)); if (!t) return toast('Select a track first');
+      return ({ freeze: freezeTrack, unfreeze: unfreezeTrack, flatten: flattenTrack, bounceInPlace, bounceToNew })[name](t);
+    }
     case 'toggleMixer': setView(V.view === 'mix' ? 'arr' : 'mix'); return;
     case 'toggleAuto': V.autoMode = !V.autoMode; ui.all(); return;
     case 'toggleFollow': V.follow = !V.follow; ui.transport(); return;
-    case 'zoomIn': zoomBy(1.4); return;
-    case 'zoomOut': zoomBy(1 / 1.4); return;
+    case 'zoomIn': zoomBy(1.25); return;
+    case 'zoomOut': zoomBy(1 / 1.25); return;
     case 'zoomFit': V.pps = clamp(arr.lanes.clientWidth / (songEnd() + 8), 0.08, 120); V.scrollX = 0; arr.draw(); return;
     case 'loopSel': { const r = V.time || (V.selClips.size ? clipSpan() : null); if (!r) return toast('Select a time range or clips first'); S.loop = { on: true, start: r.a, end: r.b }; markDirty(); ui.transport(); arr.draw(); return; }
     case 'selectAll': V.selClips = new Set(S.tracks.flatMap(t => t.clips.map(c => c.id))); arr.draw(); return;
     case 'rename': { const sc = selectedClips(); if (sc.length) return renameClip(sc[0].c); const b = busById([...V.selTracks][0]); if (b) askText('Track name', b.name, v => { pushUndo(); b.name = v; ui.headers(); }); return; }
     case 'newClip': {
       const t = S.tracks.find(x => V.selTracks.has(x.id) && x.kind === 'midi') || S.tracks.find(x => x.kind === 'midi'); if (!t) return toast('Insert a MIDI track first (Ctrl+Shift+T)');
-      pushUndo('Insert clip'); const a = V.time ? V.time.a : arr.snapFloor(V.insert), len = V.time ? V.time.b - V.time.a : 16;
-      const c = newMidiClip(a, len, t.name); c.bars = Math.max(1, Math.ceil(len / 16)); clearRange(t, a, a + len); t.clips.push(c); openClip(c); return;
+      pushUndo('Insert clip'); const a = V.time ? V.time.a : arr.snapFloor(V.insert), len = V.time ? V.time.b - V.time.a : SPB();
+      const c = newMidiClip(a, len, t.name); c.bars = len / 16; clearRange(t, a, a + len); t.clips.push(c); openClip(c); return;
     }
     case 'copy': case 'cut': {
       const sc = selectedClips(); if (!sc.length) return; const a = Math.min(...sc.map(x => x.c.start));
       CLIPBOARD = sc.map(x => ({ track: x.t.id, kind: x.t.kind, c: { ...deep(x.c), start: x.c.start - a } })); toast(`${sc.length} clip${sc.length > 1 ? 's' : ''} ${name === 'cut' ? 'cut' : 'copied'}`);
-      if (name === 'cut') { pushUndo('Cut'); sc.forEach(x => (x.t.clips = x.t.clips.filter(k => k !== x.c))); V.selClips.clear(); arr.draw(); } return;
+      if (name === 'cut') { pushUndo('Cut'); sc.forEach(x => (x.t.clips = x.t.clips.filter(k => k !== x.c))); V.selClips.clear(); if (V.editClip && !clipById(V.editClip)) V.editClip = null; ui.detail(); arr.draw(); } return;
     }
     case 'paste': {
       if (!CLIPBOARD) return; pushUndo('Paste'); const at = V.insert, sel = S.tracks.find(t => V.selTracks.has(t.id)), firstTrack = CLIPBOARD[0].track, ids = [];
@@ -113,9 +120,9 @@ function cmd(name) {
       const t = sc[0].t; if (sc.some(x => x.t !== t)) return toast('Consolidate works on clips from one track');
       pushUndo('Consolidate'); const a = Math.min(...sc.map(x => x.c.start)), b = Math.max(...sc.map(x => x.c.start + x.c.len));
       const notes = sc.flatMap(x => flattenMidi(x.c).map(n => ({ ...n, s: n.s + x.c.start - a })));
-      t.clips = t.clips.filter(c => !sc.some(x => x.c === c)); const c = newMidiClip(a, b - a, sc[0].c.name); c.bars = Math.ceil((b - a) / 16); c.len = b - a; c.notes = notes; t.clips.push(c); V.selClips = new Set([c.id]); openClip(c); return;
+      t.clips = t.clips.filter(c => !sc.some(x => x.c === c)); const c = newMidiClip(a, b - a, sc[0].c.name); c.bars = (b - a) / 16; c.len = b - a; c.notes = notes; t.clips.push(c); V.selClips = new Set([c.id]); openClip(c); return;
     }
-    case 'quantize': { const sc = selectedClips().filter(x => x.c.type === 'midi'); if (!sc.length) { if (roll.clip) transform('quant'); return; } pushUndo('Quantize'); const g = arr.gridStep() >= 1 ? 1 : arr.gridStep(); sc.forEach(x => x.c.notes.forEach(n => (n.s = Math.round(n.s / g) * g))); arr.draw(); ui.detail(); toast('Quantized to 1/16'); return; }
+    case 'quantize': { const sc = selectedClips().filter(x => x.c.type === 'midi'); if (!sc.length) { if (roll.clip) transform('quant'); return; } pushUndo('Quantize'); const g = arr.gridStep() >= 1 ? 1 : arr.gridStep(); sc.forEach(x => { const L = x.c.bars * 16; x.c.notes.forEach(n => { if (n.s < L) n.s = clamp(Math.round(n.s / g) * g, 0, L - g); }); }); arr.draw(); ui.detail(); toast('Quantized to 1/16'); return; }
     case 'deactivate': { const sc = selectedClips(); if (!sc.length) return; pushUndo('Deactivate'); const on = sc.some(x => !x.c.muted); sc.forEach(x => (x.c.muted = on)); arr.draw(); return; }
   }
 }
@@ -128,7 +135,9 @@ const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 
 const KB = { oct: 4, vel: 0.85, on: false };
 function bindKeys() {
   document.addEventListener('keydown', e => {
-    const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (T.busy) { e.preventDefault(); return; }
+    if (e.target.type === 'range') e.target.blur();
+    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
     if (!$('#ask').hidden) return;
     if (rollKey(e)) { e.preventDefault(); return; }
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
@@ -140,18 +149,26 @@ function bindKeys() {
       if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = t.inst.type === 'synth' || (t.inst.type === 'sampler' && t.inst.mode === 'keys') ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
     }
     if (k === ' ') { e.preventDefault(); if (e.repeat) return; e.shiftKey ? (T.playing ? stop() : continuePlay()) : togglePlay(); return; }
-    if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec && !T.playing) play(); else if (!T.rec && T.recording) finishRecording(); ui.transport(); return; }
+    if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec) { if (T.playing) startRecording(nowPos()); else play(); } else if (T.recording) finishRecording(); ui.transport(); return; }
     if (e.key === 'Home') { seek(0); V.scrollX = 0; return; }
     if (e.key === 'End') { seek(songEnd()); return; }
     if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); cmd('toggleDetail'); return; }
     if (e.key === 'Tab') { e.preventDefault(); cmd('toggleMixer'); return; }
     if (e.key === 'F1') { e.preventDefault(); cmd('help'); return; }
     if (mod) {
+      if (e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); return V.time ? deleteTime(V.time.a, V.time.b) : toast('Select a time range first'); }
+      if (e.altKey && k === 'i') { e.preventDefault(); return V.time ? insertSilence(V.time.a, V.time.b) : toast('Select a time range first: its length is how much silence to insert'); }
+      if (e.shiftKey && k === 'd') { e.preventDefault(); return V.time ? duplicateTime(V.time.a, V.time.b) : cmd('duplicate'); }
+      if (e.shiftKey && k === 'j') { e.preventDefault(); return cropClips(); }
+      if (e.altKey && k === 'z') { e.preventDefault(); return showUndoHistory(); }
+      if (k === 'g') { e.preventDefault(); return e.shiftKey ? ungroupTrack() : groupTracks(); }
+      if (k === '3') { e.preventDefault(); V.triplet = !V.triplet; arr.draw(); return toast(V.triplet ? 'Triplet grid' : 'Straight grid'); }
       const map = { z: e.shiftKey ? 'redo' : 'undo', y: 'redo', s: e.shiftKey ? 'saveAs' : 'save', o: 'open', n: 'new', c: 'copy', x: 'cut', v: 'paste', d: 'duplicate', e: 'split', j: 'consolidate', u: 'quantize', l: 'loopSel', a: 'selectAll', r: 'rename', t: e.shiftKey ? 'newMidi' : 'newAudio', i: 'importAudio', m: e.shiftKey ? 'newClip' : null, '=': 'zoomIn', '+': 'zoomIn', '-': 'zoomOut', ',': 'prefs' };
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
       if (e.shiftKey && k === 'f') { e.preventDefault(); return cmd('toggleFollow'); }
       if (e.altKey && k === 'b') { e.preventDefault(); return cmd('toggleBrowser'); }
       if (e.altKey && k === 'm') { e.preventDefault(); return cmd('toggleMixer'); }
+      if (e.altKey && k === 'f') { e.preventDefault(); return cmd('crossfade'); }
       if (k === 'f' && !e.shiftKey) { e.preventDefault(); if (!V.browser) cmd('toggleBrowser'); $('#bsearch').focus(); return; }
       if (k === '1') { e.preventDefault(); V.grid = Math.max(-2, V.grid - 1); arr.draw(); toast('Narrower grid'); return; }
       if (k === '2') { e.preventDefault(); V.grid = Math.min(3, V.grid + 1); arr.draw(); toast('Wider grid'); return; }
@@ -165,11 +182,17 @@ function bindKeys() {
     if (k === 'm' && !e.repeat) { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); toast(KB.on ? 'Computer MIDI keyboard on: A W S E D F T G Y H U J K, Z/X octave' : 'Computer MIDI keyboard off'); return; }
     if (k === 'o' && !e.shiftKey) { S.metro = !S.metro; ui.transport(); return; }
     if (k === '0') return cmd('deactivate');
+    if (k === 'r' && !e.shiftKey && selectedClips().some(x => x.c.type === 'audio')) return reverseClips();
+    if (e.key === 'PageDown') { e.preventDefault(); return jumpLocator(1); }
+    if (e.key === 'PageUp') { e.preventDefault(); return jumpLocator(-1); }
+    if (k === 'x') return zoomBack();
+    if (k === 'h') return fitHeights();
+    if (k === 'w') { rememberZoom(); return cmd('zoomFit'); }
     if (k === 'l') { S.loop.on = !S.loop.on; ui.transport(); arr.draw(); return; }
-    if (k === 'z') { const r = V.time || (V.selClips.size ? clipSpan() : null); if (r) { V.pps = clamp(arr.lanes.clientWidth / (r.b - r.a) * 0.9, 0.08, 120); V.scrollX = Math.max(0, r.a - (r.b - r.a) * 0.05); arr.draw(); } return; }
-    if (k === '+' || k === '=') return zoomBy(1.4);
-    if (k === '-') return zoomBy(1 / 1.4);
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const g = arr.gridStep(), d = e.key === 'ArrowLeft' ? -g : g; const sc = selectedClips(); if (sc.length) { pushUndo('Nudge'); sc.forEach(x => (x.c.start = Math.max(0, x.c.start + d))); } else seek(Math.max(0, V.insert + d)); arr.draw(); e.preventDefault(); return; }
+    if (k === 'z') { const r = V.time || (V.selClips.size ? clipSpan() : null); if (r) { rememberZoom(); V.pps = clamp(arr.lanes.clientWidth / (r.b - r.a) * 0.9, 0.08, 120); V.scrollX = Math.max(0, r.a - (r.b - r.a) * 0.05); arr.draw(); } return; }
+    if (k === '+' || k === '=') return zoomBy(1.25);
+    if (k === '-') return zoomBy(1 / 1.25);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const g = arr.gridStep(), d = e.key === 'ArrowLeft' ? -g : g; const sc = selectedClips(); if (sc.length) { pushUndo('Nudge'); const lo = Math.min(...sc.map(x => x.c.start)); const dd = Math.max(d, -lo); sc.forEach(x => (x.c.start += dd)); settleClips(sc); } else seek(Math.max(0, V.insert + d)); arr.draw(); e.preventDefault(); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { const i = S.tracks.findIndex(t => V.selTracks.has(t.id)), j = clamp(i + (e.key === 'ArrowUp' ? -1 : 1), 0, S.tracks.length - 1); if (S.tracks[j]) { V.selTracks = new Set([S.tracks[j].id]); ui.headers(); ui.detail(); } e.preventDefault(); return; }
   });
   document.addEventListener('keyup', e => liveNoteOff(e.key.toLowerCase()));
@@ -193,6 +216,11 @@ function bindBar() {
   $('#snapBtn').onclick = () => { V.snap = !V.snap; ui.transport(); };
   $('#kbBtn').onclick = () => { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); };
   $('#bpm').onchange = e => setBpm(+e.target.value || S.bpm);
+  $('#sig').onchange = e => { const m = String(e.target.value).match(/(\d+)\s*\/\s*(\d+)/); if (m) setSig(+m[1], +m[2]); else ui.transport(); };
+  $('#sig').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); };
+  $('#countIn').onclick = () => { S.prefs = S.prefs || {}; const seq = [0, 1, 2, 4], i = seq.indexOf(S.prefs.countIn || 0); S.prefs.countIn = seq[(i + 1) % seq.length]; markDirty(); ui.transport(); toast(S.prefs.countIn ? `Count-in: ${S.prefs.countIn} bar${S.prefs.countIn > 1 ? 's' : ''}` : 'Count-in off'); };
+  $('#punchIn').onclick = () => { S.punch = S.punch || {}; S.punch.in = !S.punch.in; markDirty(); ui.transport(); if (S.punch.in) toast('Punch in: recording starts at the loop start. Set the range with the loop brace.'); };
+  $('#punchOut').onclick = () => { S.punch = S.punch || {}; S.punch.out = !S.punch.out; markDirty(); ui.transport(); if (S.punch.out) toast('Punch out: recording stops at the loop end.'); };
   $('#bpm').onwheel = e => { e.preventDefault(); setBpm(S.bpm - Math.sign(e.deltaY) * (e.shiftKey ? 0.1 : 1)); };
   $('#tap').onclick = () => { const n = performance.now(); if (taps.length && n - taps[taps.length - 1] > 2000) taps.length = 0; taps.push(n); if (taps.length > 6) taps.shift(); if (taps.length >= 3) setBpm(60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1))); };
   $('#root').onchange = e => { S.root = +e.target.value; markDirty(); DEV_RT.forEach(d => d instanceof TuneDev && d.set()); ui.detail(); };
@@ -216,7 +244,14 @@ function bindBar() {
 function showExport() {
   const d = $('#export'); d.hidden = false;
   $('#exRange').innerHTML = `<option value="song">Whole song (1.1.1 to ${barsBeats(songEnd())})</option><option value="loop" ${S.loop.on ? 'selected' : ''}>Loop brace (${barsBeats(S.loop.start)} to ${barsBeats(S.loop.end)})</option>${V.time ? `<option value="sel">Time selection</option>` : ''}`;
-  $('#exGo').onclick = async () => { const o = { range: $('#exRange').value, sr: +$('#exSr').value, bits: +$('#exBits').value, normalize: $('#exNorm').checked, tail: +$('#exTail').value }; $('#exGo').disabled = true; try { await exportAudio(o); d.hidden = true; } catch (e) { console.error(e); toast('Export failed: ' + e.message); } $('#exGo').disabled = false; };
+  $('#exWhat').onchange = () => ($('#exStemOpts').hidden = $('#exWhat').value === 'mix'); $('#exStemOpts').hidden = $('#exWhat').value === 'mix'; $('#exProgText').textContent = '';
+  $('#exGo').onclick = async () => {
+    const o = { range: $('#exRange').value, sr: +$('#exSr').value, bits: +$('#exBits').value, normalize: $('#exNorm').checked, tail: +$('#exTail').value }, what = $('#exWhat').value;
+    $('#exGo').disabled = true;
+    try { if (what === 'mix') await exportAudio(o); else await exportStems({ ...o, onlySelected: what === 'stemsSel', returns: $('#exReturns').checked, main: $('#exReturns').checked }); d.hidden = true; }
+    catch (e) { console.error(e); toast('Export failed: ' + e.message); } finally { showBusy(null); }
+    $('#exGo').disabled = false;
+  };
 }
 /* ---------- live updates (desktop) ---------- */
 function showUpdate(u) {
@@ -236,6 +271,10 @@ async function showPrefs() {
   const lat = Math.round(((LIVE_CTX.baseLatency || 0) + (LIVE_CTX.outputLatency || 0)) * 1000);
   $('#pfInfo').textContent = `Sample rate ${LIVE_CTX.sampleRate} Hz · output latency about ${lat} ms`;
   $('#pfLat').value = S.prefs.latencyMs != null ? S.prefs.latencyMs : lat; $('#pfLat').onchange = e => { S.prefs.latencyMs = +e.target.value; markDirty(); };
+  $('#pfMetVol').value = S.prefs.metroVol != null ? S.prefs.metroVol : 0.6; $('#pfMetVol').oninput = e => { S.prefs.metroVol = +e.target.value; click(ctx.currentTime + 0.02, true); };
+  $('#pfMetSnd').value = S.prefs.metroSound || 'click'; $('#pfMetSnd').onchange = e => { S.prefs.metroSound = e.target.value; click(ctx.currentTime + 0.02, true); };
+  $('#pfMetRec').checked = !!S.prefs.metroRecOnly; $('#pfMetRec').onchange = e => { S.prefs.metroRecOnly = e.target.checked; };
+  $('#pfRecQ').value = String(S.prefs.recQuant || 0.0625); $('#pfRecQ').onchange = e => { S.prefs.recQuant = +e.target.value; };
   let devs = []; try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { }
   const outs = devs.filter(x => x.kind === 'audiooutput'), ins = devs.filter(x => x.kind === 'audioinput');
   $('#pfOut').innerHTML = (outs.length ? outs : [{ deviceId: 'default', label: 'System default' }]).map(o => `<option value="${o.deviceId}">${esc(o.label || 'Output')}</option>`).join('');
@@ -277,9 +316,9 @@ async function demoProject() {
   S = emptyProject(); buildMaster(); rebuildAll();
   arr.init(); bindHeaders(); bindBar(); bindKeys(); await browser.init();
   const pending = IS_DESKTOP ? await NATIVE.pendingOpen() : null;
-  if (pending) await openPath(pending); else await loadProjectObj(await demoProject());
+  if (pending) await openPath(pending); else if (!(await offerRecovery())) await loadProjectObj(await demoProject());
   V.selTracks = new Set([S.tracks[0].id]); ui.all(); V.dirty = false; ui.title();
-  if (IS_DESKTOP) { NATIVE.onMenu(c => cmd(c)); NATIVE.onOpenPath(p => confirmLeave(() => openPath(p))); if (NATIVE.onUpdate) { NATIVE.onUpdate(showUpdate); NATIVE.appInfo().then(i => i.update && showUpdate(i.update)); } }
+  if (IS_DESKTOP) { NATIVE.onMenu(c => { const a = document.activeElement, txt = a && (a.tagName === 'INPUT' && a.type !== 'range' || a.tagName === 'TEXTAREA'); const ed = { copy: 'copy', cut: 'cut', paste: 'paste', selectAll: 'selectAll', undo: 'undo', redo: 'redo', delete: 'delete' }[c]; if (txt && ed) { document.execCommand(ed); return; } cmd(c); }); NATIVE.onOpenPath(p => confirmLeave(() => openPath(p))); if (NATIVE.onUpdate) { NATIVE.onUpdate(showUpdate); NATIVE.appInfo().then(i => i.update && showUpdate(i.update)); } }
   requestAnimationFrame(frame);
   const resume = () => { if (ctx.state !== 'running') ctx.resume(); }; document.addEventListener('pointerdown', resume, { once: true }); document.addEventListener('keydown', resume, { once: true });
   window.SB_ready = true;

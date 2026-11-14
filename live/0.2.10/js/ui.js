@@ -8,23 +8,26 @@ const ui = {
     $('#metro').classList.toggle('on', !!S.metro); $('#loopBtn').classList.toggle('on', S.loop.on);
     $('#follow').classList.toggle('on', V.follow); $('#autoBtn').classList.toggle('on', V.autoMode);
     $('#root').value = S.root; $('#scale').value = S.scale; $('#snapBtn').classList.toggle('on', V.snap);
+    $('#sig').value = SIG().join('/'); { const ci = (S.prefs && S.prefs.countIn) || 0; $('#countIn').classList.toggle('on', !!ci); $('#countIn .badge').textContent = ci ? String(ci) : ''; $('#countIn').title = ci ? `Count-in: ${ci} bar${ci > 1 ? 's' : ''} before recording. Click to change.` : 'Count-in before recording: off. Click to turn on.'; } S.punch = S.punch || {}; $('#punchIn').classList.toggle('on', !!S.punch.in); $('#punchOut').classList.toggle('on', !!S.punch.out);
+    const nb = SIG()[0], beats = $('#beats'); if (beats.children.length !== Math.min(nb, 12)) beats.innerHTML = '<i></i>'.repeat(Math.min(nb, 12));
     $('#loopStart').textContent = barsBeats(S.loop.start); $('#loopLen').textContent = barsBeatsLen(S.loop.end - S.loop.start);
     $('#app').classList.toggle('nobrowser', !V.browser);
   },
   headers() {
     arr.layout(); const box = $('#hdrInner'); let h = '';
     arr.rows.forEach(r => {
-      const b = r.b, isT = r.kind === 'track', sel = V.selTracks.has(b.id), num = isT ? S.tracks.indexOf(b) + 1 : r.kind === 'return' ? 'AB'[S.returns.indexOf(b)] || 'R' : 'M';
+      if (r.kind === 'take') { h += `<div class="hdr take" data-id="${r.b.id}" data-lane="${r.lane.id}" style="top:${r.y}px;height:${r.h}px;--tc:${r.b.color}"><i class="hcol dim"></i><div class="hmain"><div class="hrow"><span class="hname tname" title="Drag across a take (or click it) to comp it onto the track">${esc(r.lane.name)}</span><button class="hb" data-h="compAll" title="Use this whole take">Use</button><button class="hb" data-h="delTake" title="Delete this take lane">✕</button></div></div></div>`; return; }
+      const b = r.b, isT = r.kind === 'track', sel = V.selTracks.has(b.id), num = isT ? S.tracks.indexOf(b) + 1 : r.kind === 'return' ? RET_LETTERS[S.returns.indexOf(b)] || 'R' : 'M', grp = b.kind === 'group';
       const big = r.h >= 50, params = V.autoMode ? autoParams(b) : null;
-      h += `<div class="hdr ${sel ? 'sel' : ''} ${r.kind}" data-id="${b.id}" style="top:${r.y}px;height:${r.h}px;--tc:${b.color || '#a7a3b8'}">
+      h += `<div class="hdr ${sel ? 'sel' : ''} ${r.kind} ${grp ? 'group' : ''}" data-id="${b.id}" style="top:${r.y}px;height:${r.h}px;--tc:${b.color || '#a7a3b8'};--depth:${isT ? depthOf(b) : 0}">
         <i class="hcol"></i>
         <div class="hmain">
-          <div class="hrow"><span class="hname" title="Double-click to rename">${esc(b.name)}</span>
+          <div class="hrow">${grp ? `<button class="hb fold" data-h="fold" title="Fold or unfold the group">${b.fold ? '▸' : '▾'}</button>` : ''}<span class="hname" title="Double-click to rename">${esc(b.name)}</span>${r.kind === 'return' ? `<button class="hb ${b.pre ? 'on' : ''}" data-h="pre" title="Sends into this return are taken before the track faders (Pre) or after them (Post)">${b.pre ? 'Pre' : 'Post'}</button>` : ''}
             ${r.kind !== 'master' ? `<button class="hb act ${b.mute ? '' : 'on'}" data-h="mute" title="Track activator">${num}</button>` : ''}
-            ${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-h="solo" title="Solo">S</button><button class="hb arm ${b.arm ? 'on' : ''}" data-h="arm" title="Arm recording">●</button>` : ''}
+            ${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-h="solo" title="Solo">S</button>${grp ? '' : `<button class="hb arm ${b.arm ? 'on' : ''}" data-h="arm" title="Arm recording">●</button>`}` : ''}${isT && b.takes && b.takes.length ? `<button class="hb tk ${b.showTakes ? 'on' : ''}" data-h="takes" title="Show or hide take lanes">T${b.takes.length}</button>` : ''}${isT && b.frozen ? '<span class="frz" title="Frozen">❄</span>' : ''}
           </div>
           ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
-          : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : isT ? `<span class="itype">${{ synth: 'Contour', drums: 'Kit', sampler: 'Cutline' }[b.inst.type]}</span>` : ''}
+          : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${{ synth: 'Contour', drums: 'Kit', sampler: 'Cutline' }[b.inst.type]}</span>` : ''}
               <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
           ${r.h >= 86 && !V.autoMode ? `<div class="hrow hsm"><span class="lab">Pan</span><input type="range" class="hpan" min="-1" max="1" step="0.01" value="${b.pan || 0}" data-h="pan" aria-label="Pan">${isT ? `<span class="lab">A</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendA}" data-h="sendA" aria-label="Send A"><span class="lab">B</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendB}" data-h="sendB" aria-label="Send B">` : ''}</div>` : ''}
         </div>
@@ -64,9 +67,10 @@ function bindHeaders() {
   const box = $('#hdrInner');
   box.addEventListener('pointerdown', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id); const h = e.target.closest('[data-h]');
+    if (hd.dataset.lane) return;
     if (h && h.dataset.h === 'resize') {
       e.preventDefault(); const y0 = e.clientY, h0 = b.h || 40; h.setPointerCapture(e.pointerId);
-      h.onpointermove = ev => { b.h = clamp(h0 + ev.clientY - y0, 22, 320); arr.layout(); $$('.hdr', box).forEach(el => { const r = arr.rows.find(q => q.b.id === el.dataset.id); el.style.top = r.y + 'px'; el.style.height = r.h + 'px'; }); arr.draw(); };
+      h.onpointermove = ev => { b.h = clamp(h0 + ev.clientY - y0, 22, 320); arr.layout(); $$('.hdr', box).forEach(el => { const r = arr.rows.find(q => q.b.id === el.dataset.id && (el.dataset.lane ? q.lane && q.lane.id === el.dataset.lane : q.kind !== 'take')); if (r) { el.style.top = r.y + 'px'; el.style.height = r.h + 'px'; } }); arr.draw(); };
       h.onpointerup = () => { h.onpointermove = null; ui.headers(); }; return;
     }
     if (h && h.tagName !== 'DIV') return;
@@ -81,25 +85,37 @@ function bindHeaders() {
       case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; break;
       case 'arm': { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); break; }
       case 'mon': b.monitor = h.dataset.m; break;
-      case 'clearAuto': pushUndo('Clear automation'); delete b.auto[b.autoShow || 'vol']; releaseAutomation(); break;
+      case 'fold': b.fold = !b.fold; break;
+      case 'pre': pushUndo('Send position'); b.pre = !b.pre; rebuildAll(); break;
+      case 'clearAuto': pushUndo('Clear automation'); delete b.auto[b.autoShow || 'vol']; releaseAutomation(); _tmKey = ''; break;
+      case 'takes': b.showTakes = !b.showTakes; break;
+      case 'compAll': { const lane = b.takes.find(l => l.id === hd.dataset.lane); const a = Math.min(...lane.clips.map(c => c.start)), z = Math.max(...lane.clips.map(c => c.start + c.len)); compRange(b, lane, a, z); break; }
+      case 'delTake': pushUndo('Delete take'); b.takes = b.takes.filter(l => l.id !== hd.dataset.lane); if (!b.takes.length) b.showTakes = false; break;
       default: return;
     }
     applyAllMix(); markDirty(); ui.headers();
   });
+  box.addEventListener('pointerdown', e => { if (e.target.matches && e.target.matches('input[type=range]')) pushUndo('Mixer'); }, true);
   box.addEventListener('input', e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id), k = h.dataset.h;
-    if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { b[k] = +h.value; applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
+    if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { if (k === 'sendA' || k === 'sendB') setSend(b, sendIndex(k), +h.value); else b[k] = +h.value; applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
   });
   box.addEventListener('change', e => { hideTip(); const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (h && h.dataset.h === 'autoShow') { busById(hd.dataset.id).autoShow = h.value; ui.headers(); } });
   box.addEventListener('dblclick', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id);
+    if (hd.dataset.lane && e.target.closest('.hname')) { const lane = b.takes.find(l => l.id === hd.dataset.lane); return askText('Take name', lane.name, v => { pushUndo('Rename take'); lane.name = v; ui.headers(); }); }
     if (e.target.closest('.hname')) askText('Track name', b.name, v => { pushUndo('Rename'); b.name = v; ui.headers(); ui.detail(); });
     if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); }
   });
   box.addEventListener('contextmenu', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; e.preventDefault(); const b = busById(hd.dataset.id); const isT = S.tracks.includes(b);
+    if (hd.dataset.lane) return;
     const items = [{ label: 'Rename', key: 'Ctrl+R', run: () => askText('Track name', b.name, v => { pushUndo(); b.name = v; ui.headers(); }) }];
+    if (isT) items.push({ label: 'Select all clips on track', run: () => selectTrackClips(b) });
     if (isT) items.push({ label: 'Duplicate track', run: () => duplicateTrack(b) }, { label: 'Delete track', danger: true, run: () => deleteTrack(b) }, { colors: c => { pushUndo(); b.color = c; ui.all(); } });
+    if (isT && b.kind !== 'group') items.push('-', ...trackRenderMenu(b));
+    if (isT) items.push(b.kind === 'group' ? { label: 'Ungroup', key: 'Ctrl+Shift+G', run: () => ungroupTrack(b) } : { label: 'Group selected tracks', key: 'Ctrl+G', run: () => { V.selTracks.add(b.id); groupTracks(); } });
+    if (isT && b.takes && b.takes.length) items.push({ label: b.showTakes ? 'Hide take lanes' : 'Show take lanes', run: () => { b.showTakes = !b.showTakes; ui.headers(); } });
     if (isT && b.kind === 'audio') items.push('-', { label: 'Choose input…', run: () => chooseInput(b) });
     if (S.returns.includes(b)) items.push({ label: 'Delete return', danger: true, run: () => { if (S.returns.length <= 1) return toast('Keep at least one return'); pushUndo(); S.returns = S.returns.filter(r => r !== b); rebuildAll(); ui.all(); } });
     items.push('-', { label: 'Show automation', run: () => { V.autoMode = true; ui.all(); } }, { label: 'Fold to small height', run: () => { b.h = 26; ui.headers(); } }, { label: 'Make tall', run: () => { b.h = 110; ui.headers(); } });
@@ -110,8 +126,8 @@ function bindHeaders() {
     if (d) { pushUndo('Add device'); b.devices.push(newDevice(d)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.all(); }
     if (i && b.kind === 'midi') addInstrumentTrack(i, b); });
 }
-function duplicateTrack(t) { pushUndo('Duplicate track'); const c = deep(t); c.id = uid(); c.name = t.name + ' copy'; c.arm = false; c.devices.forEach(d => (d.id = uid())); c.clips.forEach(k => (k.id = uid())); S.tracks.splice(S.tracks.indexOf(t) + 1, 0, c); buildBus(c, 'track'); V.selTracks = new Set([c.id]); ui.all(); }
-function deleteTrack(t) { pushUndo('Delete track'); removeBus(t); S.tracks = S.tracks.filter(x => x !== t); if (V.editClip && !clipById(V.editClip)) V.editClip = null; applyAllMix(); ui.all(); }
+function duplicateTrack(t) { if (t.kind === 'group') return toast('Duplicate the tracks inside the group instead'); pushUndo('Duplicate track'); const c = deep(t); c.id = uid(); c.name = t.name + ' copy'; c.arm = false; const idMap = {}; c.devices.forEach(d => { const n = uid(); idMap[d.id] = n; d.id = n; }); const remap = k => k.replace(/^(dev|eqf|eqg):([^:]+)/, (m, kind, id) => `${kind}:${idMap[id] || id}`); c.auto = Object.fromEntries(Object.entries(c.auto).map(([k, v]) => [remap(k), v])); if (c.autoShow) c.autoShow = remap(c.autoShow); delete c.frozen; c.clips.forEach(k => (k.id = uid())); S.tracks.splice(S.tracks.indexOf(t) + 1, 0, c); buildBus(c, 'track'); V.selTracks = new Set([c.id]); ui.all(); }
+function deleteTrack(t) { pushUndo('Delete track'); if (t.kind === 'group') S.tracks.forEach(x => { if (x.group === t.id) x.group = t.group || null; }); removeBus(t); S.tracks = S.tracks.filter(x => x !== t); if (V.editClip && !clipById(V.editClip)) V.editClip = null; if (t.kind === 'group') rebuildAll(); applyAllMix(); ui.all(); }
 function addTrack(kind, instType) { pushUndo('Insert track'); const t = newTrack(kind, instType); const after = S.tracks.findIndex(x => V.selTracks.has(x.id)); S.tracks.splice(after >= 0 ? after + 1 : S.tracks.length, 0, t); buildBus(t, 'track'); V.selTracks = new Set([t.id]); ui.all(); return t; }
 function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler" or "synth:Preset"
   const [type, preset] = spec.split(':');
@@ -120,8 +136,9 @@ function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler" o
   V.detail = 'devices'; ui.all();
 }
 async function chooseInput(t) {
-  let devs = []; try { await getInput(t.input); devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) { return toast('No audio input is available. Check microphone permission.'); }
-  popMenu(lastPointer, devs.map(d => ({ label: (d.deviceId === t.input ? '✓ ' : '') + (d.label || 'Input ' + d.deviceId.slice(0, 5)), run: async () => { t.input = d.deviceId; try { await getInput(d.deviceId); connectInputs(); toast('Input: ' + d.label); } catch (e) { toast('That input could not be opened'); } } })));
+  let devs = []; try { if (!internalInput(t)) await getInput(t.input); devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) { return toast('No audio input is available. Check microphone permission.'); }
+  const others = S.tracks.filter(x => x !== t && x.kind !== 'group').map(x => ({ label: (t.input === 'track:' + x.id ? '✓ ' : '') + 'Track: ' + x.name, run: () => { pushUndo('Input'); t.input = 'track:' + x.id; connectInputs(); ui.headers(); toast(`Records ${x.name}'s output`); } }));
+  popMenu(lastPointer, [...devs.map(d => ({ label: (d.deviceId === t.input ? '✓ ' : '') + (d.label || 'Input ' + d.deviceId.slice(0, 5)), run: async () => { t.input = d.deviceId; try { await getInput(d.deviceId); connectInputs(); toast('Input: ' + d.label); } catch (e) { toast('That input could not be opened'); } } })), '-', { label: (t.input === 'resample' ? '✓ ' : '') + 'Resampling (the main output)', run: () => { pushUndo('Input'); t.input = 'resample'; connectInputs(); ui.headers(); toast('Records the main output'); } }, ...others]);
 }
 
 /* ---------- audio clip editor (Clip View for audio) ---------- */
@@ -139,7 +156,7 @@ function audioEditor(c) {
       <div class="aedctl"></div>
       <canvas id="aedWave" aria-label="Audio clip waveform"></canvas>
     </div></div>`;
-  const ctl = $('.aedctl', pane), changed = () => { markDirty(); arr.draw(); drawW(); if (T.playing) play(nowPos()); };
+  let rt = 0; const ctl = $('.aedctl', pane), changed = () => { markDirty(); arr.draw(); drawW(); clearTimeout(rt); rt = setTimeout(() => { if (T.playing) play(nowPos()); }, 350); };
   const wrapK = (o, lbl) => { const d = document.createElement('div'); d.className = 'kgroup'; d.innerHTML = `<span class="lab">${lbl}</span>`; d.appendChild(o); return d; };
   ctl.appendChild(toggleEl('Warp', c.warp, v => { pushUndo('Warp'); c.warp = v; if (v) { c.srcBpm = c.srcBpm || (s && s.bpm) || S.bpm; } changed(); audioEditor(c); }));
   if (c.warp) {
@@ -151,6 +168,8 @@ function audioEditor(c) {
   }
   ctl.appendChild(knob({ label: 'Gain', value: c.gain, min: -36, max: 24, def: 0, fmt: fDb, onInput: v => { c.gain = v; changed(); } }));
   ctl.appendChild(knob({ label: 'Transpose', value: c.semis, min: -24, max: 24, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v + ' st', onInput: v => { c.semis = v; changed(); } }));
+  ctl.appendChild(knob({ label: 'Detune', value: c.cents || 0, min: -50, max: 50, step: 1, def: 0, fmt: v => (v > 0 ? '+' : '') + v + ' ct', onInput: v => { c.cents = v; changed(); } }));
+  const rv = document.createElement('button'); rv.className = 'btn ghostb'; rv.textContent = c.revOf ? 'Un-reverse' : 'Reverse'; rv.onclick = () => { V.selClips = new Set([c.id]); reverseClips(); }; ctl.appendChild(rv);
   ctl.appendChild(knob({ label: 'Fade in', value: c.fadeIn, min: 0, max: Math.max(0.25, c.len / 2), def: 0, fmt: v => barsBeatsLen(v), onInput: v => { c.fadeIn = v; changed(); } }));
   ctl.appendChild(knob({ label: 'Fade out', value: c.fadeOut, min: 0, max: Math.max(0.25, c.len / 2), def: 0, fmt: v => barsBeatsLen(v), onInput: v => { c.fadeOut = v; changed(); } }));
   ctl.appendChild(toggleEl(c.muted ? 'Clip off' : 'Clip on', !c.muted, v => { pushUndo(); c.muted = !v; changed(); }));
@@ -172,10 +191,11 @@ function audioEditor(c) {
   };
   // drag start/end markers to change the region
   cv.onpointerdown = e => {
+    if (!s) return;
     const r = cv.getBoundingClientRect(), k = r.width / s.buf.duration, x = e.clientX - r.left, a = srcSecAt(c, c.offset) * k, b = srcSecAt(c, c.offset + c.len) * k;
     const which = Math.abs(x - a) < 8 ? 'a' : Math.abs(x - b) < 8 ? 'b' : null; if (!which) return; pushUndo('Clip region'); cv.setPointerCapture(e.pointerId);
-    const secToStep = sec => (c.warp ? sec * c.srcBpm / 15 : sec / Math.pow(2, c.semis / 12) * S.bpm / 15);
-    cv.onpointermove = ev => { const st = secToStep(clamp((ev.clientX - r.left) / k, 0, s.buf.duration)); if (which === 'a') { const end = c.offset + c.len; const d = clamp(st, 0, end - 0.25) - c.offset; c.offset += d; c.start = Math.max(0, c.start + d); c.len = end - c.offset; } else c.len = Math.max(0.25, st - c.offset); changed(); };
+    const secToStep = sec => (c.warp ? sec * c.srcBpm / 15 : sec / clipPitch(c) * S.bpm / 15);
+    cv.onpointermove = ev => { const st = secToStep(clamp((ev.clientX - r.left) / k, 0, s.buf.duration)); if (which === 'a') { const end = c.offset + c.len; const d = Math.max(clamp(st, 0, end - 0.25) - c.offset, -c.start); c.offset += d; c.start = Math.max(0, c.start + d); c.len = end - c.offset; } else c.len = Math.max(0.25, st - c.offset); changed(); };
     cv.onpointerup = () => (cv.onpointermove = null);
   };
   VIS.add(() => { if (!cv.isConnected) return false; if (T.playing) drawW(); });
