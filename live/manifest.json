@@ -1,13 +1,13 @@
 {
- "version": "0.2.25",
+ "version": "0.2.26",
  "shell": 3,
- "date": "2026-11-14T19:42:31.607Z",
- "notes": "Settings for the native engine (engine, driver, devices, main and cue outputs, sample rate, buffer, latency, status; plug-in sources, folders, rescan, delay compensation, plug-in buffer); Audio From / Audio To on mixer strips and track menus; app requires shell 3; docs",
+ "date": "2026-11-14T20:13:02.118Z",
+ "notes": "MIDI effects (Arpeggiator, Chord, Scale, Note Length, Random, Velocity, Pitch) on clips and live input; track header I/O column (MIDI From and channel, Audio From and channel, monitor, Audio To), sends, mixer and delay columns with I/O R M D toggles; per-track MIDI input routing; one-row toolbar with a fixed grid menu and engine CPU; file buttons removed on desktop (menu and shortcuts), templates in the browser",
  "files": [
   {
    "path": "css/base.css",
-   "size": 27765,
-   "sha256": "aad7c005fc3d58a34307978a6847f8c4c73db1c3495c7115c768c4facfbed14c"
+   "size": 29348,
+   "sha256": "bd449bfd9df4bb9f8371dcf377b8ef413e2ca1f4f89a8e7411391e0244b25e4d"
   },
   {
    "path": "css/studio.css",
@@ -16,18 +16,18 @@
   },
   {
    "path": "index.html",
-   "size": 19301,
-   "sha256": "12bd3775b35762a5c76edaf2d9c9e8aa78aa7b322426e9ad65b9894e02ed32f6"
+   "size": 20245,
+   "sha256": "9477586938f61344e314c75736cae9709b1314fa13e20d6ba620ba12fe27fe1c"
   },
   {
    "path": "js/arrange.js",
-   "size": 49527,
-   "sha256": "436ecff970ab4c73999b10be122adeffb2a73f807cbdb8116b7188a2c2e2b33e"
+   "size": 49854,
+   "sha256": "d8c93dbfe7b86e8ad746b250e32dfbce62cf22abc20277e9d5b45f3da731d2df"
   },
   {
    "path": "js/browser.js",
-   "size": 31981,
-   "sha256": "c3e46ec1a90119da0044068d71b91efaba05b6ca01674f2423b88a14df83ebfd"
+   "size": 32588,
+   "sha256": "18344c78938fe5aafcf637359a6a2e14f76515e858557f62e1943198e70365bf"
   },
   {
    "path": "js/cards.js",
@@ -61,8 +61,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 51609,
-   "sha256": "56f83ec713f1ad43474ff732937b27f45360a29aeba3cae77ad74ddb7fd3eb7a"
+   "size": 52972,
+   "sha256": "cb87b04b76adb16edd76842632bba654d60dbdc78ca1fcda6f7bb51913e27cac"
   },
   {
    "path": "js/features.js",
@@ -101,13 +101,18 @@
   },
   {
    "path": "js/main.js",
-   "size": 34746,
-   "sha256": "f69f79f2b1399399a9f8fdcd681bcb5acab19cad4bd30bd4263513acf51e2f47"
+   "size": 35889,
+   "sha256": "3f00fa1f1bda6f878a225ec9707d22ed6a773d56cfd9e1ef580c703519543d6d"
   },
   {
    "path": "js/mapping.js",
    "size": 7140,
    "sha256": "1cc82f2a3ab64ba7bfe66ddd02bf6bf120bf6dd2ca436997e08e2d64a39a56b2"
+  },
+  {
+   "path": "js/midifx.js",
+   "size": 11988,
+   "sha256": "5816e3274ef5b3e7e362318b41d8538867e801cb8909b9c3c33a645e2c1dd3f4"
   },
   {
    "path": "js/mixer.js",
@@ -116,13 +121,13 @@
   },
   {
    "path": "js/mods.js",
-   "size": 8137,
-   "sha256": "166affbfbc7c7e2826b5d430fd0017d00b413d5c889331464d295337dc665cca"
+   "size": 8165,
+   "sha256": "bf1608c7c2c74e1c59f908b6dd1a3e6da5f2d672b719b55eee8c91073f42ee46"
   },
   {
    "path": "js/native.js",
-   "size": 15667,
-   "sha256": "37eb33f7427fc03ec1776c108fc0dd8694b84cb0ef4e667d5ec4c5d106e52c29"
+   "size": 15755,
+   "sha256": "ae8b23c8562c330b0f1a2ecb1884e2364888ab8ba90eb88f72b75b86b4c57758"
   },
   {
    "path": "js/plugins.js",
@@ -151,8 +156,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 38141,
-   "sha256": "1234b426af358d693e6c49bf6a5acb20fdacdcab7e71ea3b01829be674ebbfac"
+   "size": 43797,
+   "sha256": "887c08827dd6d772bff1d670a5015ca0166d307323eac2f1491e7b3224868124"
   },
   {
    "path": "js/warp.js",
@@ -172,7 +177,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "5148e1b3f9c8875f5aac1c8b3423a2047fab3f6f679dcdd4baf81206c48341ce"
+   "sha256": "24c5022600d135627f24f307d5a3581adb973476fb367e8d9e51b99f8f0ebb11"
   }
  ]
 }

@@ -14,6 +14,7 @@ const arr = {
   x(pos) { return (pos - V.scrollX) * V.pps; },
   pos(x) { return x / V.pps + V.scrollX; },
   gridStep() {
+    if (V.fixedGrid) { const f = V.fixedGrid, b = SPB(), v = f === 'bar' ? b : f === 'bar2' ? 2 * b : f === 'bar4' ? 4 * b : +f; return V.triplet && v < b ? v * 2 / 3 : v; }   // a fixed size from the toolbar
     const c = gridCandidates(); const min = 11 * Math.pow(2, V.grid);
     return c.find(s => s * V.pps >= min) || c[c.length - 1];
   },
@@ -443,11 +444,13 @@ function CSS() {
 function addMarker(t) { pushUndo('Locator'); S.markers.push({ id: uid(), t, name: 'Locator ' + (S.markers.length + 1) }); S.markers.sort((a, b) => a.t - b.t); arr.draw(); }
 function renameMarker(m) { askText('Locator name', m.name, v => { pushUndo(); m.name = v; arr.draw(); }); }
 function renameClip(c) { askText('Clip name', c.name, v => { pushUndo(); c.name = v; arr.draw(); ui.detail(); }); }
-function openClip(c) { V.editClip = c.id; V.selClips = new Set([c.id]); const t = trackOf(c); if (t) V.selTracks = new Set([t.id]); V.detail = 'clip'; ui.detail(); ui.headers(); arr.draw(); }
+function openClip(c) { if ($('#app').classList.contains('nodetail')) setDetailShown(true); V.editClip = c.id; V.selClips = new Set([c.id]); const t = trackOf(c); if (t) V.selTracks = new Set([t.id]); V.detail = 'clip'; ui.detail(); ui.headers(); arr.draw(); }
 async function dropOnTimeline(e, r, at) {
   if (typeof browser !== 'undefined' && browser.stopPreview) browser.stopPreview();
   const dt = e.dataTransfer, track = r && r.kind === 'track' ? r.b : null;
-  const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst');
+  const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst'), sbp = dt.getData('sb/plugin');
+  const sbm = dt.getData('sb/midifx'); if (sbm) return addMidiFx(sbm, track && track.kind === 'midi' ? track : null);
+  if (sbp) { const o = JSON.parse(sbp); if (!NE.on) return toast('Turn on the native engine in Settings → Audio to use plug-ins'); return addPlugin(o.ref, o.instrument, track || (r ? r.b : null)); }
   if (sbd) { const b = r ? r.b : null; if (b) { pushUndo('Add device'); b.devices.push(newDevice(sbd)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.all(); } return; }
   if (sbi) { addInstrumentTrack(sbi, track && track.kind === 'midi' ? track : null); return; }
   const files = sbs ? [JSON.parse(sbs)] : [...dt.files].map(f => ({ file: f }));

@@ -67,6 +67,7 @@ function cmd(name) {
     case 'newMidi': return addInstrumentTrack('synth', null);
     case 'newReturn': { if (S.returns.length >= 12) return toast('Studio B supports up to 12 returns'); pushUndo('Insert return'); S.returns.push(newBusLike('Return ' + RET_LETTERS[S.returns.length], [newDevice('verb', { ...DEVICES.verb.def(), mix: 1 })])); rebuildAll(); ui.all(); toast(`Added return ${RET_LETTERS[S.returns.length - 1]}. Every track has a send to it (Mixer view).`); return; }
     case 'addMarker': return addMarker(nowPos());
+    case 'toggleDetailPane': setDetailShown($('#app').classList.contains('nodetail')); return;
     case 'toggleBrowser': V.browser = !V.browser; ui.transport(); arr.draw(); return;
     case 'toggleDetail': V.detail = V.detail === 'clip' ? 'devices' : V.detail === 'devices' ? 'clip' : 'clip'; ui.detail(); return;
     case 'crossfade': return createCrossfades();
@@ -135,6 +136,8 @@ function cmd(name) {
 }
 const clipSpan = () => { const sc = selectedClips(); return { a: Math.min(...sc.map(x => x.c.start)), b: Math.max(...sc.map(x => x.c.start + x.c.len)) }; };
 function zoomBy(k) { const cx = V.insert >= V.scrollX && V.insert <= arr.pos(arr.lanes.clientWidth) ? V.insert : arr.pos(arr.lanes.clientWidth / 2); const x = arr.x(cx); zoomSmooth((ZOOM.t ? ZOOM.t.pps : V.pps) * k, cx, x); }
+// the clip and devices panel at the bottom can be hidden; a slim bar brings it back
+function setDetailShown(on) { const app = $('#app'); app.classList.toggle('nodetail', !on); lsSet('sb-detailHidden', on ? '0' : '1'); $('#split').title = on ? 'Drag to resize' : 'Show clip and devices (Ctrl+Alt+L)'; arr.draw(); if (on) { ui.detail(); roll.draw_ && roll.draw_(); } }
 function confirmLeave(fn) { if (!V.dirty) return fn(); const d = $('#leave'); d.hidden = false; d.onclick = async e => { const b = e.target.closest('[data-v]'); if (!b) return; d.hidden = true; if (b.dataset.v === 'save') { if (await saveProject()) fn(); } else if (b.dataset.v === 'discard') fn(); }; }
 
 /* ---------- keyboard ---------- */
@@ -153,7 +156,7 @@ function bindKeys() {
       if (k === 'x' && !e.repeat) { KB.oct = clamp(KB.oct + 1, 0, 8); toast('Computer MIDI keyboard: C' + KB.oct); e.preventDefault(); return; }
       if (k === 'c' && !e.repeat) { KB.vel = clamp(KB.vel - 0.1, 0.1, 1); toast('Velocity ' + Math.round(KB.vel * 127)); return; }
       if (k === 'v' && !e.repeat) { KB.vel = clamp(KB.vel + 0.1, 0.1, 1); toast('Velocity ' + Math.round(KB.vel * 127)); return; }
-      if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const t = liveTarget(); if (!t) return; const off = KEYMAP[k]; const n = isPitched(t) ? KB.oct * 12 + 12 + off : off; liveNoteOn(k, n, KB.vel, t); return; }
+      if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const ts = midiTargets('kb', 0); if (!ts.length) return; const off = KEYMAP[k]; ts.forEach(t => liveNoteOn(k + ':' + t.id, isPitched(t) ? KB.oct * 12 + 12 + off : off, KB.vel, t)); return; }
     }
     if (k === ' ') { e.preventDefault(); if (e.repeat) return; e.shiftKey ? (T.playing ? stop() : continuePlay()) : togglePlay(); return; }
     if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec) { if (T.playing) startRecording(nowPos()); else play(); } else if (T.recording) finishRecording(); ui.transport(); return; }
@@ -176,11 +179,12 @@ function bindKeys() {
       if (e.shiftKey && k === 'r') { e.preventDefault(); return cmd('export'); }
       if (e.shiftKey && k === 'f') { e.preventDefault(); return cmd('toggleFollow'); }
       if (e.altKey && k === 'b') { e.preventDefault(); return cmd('toggleBrowser'); }
+      if (e.altKey && k === 'l') { e.preventDefault(); return cmd('toggleDetailPane'); }
       if (e.altKey && k === 'm') { e.preventDefault(); return cmd('toggleMixer'); }
       if (e.altKey && k === 'f') { e.preventDefault(); return cmd('crossfade'); }
       if (k === 'f' && !e.shiftKey) { e.preventDefault(); if (!V.browser) cmd('toggleBrowser'); $('#bsearch').focus(); return; }
-      if (k === '1') { e.preventDefault(); V.grid = Math.max(-2, V.grid - 1); arr.draw(); toast('Narrower grid'); return; }
-      if (k === '2') { e.preventDefault(); V.grid = Math.min(3, V.grid + 1); arr.draw(); toast('Wider grid'); return; }
+      if (k === '1') { e.preventDefault(); V.fixedGrid = 0; $('#gridSel').value = '0'; lsSet('sb-grid', '0'); V.grid = Math.max(-2, V.grid - 1); arr.draw(); toast('Narrower grid'); return; }
+      if (k === '2') { e.preventDefault(); V.fixedGrid = 0; $('#gridSel').value = '0'; lsSet('sb-grid', '0'); V.grid = Math.min(3, V.grid + 1); arr.draw(); toast('Wider grid'); return; }
       if (k === '4') { e.preventDefault(); V.snap = !V.snap; ui.transport(); toast(V.snap ? 'Snap to grid on' : 'Snap to grid off'); return; }
       if (map[k] && !IS_DESKTOP) { e.preventDefault(); return cmd(map[k]); }
       if (map[k] && IS_DESKTOP && ['=', '+', '-', '1', '2', '4'].includes(k)) { e.preventDefault(); return cmd(map[k]); }
@@ -205,11 +209,12 @@ function bindKeys() {
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.ctrlKey || e.metaKey) && e.altKey) { nudgeTrack(e.key === 'ArrowUp' ? -1 : 1); e.preventDefault(); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { const i = S.tracks.findIndex(t => V.selTracks.has(t.id)), j = clamp(i + (e.key === 'ArrowUp' ? -1 : 1), 0, S.tracks.length - 1); if (S.tracks[j]) { V.selTracks = new Set([S.tracks[j].id]); ui.headers(); ui.detail(); } e.preventDefault(); return; }
   });
-  document.addEventListener('keyup', e => liveNoteOff(e.key.toLowerCase()));
+  document.addEventListener('keyup', e => { const k = e.key.toLowerCase(); [...held.keys()].filter(x => x === k || x.startsWith(k + ':')).forEach(x => liveNoteOff(x)); });
   window.addEventListener('blur', () => [...held.keys()].forEach(liveNoteOff));
   if (navigator.requestMIDIAccess) navigator.requestMIDIAccess().then(acc => {
-    const hook = inp => (inp.onmidimessage = m => { if (GP.midiOff && GP.midiOff[inp.id]) return; if (midiMapIn(m.data)) return; const [st, n, v] = m.data, c = st & 0xf0; const t = liveTarget(); if (!t) return; const note = t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n; if (c === 0xe0) { liveBend(st & 15, ((v << 7) | n) / 8192 - 1); return; } if (c === 0x90 && v > 0) liveNoteOn('midi' + n, note, v / 127, t, st & 15); else if (c === 0x80 || (c === 0x90 && v === 0)) liveNoteOff('midi' + n, c === 0x80 ? v / 127 : undefined); });
-    acc.inputs.forEach(hook); acc.onstatechange = () => acc.inputs.forEach(hook);
+    const hook = inp => (inp.onmidimessage = m => { if (GP.midiOff && GP.midiOff[inp.id]) return; if (midiMapIn(m.data)) return; const [st, n, v] = m.data, c = st & 0xf0; if (c === 0xe0) { liveBend(st & 15, ((v << 7) | n) / 8192 - 1); return; } if (c === 0x90 && v > 0) midiTargets(inp.id, st & 15).forEach(t => liveNoteOn('midi' + n + ':' + t.id, padNote(t, n), v / 127, t, st & 15)); else if (c === 0x80 || (c === 0x90 && v === 0)) [...held.keys()].filter(k => k.startsWith('midi' + n + ':')).forEach(k => liveNoteOff(k, c === 0x80 ? v / 127 : undefined)); });
+    const list = () => { window.MIDI_INS = [...acc.inputs.values()].map(i => ({ id: i.id, name: i.name })); }; list();
+    acc.inputs.forEach(hook); acc.onstatechange = () => { acc.inputs.forEach(hook); list(); if (V.showIO) ui.headers(); };
   }).catch(() => { });
 }
 
@@ -228,6 +233,12 @@ function bindBar() {
   $('#snapBtn').onclick = () => { V.snap = !V.snap; ui.transport(); };
   $('#autoArm').onclick = () => { V.autoArm = !V.autoArm; ui.transport(); toast(V.autoArm ? 'Automation Arm on: move controls while playing to record them' : 'Automation Arm off'); };
   $('#reAuto').onclick = () => reenableAutomation();
+  V.fixedGrid = lsGet('sb-grid') && lsGet('sb-grid') !== '0' ? lsGet('sb-grid') : 0; $('#gridSel').value = String(V.fixedGrid || 0);
+  $('#gridSel').onchange = e => { V.fixedGrid = e.target.value === '0' ? 0 : e.target.value; lsSet('sb-grid', e.target.value); arr.draw(); roll.draw_ && roll.draw_(); e.target.blur(); };
+  $('#gridSel').onkeydown = e => e.stopPropagation();
+  if (IS_DESKTOP) document.body.classList.add('desktop');
+  setInterval(async () => { const el = $('#cpu'); if (!el) return; el.hidden = !NE.on; if (!NE.on) return; const st = await neStatus(); if (st) { el.textContent = Math.round(st.cpu * 100) + ' %'; el.classList.toggle('hot', st.cpu > 0.8); } }, 700);
+  $$('[data-col]').forEach(x => (x.onclick = () => colToggle(x.dataset.col)));
   $('#mapMidi').onclick = () => toggleMap('midi'); $('#mapKey').onclick = () => toggleMap('key');
   $('#kbBtn').onclick = () => { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); };
   applyLook(); applyOutputMono(); if (GP.outId) applyOutputDevice();
@@ -251,7 +262,8 @@ function bindBar() {
   // splitter between arrangement and detail
   const spl = $('#split'), app = $('#app'); const setH = h => { h = clamp(h, 160, innerHeight - 260); app.style.setProperty('--detailH', h + 'px'); lsSet('sb-detailH', h); arr.draw(); roll.draw_(); };
   const sv = +lsGet('sb-detailH'); if (sv) setH(sv);
-  spl.onpointerdown = e => { spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
+  setDetailShown(lsGet('sb-detailHidden') !== '1'); $('#dHide').onclick = () => setDetailShown(false);
+  spl.onpointerdown = e => { if (app.classList.contains('nodetail')) { setDetailShown(true); return; } spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { if (e.defaultPrevented) return; e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && /\.(als|sbproj|json)$/i.test(f.name)) f.arrayBuffer().then(data => confirmLeave(() => openProjectFile({ name: f.name, path: IS_DESKTOP && f.path ? f.path : null, data }))); });
 }
@@ -312,7 +324,7 @@ async function demoProject() {
 /* ---------- boot ---------- */
 (async function boot() {
   await audioReady; PITCH_OK = PITCH_OK || false;
-  S = emptyProject(); buildMaster(); rebuildAll();
+  ioInit(); S = emptyProject(); buildMaster(); rebuildAll();
   arr.init(); bindHeaders(); bindBar(); bindKeys(); await browser.init();
   const pending = IS_DESKTOP ? await NATIVE.pendingOpen() : null;
   if (pending) await openPath(pending); else if (!(await offerRecovery())) await loadProjectObj(await demoProject());
@@ -321,4 +333,5 @@ async function demoProject() {
   requestAnimationFrame(frame);
   const resume = () => { if (ctx.state !== 'running') ctx.resume(); }; document.addEventListener('pointerdown', resume, { once: true }); document.addEventListener('keydown', resume, { once: true });
   window.SB_ready = true;
+  neInit().then(on => { if (on) { ui.all(); toast(`Native audio: ${NE.dev.outputName} at ${NE.dev.sampleRate} Hz, ${NE.dev.buffer} samples`); } });
 })();
