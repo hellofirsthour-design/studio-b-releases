@@ -266,7 +266,7 @@ function nativeAudioBind() {
   const reopen = async () => { showBusy('Opening the audio device…'); try { await neRestart(); } finally { showBusy(null); } showPrefs(); };
   $('#pfEng').onchange = async e => { GP.engine = e.target.value; saveGP(); if (GP.engine === 'web') { await neStop(); toast('Using the built-in engine. Plug-ins are paused.'); } showPrefs(); };
   $('#pfDrv').onchange = e => { GP.driver = e.target.value; GP.outName = ''; GP.inName = ''; saveGP(); reopen(); };
-  $('#pfIn').onchange = e => { if (e.target.value === 'none') GP.inId = 'none'; else { GP.inId = null; GP.inName = e.target.value; } saveGP(); reopen(); };
+  $('#pfIn').onchange = e => { if (e.target.value === 'none') GP.inId = 'none'; else { GP.inId = null; GP.inName = e.target.value; NE.wantIn = true; } saveGP(); reopen(); };
   $('#pfOut').onchange = e => { GP.outName = e.target.value; saveGP(); reopen(); };
   $('#pfMainOut').onchange = e => { GP.mainOut = e.target.value; saveGP(); ioWire(); };
   $('#pfCueOut').onchange = e => { GP.cueOut = e.target.value; saveGP(); ioWire(); };

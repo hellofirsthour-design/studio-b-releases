@@ -165,6 +165,7 @@ function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler", 
   V.detail = 'devices'; ui.all();
 }
 async function chooseInput(t) {
+  if (IO.native && !IO.inCh) await neWantInput();   // the input opens the first time you ask for it
   if (IO.native) { // the device's own channels, plus the internal sources
     const set = v => { pushUndo('Input'); t.input = v; connectInputs(); ui.headers(); if (V.view === 'mix') mixer.render(); };
     const others = S.tracks.filter(x => x !== t && x.kind !== 'group').map(x => ({ label: (t.input === 'track:' + x.id ? '✓ ' : '') + 'Track: ' + x.name, run: () => set('track:' + x.id) }));
@@ -314,8 +315,8 @@ function ioChange(b, h) {
   if (!b) return false; const k = h.dataset.h, v = h.value;
   if (k === 'midiIn') { pushUndo('MIDI from'); b.midiIn = v; }
   else if (k === 'midiCh') { pushUndo('MIDI channel'); b.midiCh = +v; }
-  else if (k === 'inT') { pushUndo('Audio from'); b.input = v === 'ext' ? (IO.native ? 'ext:1' : 'default') : v; connectInputs(); }
-  else if (k === 'inC') { pushUndo('Input channel'); b.input = v; connectInputs(); }
+  else if (k === 'inT') { pushUndo('Audio from'); b.input = v === 'ext' ? (IO.native ? 'ext:1' : 'default') : v; if (IO.native && extParse(b.input)) neWantInput().then(connectInputs); else connectInputs(); }
+  else if (k === 'inC') { pushUndo('Input channel'); b.input = v; if (IO.native && extParse(v)) neWantInput().then(connectInputs); else connectInputs(); }
   else if (k === 'outT') { pushUndo('Audio to'); if (v) b.out = v; else delete b.out; routeOut(b); }
   else if (k === 'mainOut') { GP.mainOut = v; saveGP(); ioWire(); }
   else if (k === 'delay') { pushUndo('Track delay'); b.delayMs = clamp(+v || 0, -500, 500); applyAllMix(); }

@@ -127,6 +127,7 @@ function deviceCard(o, d, i) {
   else {
     if (['comp', 'limit', 'gate', 'iron', 'apex', 'deess', 'breath'].includes(d.type)) grMeter(body, r);
     if (def.meters) bandMeters(body, r, def.meters);
+    if (d.type === 'spaces') { const row = document.createElement('div'); row.className = 'row tight'; row.innerHTML = `<button class="btn ghostb tiny">Load impulse response…</button><span class="muted small">${d.p.type === 'file' && d.p.irName ? esc(d.p.irName) : 'WAV or AIFF, from any reverb library or your own recordings'}</span>`; row.querySelector('button').onclick = () => spacesPickIR(d); body.appendChild(row); }
     if (d.type === 'comp' || d.type === 'iron') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
     body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`));
   }
@@ -187,7 +188,7 @@ function eqEditor(body, d, r, changed) {
       const del = document.createElement('button'); del.className = 'btn ghostb'; del.textContent = 'Remove band'; del.onclick = () => { d.p.bands.splice(selB, 1); selB = Math.max(0, selB - 1); changed(); bandBar(); }; ctl.appendChild(del);
       bar.appendChild(ctl);
     } else { const p = document.createElement('span'); p.className = 'muted'; p.textContent = 'Double-click the curve to add a band'; bar.appendChild(p); }
-    const rs = selectEl([[12, '±12 dB'], [18, '±18 dB'], [30, '±30 dB']], range, v => { range = v; bandBar(); }, 'Display range'); bar.appendChild(rs); bar.appendChild(outK);
+    const rs = selectEl([[12, '±12 dB'], [18, '±18 dB'], [30, '±30 dB']], range, v => { range = v; bandBar(); }, 'Display range'); bar.appendChild(rs); bar.appendChild(outK); bar.appendChild(toggleEl('Linear phase', !!d.p.linear, v => { pushUndo('Linear phase'); d.p.linear = v; changed(); }));
   };
   const hit = (x, y) => { let best = -1, bd = 14; d.p.bands.forEach((b, i) => { const [nx, ny] = nodeXY(b); const dd = Math.hypot(nx - x, ny - y); if (dd < bd) { bd = dd; best = i; } }); return best; };
   cv.addEventListener('pointerdown', e => {

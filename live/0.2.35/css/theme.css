@@ -69,3 +69,5 @@ input[type=range]:hover::-webkit-slider-thumb{background:#fff}
 #menu{background:#1b1c21;border:1px solid #08090b;border-radius:var(--r2);box-shadow:0 12px 32px -8px rgba(0,0,0,.75),var(--edge)}
 #menu button:hover{background:color-mix(in srgb,var(--accent) 14%,#24262c)}
 .toast,#toast{background:#1e1f24;border:1px solid #08090b;border-radius:var(--r2);box-shadow:0 10px 28px -8px rgba(0,0,0,.7),var(--edge);color:var(--fg);font-weight:500}
+
+.brand svg{width:24px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}

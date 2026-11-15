@@ -1,8 +1,8 @@
 {
- "version": "0.2.34",
+ "version": "0.2.35",
  "shell": 3,
- "date": "2026-11-15T19:35:49.816Z",
- "notes": "EQ and tone: linear-phase Prism, Console, Low End, Strip",
+ "date": "2026-11-15T19:44:16.700Z",
+ "notes": "Space and movement: Taps, Motion, Spaces, Half, Stereo",
  "files": [
   {
    "path": "css/base.css",
@@ -31,8 +31,8 @@
   },
   {
    "path": "index.html",
-   "size": 20992,
-   "sha256": "16e0352b3803ed2a43feb16d3e68c5094029b1cd467172aaf26bbc1377ce01d6"
+   "size": 21028,
+   "sha256": "069feb863ee225a61b9cf4bfeafa5598c7ac4f9c472901df46fdbd8a8a35030f"
   },
   {
    "path": "js/arrange.js",
@@ -41,13 +41,13 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34249,
-   "sha256": "9aa7005043e441f474aa8da31e6de39063a8b874932d7ca063548f1d2d583e06"
+   "size": 34295,
+   "sha256": "0f0f62e31d5e1b580852a060524de69ea4c4694f624d5c22ed11cbe060df78d2"
   },
   {
    "path": "js/cards.js",
-   "size": 40108,
-   "sha256": "ef3f710d6b1beb086e0cee03d04047553391453a81aaf45c31e07bc4094f7be8"
+   "size": 40533,
+   "sha256": "5589099096b4496527e5952002b8c01e8900eccc3f5f7d413ee0d1f7380451b9"
   },
   {
    "path": "js/convert.js",
@@ -86,8 +86,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 54283,
-   "sha256": "ebec5288e3db9d6cf383d6dfb0115c68095e673768d9abf0d84ea9578077cd18"
+   "size": 54338,
+   "sha256": "17dced8de7ed1f4528c157485614619326a44eb01aac12547366638ca145df8d"
   },
   {
    "path": "js/features.js",
@@ -146,8 +146,8 @@
   },
   {
    "path": "js/mods.js",
-   "size": 8165,
-   "sha256": "bf1608c7c2c74e1c59f908b6dd1a3e6da5f2d672b719b55eee8c91073f42ee46"
+   "size": 8293,
+   "sha256": "cbbf2442af2d9c4ee3c5f43904b824f20c6dd81975e607854099a2f22e327e28"
   },
   {
    "path": "js/native.js",
@@ -190,6 +190,11 @@
    "sha256": "9dea7b72f906e234183281c7a4194bc02a2ecca682226714209fe166ab723c7d"
   },
   {
+   "path": "js/space.js",
+   "size": 16535,
+   "sha256": "173b8a942f91051515ac4b88da12675eb0c0f78dded2d14857a020983a5abf75"
+  },
+  {
    "path": "js/timeline.js",
    "size": 5116,
    "sha256": "e34e60a252210717d15b8e516d38de2ecd14ee7c7a43128810111311ad5eaa67"
@@ -211,8 +216,8 @@
   },
   {
    "path": "js/worklets2.js",
-   "size": 20496,
-   "sha256": "632c607f6fb10b1b84ab46ec772c4c14cfceef55a4949c71612b5650f63568c5"
+   "size": 22834,
+   "sha256": "453f1107bc584638c867c50ff48ab14c6d7de374259c505c73b40de8a7d68047"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -227,7 +232,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "66889ef6d20b2176084659acf9c554a8c5c00b667f57c3334639155763194f33"
+   "sha256": "c9481aedf7c252b2f5813a0ef42e9207fd0264a00e9160566742b31c97cf2464"
   }
  ]
 }
