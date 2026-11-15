@@ -141,3 +141,14 @@ DEVICES.stereo = { name: 'Stereo', blurb: 'Mid/side, width, mono bass', cls: Ste
   def: () => ({ width: 1, mid: 0, side: 0, monoBass: 20, balance: 0, listen: 'stereo' }),
   params: [K('width', 'Width', 0, 2, { fmt: fPct }), K('mid', 'Mid', -12, 12, { fmt: fDb }), K('side', 'Side', -12, 12, { fmt: fDb }), K('monoBass', 'Mono below', 20, 400, { scale: 'log', fmt: v => v < 21 ? 'Off' : fHz(v) }), K('balance', 'Balance', -1, 1, { fmt: v => Math.abs(v) < 0.02 ? 'C' : (v < 0 ? 'L' : 'R') + Math.round(Math.abs(v) * 50) }), SEL('listen', 'Listen', [['stereo', 'Stereo'], ['mid', 'Mid only'], ['side', 'Side only']])],
   presets: { 'Wider': { width: 1.4, monoBass: 120 }, 'Mono check': { width: 0 }, 'Tighten the low end': { monoBass: 150 }, 'Focus the centre': { mid: 2, side: -2 } } };
+
+/* --- Stutter: tempo-locked glitch edits (repeat rolls, reverse, tape stop, pitch rise, gate) --- */
+class StutterDev extends Base {
+  constructor(d) { super(d); this.node = PITCH_OK ? new AudioWorkletNode(ctx, 'gw-glitch', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] }) : null; if (this.node) { this.input.connect(this.node); this.node.connect(this.output); } else this.input.connect(this.output); this.set(); }
+  set() { const p = this.d.p; if (this.node) this.node.port.postMessage({ slot: +p.slot, chance: p.chance, roll: +p.roll, repeat: !!p.repeat, reverse: !!p.reverse, stop: !!p.stop, rise: !!p.rise, gate: !!p.gate, seed: p.seed, mix: p.mix }); }
+  transport(time, pos) { if (!this.node) return; if (time == null) return this.node.port.postMessage({ on: false }); this.node.port.postMessage({ on: true, t0: timeAt(pos), p0: pos, bpm: bpmAt(pos) }); }
+}
+DEVICES.stutter = { name: 'Stutter', blurb: 'Glitch edits in time with the song', cls: StutterDev,
+  def: () => ({ slot: 1, chance: 0.3, roll: 0.25, repeat: true, reverse: true, stop: true, rise: false, gate: true, seed: 1, mix: 1 }),
+  params: [SEL('slot', 'Slot', [[0.5, '1/32'], [1, '1/16'], [2, '1/8'], [4, '1/4']]), K('chance', 'Amount', 0, 1, { fmt: fPct }), SEL('roll', 'Roll', [[0.5, '1/2 slot'], [0.25, '1/4 slot'], [0.125, '1/8 slot']]), TOG('repeat', 'Repeat'), TOG('reverse', 'Reverse'), TOG('stop', 'Tape stop'), TOG('rise', 'Pitch rise'), TOG('gate', 'Gate'), K('seed', 'Pattern', 1, 64, { step: 1, fmt: v => '#' + Math.round(v) }), K('mix', 'Mix', 0, 1, { fmt: fPct })],
+  presets: { 'Subtle fills': { chance: 0.15, slot: 1, rise: false }, 'Glitchy hats': { chance: 0.45, slot: 0.5, roll: 0.25, stop: false }, 'Build-up rolls': { chance: 0.7, slot: 2, repeat: true, rise: true, reverse: false, stop: false, gate: false }, 'Tape-stop breaks': { chance: 0.25, slot: 4, stop: true, repeat: false, reverse: false, gate: false } } };

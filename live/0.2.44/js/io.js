@@ -119,12 +119,12 @@ const fmtTime = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padSt
 
 /* ---------- project save / open ---------- */
 function usedSampleIds() {
-  const used = new Set(); S.tracks.forEach(t => { t.clips.forEach(c => c.sampleId && used.add(c.sampleId)); (t.takes || []).forEach(l => l.clips.forEach(c => c.sampleId && used.add(c.sampleId))); if (t.frozen) used.add(t.frozen.sid); if (t.inst) { if (t.inst.sampleId) used.add(t.inst.sampleId); (t.inst.pads || []).forEach(p => p.sampleId && used.add(p.sampleId)); } });
+  const used = new Set(); S.tracks.forEach(t => { t.clips.forEach(c => c.sampleId && used.add(c.sampleId)); (t.takes || []).forEach(l => l.clips.forEach(c => c.sampleId && used.add(c.sampleId))); if (t.frozen) used.add(t.frozen.sid); if (t.inst) { if (t.inst.sampleId) used.add(t.inst.sampleId); (t.inst.pads || []).forEach(p => p.sampleId && used.add(p.sampleId)); (t.inst.zones || []).forEach(z => z.sampleId && used.add(z.sampleId)); ['sidA', 'sidB'].forEach(k => t.inst[k] && used.add(t.inst[k])); } });
   return used;
 }
 function serialise(forPath) {
   const P = deep({ ...S, view: { pps: V.pps, scrollX: V.scrollX, insert: V.insert } });
-  const used = new Set(); S.tracks.forEach(t => { t.clips.forEach(c => c.sampleId && used.add(c.sampleId)); (t.takes || []).forEach(l => l.clips.forEach(c => c.sampleId && used.add(c.sampleId))); if (t.frozen) used.add(t.frozen.sid); if (t.inst) { if (t.inst.sampleId) used.add(t.inst.sampleId); (t.inst.pads || []).forEach(p => p.sampleId && used.add(p.sampleId)); } });
+  const used = usedSampleIds();   // clips, takes, frozen audio, and every instrument's samples (Cutline, Kit pads, Zones, Spectra)
   P.samples = [...used].map(id => { const s = SAMPLES.get(id); if (!s) return null; const e = { id, name: s.name, bpm: s.bpm }; if (s.path) e.path = s.path; else if (s.bytes) e.b64 = b64(s.bytes); return e; }).filter(Boolean);
   return P;
 }

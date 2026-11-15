@@ -1,8 +1,8 @@
 {
- "version": "0.2.43",
+ "version": "0.2.44",
  "shell": 4,
- "date": "2026-11-15T22:00:54.595Z",
- "notes": "Device chain like Ableton: one row, every device fits the panel height",
+ "date": "2026-11-15T22:47:29.763Z",
+ "notes": "Fix double-click on tracks; Escape closes windows; a real-mouse bug sweep",
  "files": [
   {
    "path": "css/base.css",
@@ -136,8 +136,8 @@
   },
   {
    "path": "js/look.js",
-   "size": 7338,
-   "sha256": "ec680e27476eb876ec106f61a0a504beab7eb56b4cc3acabf8bccc921d32dce2"
+   "size": 8005,
+   "sha256": "b9d4dd8506b613868d1e74323d61bac5a06724f98a3f86e4efcf3ce7a9745c85"
   },
   {
    "path": "js/main.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 47985,
-   "sha256": "d7ac0fd8c15d01cff023a60673d40b5e33d55e3cf9bcbc0961b37461515b8aba"
+   "size": 48555,
+   "sha256": "37e3a320510b2d70ce8eb9a4b1629fda6829901a9b96d97fc7f0661838f3baa1"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "b5714df4e5a1c6676817d614f5757dedb06ea883a67bfca7c96194341aa3b685"
+   "sha256": "4c196320a75dfc06f695034c5745035b279cb4c02bcd67d968ece1b42fad57ad"
   }
  ]
 }

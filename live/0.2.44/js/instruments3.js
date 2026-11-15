@@ -91,3 +91,45 @@ const vastOsc = o => [{ group: 'Oscillator ' + o }, SEL('table' + o, 'Table', VA
 INST2_PARAMS.vast = [...vastOsc(1), ...vastOsc(2), { group: 'Voice and filter' }, K('unison', 'Unison', 1, 4, { step: 1, fmt: v => v + '' }), K('spread', 'Spread', 0, 50, { fmt: v => Math.round(v) + 'c' }), SEL('ftype', 'Filter', ['lowpass', 'bandpass', 'highpass']), K('cutoff', 'Cutoff', 40, 18000, { scale: 'log', fmt: fHz }), K('res', 'Reso', 0.3, 15, { fmt: v => v.toFixed(1) }), K('drive', 'Drive', 0, 1, { fmt: fPct }), K('envCut', 'Env > cutoff', -1, 1, { fmt: fPct }), K('lfoCut', 'LFO > cutoff', 0, 1, { fmt: fPct }),
   { group: 'Envelopes and LFO' }, K('mA', 'Mod attack', 0.001, 4, { scale: 'log', fmt: SEC }), K('mD', 'Mod decay', 0.01, 6, { scale: 'log', fmt: SEC }), K('mS', 'Mod sustain', 0, 1, { fmt: fPct }), K('lfoRate', 'LFO rate', 0.02, 20, { scale: 'log', fmt: v => v.toFixed(2) + ' Hz' }), K('A', 'Attack', 0.001, 4, { scale: 'log', fmt: SEC }), K('D', 'Decay', 0.01, 4, { scale: 'log', fmt: SEC }), K('S', 'Sustain', 0, 1, { fmt: fPct }), K('R', 'Release', 0.01, 8, { scale: 'log', fmt: SEC }), K('gain', 'Volume', 0, 1, { fmt: fPct })];
 INST2_CLS.vast = Vast; INST_NAMES.vast = 'Vast'; INST_BLURB.vast = 'Wavetable synth, two oscillators';
+
+/* --- Spectra: two sample layers, each split by its spectrum (tonal partials, noise, or a band), played across the keys --- */
+const SPEC_CACHE = new Map();
+function spectralBuffer(sid, mode, lo, hi) {
+  const s = SAMPLES.get(sid); if (!s) return null; if (mode === 'full') return s.buf;
+  const key = sid + '|' + mode + '|' + (mode === 'band' ? Math.round(lo) + '-' + Math.round(hi) : ''); if (SPEC_CACHE.has(key)) return SPEC_CACHE.get(key);
+  const src = s.buf, sr = src.sampleRate, len = Math.min(src.length, sr * 12), N = 2048, H = N / 4, win = new Float32Array(N); for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  const out = new AudioBuffer({ length: len, numberOfChannels: src.numberOfChannels, sampleRate: sr }), re = new Float64Array(N), im = new Float64Array(N), mag = new Float64Array(N / 2 + 1), peaks = new Uint8Array(N / 2 + 1);
+  for (let ch = 0; ch < src.numberOfChannels; ch++) {
+    const x = src.getChannelData(ch), y = new Float32Array(len), norm = new Float32Array(len);
+    for (let f0 = -N + H; f0 < len; f0 += H) {
+      for (let i = 0; i < N; i++) { const j = f0 + i; re[i] = j >= 0 && j < len ? x[j] * win[i] : 0; im[i] = 0; }
+      fft(re, im, false); for (let k = 0; k <= N / 2; k++) mag[k] = Math.hypot(re[k], im[k]);
+      if (mode !== 'band') { let mx = 0, acc = 0; const W = 12, half = N / 2; for (let k = 0; k <= half; k++) mx = Math.max(mx, mag[k]); for (let k = 0; k <= Math.min(half, W); k++) acc += mag[k];
+        for (let k = 0; k <= half; k++) { if (k + W + 1 <= half) acc += mag[k + W + 1]; if (k - W - 1 >= 0) acc -= mag[k - W - 1]; const avg = acc / (Math.min(half, k + W) - Math.max(0, k - W) + 1); let pk = mag[k] > mx * 0.003 && mag[k] > avg * 4; /* a real partial stands well above its neighbourhood */ for (let d = -3; d <= 3 && pk; d++) if (d && k + d >= 0 && k + d <= N / 2 && mag[k + d] > mag[k]) pk = false; peaks[k] = pk ? 1 : 0; } }
+      for (let k = 0; k <= N / 2; k++) {
+        const hz = k * sr / N; let keep;
+        if (mode === 'band') keep = hz >= lo && hz <= hi;
+        else { const near = peaks[k] || (k > 0 && peaks[k - 1]) || (k < N / 2 && peaks[k + 1]); keep = mode === 'tonal' ? !!near : !near; }
+        if (!keep) { re[k] = im[k] = 0; if (k && k < N / 2) { re[N - k] = im[N - k] = 0; } }
+      }
+      fft(re, im, true); for (let i = 0; i < N; i++) { const j = f0 + i; if (j >= 0 && j < len) { y[j] += re[i] / N * win[i]; norm[j] += win[i] * win[i]; } }
+    }
+    for (let i = 0; i < len; i++) y[i] /= norm[i] > 1e-3 ? norm[i] : 1; out.copyToChannel(y, ch);
+  }
+  SPEC_CACHE.set(key, out); return out;
+}
+class Spectra extends PolyBase {
+  relTime() { return this.t.inst.R; }
+  noteOn(note, time, vel, dur, rv, mpe) {
+    const p = this.t.inst, amp = ctx.createGain(), lp = ctx.createBiquadFilter(), srcs = []; lp.type = 'lowpass'; lp.frequency.value = p.cutoff; lp.Q.value = 0.7;
+    ['A', 'B'].forEach(L => { const sid = p['sid' + L], lvl = p['level' + L]; if (!sid || lvl <= 0) return; const buf = spectralBuffer(sid, p['mode' + L], p['lo' + L], p['hi' + L]); if (!buf) return;
+      const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf; s.loop = !!p.loop; const r0 = Math.pow(2, (note - p.root + (p['tune' + L] || 0)) / 12); s.playbackRate.value = r0; mpeBend([s.playbackRate], time, dur, mpe, r0); g.gain.value = lvl; s.connect(g); g.connect(lp); srcs.push(s); });
+    if (!srcs.length) return null;
+    lp.connect(amp); amp.connect(this.out); adsr(amp, time, p, vel, 0.8); srcs.forEach(s => s.start(time)); return this.finish({ amp, srcs }, time, dur, rv);
+  }
+}
+const SPEC_MODES = [['full', 'Full'], ['tonal', 'Tonal (partials)'], ['noise', 'Noise (air, breath)'], ['band', 'Band']];
+INST2_DEF.spectra = () => ({ type: 'spectra', sidA: null, sidB: null, modeA: 'tonal', modeB: 'noise', loA: 200, hiA: 4000, loB: 2000, hiB: 16000, levelA: 1, levelB: 0.6, tuneA: 0, tuneB: 0, root: 60, loop: false, cutoff: 14000, A: 0.005, D: 0.6, S: 0.8, R: 0.6, gain: 0.7 });
+const specLayer = L => [{ group: 'Layer ' + L }, SEL('mode' + L, 'Keep', SPEC_MODES), K('lo' + L, 'Band low', 20, 20000, { scale: 'log', fmt: fHz }), K('hi' + L, 'Band high', 20, 20000, { scale: 'log', fmt: fHz }), K('level' + L, 'Level', 0, 1, { fmt: fPct }), K('tune' + L, 'Tune', -24, 24, { step: 1, fmt: v => (v > 0 ? '+' : '') + v + ' st' })];
+INST2_PARAMS.spectra = [...specLayer('A'), ...specLayer('B'), { group: 'Voice' }, K('root', 'Root note', 24, 96, { step: 1, fmt: v => noteName(v) }), TOG('loop', 'Loop'), K('cutoff', 'Cutoff', 60, 18000, { scale: 'log', fmt: fHz }), K('A', 'Attack', 0.001, 4, { scale: 'log', fmt: SEC }), K('D', 'Decay', 0.01, 4, { scale: 'log', fmt: SEC }), K('S', 'Sustain', 0, 1, { fmt: fPct }), K('R', 'Release', 0.01, 8, { scale: 'log', fmt: SEC }), K('gain', 'Volume', 0, 1, { fmt: fPct })];
+INST2_CLS.spectra = Spectra; INST_NAMES.spectra = 'Spectra'; INST_BLURB.spectra = 'Spectral sampler';
