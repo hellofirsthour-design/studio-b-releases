@@ -1,8 +1,8 @@
 {
- "version": "0.2.36",
+ "version": "0.2.37",
  "shell": 3,
- "date": "2026-11-15T19:52:14.821Z",
- "notes": "Browser: names only, descriptions move to the tooltip",
+ "date": "2026-11-15T19:57:34.848Z",
+ "notes": "Ember (analog poly) and Vast (wavetable) instruments",
  "files": [
   {
    "path": "css/base.css",
@@ -31,8 +31,8 @@
   },
   {
    "path": "index.html",
-   "size": 21028,
-   "sha256": "069feb863ee225a61b9cf4bfeafa5598c7ac4f9c472901df46fdbd8a8a35030f"
+   "size": 21071,
+   "sha256": "5229891233e40a811a99b0ef34ae47cd77fbc4fad6256be38852768c78e5539a"
   },
   {
    "path": "js/arrange.js",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34303,
-   "sha256": "b81c6420d2f1226dfec3bf598d441842d11ea100f1e005ac104262222e58c77a"
+   "size": 34425,
+   "sha256": "75cfd0caea0851a2df167b2a77bc742ef686bcc96e228dcdcb79f129c0c19101"
   },
   {
    "path": "js/cards.js",
@@ -120,6 +120,11 @@
    "sha256": "230a1c590301fa013ac26bc96d31c60520358b98d5b93eab5372adef0501bf12"
   },
   {
+   "path": "js/instruments3.js",
+   "size": 12904,
+   "sha256": "f9566c2e15674bd1b5dd36aaccc15d5e5a48dcb6ea6b5aa77659335c4b4e0eb3"
+  },
+  {
    "path": "js/io.js",
    "size": 46404,
    "sha256": "c36b795b18bb8c478a0ec2f2f33f7c44fb89462d7fa5b8dbbede201032a9091a"
@@ -186,8 +191,8 @@
   },
   {
    "path": "js/sounds.js",
-   "size": 34990,
-   "sha256": "9dea7b72f906e234183281c7a4194bc02a2ecca682226714209fe166ab723c7d"
+   "size": 37783,
+   "sha256": "8a2c9fee020a9a8d5219d1f9ba3ca75cfacc9c7cc2d02f030d15214536b863b8"
   },
   {
    "path": "js/space.js",
@@ -232,7 +237,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "438268b11d7d6ae42176bcb86bd3460f4f86cf200a2160f6689ec722f91a27e2"
+   "sha256": "529579b243401ea39d99ee531ba1299238c99e86c60344d997d74a144f351d0a"
   }
  ]
 }

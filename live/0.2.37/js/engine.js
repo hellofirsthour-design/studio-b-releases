@@ -100,7 +100,7 @@ function wireSidechains() {
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
-function rewire(b) { if (NE.on && !isOffline()) { setTimeout(neSyncProject, 0); schedulePDC(); } if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
+function rewire(b) { if (!isOffline()) schedulePDC(); if (NE.on && !isOffline()) setTimeout(neSyncProject, 0); if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
 const anySolo = () => S.tracks.some(t => t.solo);
 // A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
 const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
@@ -382,7 +382,7 @@ function stop(silent) {
   if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
-  clearMidiFxQueues(); T.playing = false; stopSources(now);
+  clearMidiFxQueues(); T.playing = false; stopSources(now); DEV_RT.forEach(r => r.transport && r.transport(null));
   S.tracks.forEach(t => { const r = RT.get(t.id); if (r && r.inst) r.inst.allOff(now); });
   releaseAutomation();
   if (!silent) { ui.transport(); arr.draw(); }
