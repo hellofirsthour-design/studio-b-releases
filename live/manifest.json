@@ -1,13 +1,13 @@
 {
- "version": "0.2.41",
+ "version": "0.2.42",
  "shell": 4,
- "date": "2026-11-15T20:30:07.731Z",
- "notes": "App icon: your organic \"B\"; the app sets its own icon (shell 4)",
+ "date": "2026-11-15T21:40:46.861Z",
+ "notes": "Device screens, a help and status bar, denser track headers",
  "files": [
   {
    "path": "css/base.css",
-   "size": 29593,
-   "sha256": "09e6e6983561cd9af14198ce824e5a22c77d5f985d95471d37974f2c7d7fcb69"
+   "size": 29619,
+   "sha256": "94d2cba5bf9c63101e02880b31d88f947162cf2578f464ac0d3d63bb09b8bd6f"
   },
   {
    "path": "css/studio.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 6244,
-   "sha256": "ca4087309ad0066113e5e8565b61698898c185dfb44bc6175ec327b56106b97e"
+   "size": 7772,
+   "sha256": "16e3d9962fa6564da9af446933114688e2a201907c123b398843a49287f18cfd"
   },
   {
    "path": "img/b-mark.svg",
@@ -36,8 +36,8 @@
   },
   {
    "path": "index.html",
-   "size": 24367,
-   "sha256": "e3c2563e15aef1ac813f854035f89a8c92ece06a6ce5f444364016163bc04d4f"
+   "size": 24484,
+   "sha256": "f4277f42ad1b48d4b6e8510e7cae6978eb584f235a69a3df810cb0e24bbcc09d"
   },
   {
    "path": "js/arrange.js",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/cards.js",
-   "size": 40533,
-   "sha256": "5589099096b4496527e5952002b8c01e8900eccc3f5f7d413ee0d1f7380451b9"
+   "size": 40612,
+   "sha256": "4cb1b93e069dd2f394e3050696a81e1ac9f8b95a05786eba079e5fcc62839a37"
   },
   {
    "path": "js/convert.js",
@@ -133,6 +133,11 @@
    "path": "js/io.js",
    "size": 46321,
    "sha256": "90d65ad6cd472ae3fae7309587f282385e51a5a18ec85a08a4c5ab044a31f348"
+  },
+  {
+   "path": "js/look.js",
+   "size": 7338,
+   "sha256": "ec680e27476eb876ec106f61a0a504beab7eb56b4cc3acabf8bccc921d32dce2"
   },
   {
    "path": "js/main.js",
@@ -216,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 44841,
-   "sha256": "3ea63907e17a8a38814d55593c8de7d5dcbe890d92ca1dba6b447853063250f9"
+   "size": 46582,
+   "sha256": "c5fd4254ba094e761b65e89cb79ff71bafac01b32968598b0fbcb5a6f91c45d7"
   },
   {
    "path": "js/warp.js",
@@ -247,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "21aa6989d3fab81e9e2d2b45240d3e76d55603da1c3a12a1701e0a9151bc412b"
+   "sha256": "8788ebccf3c213413ccacff4cfc075415cc111850e0521424148e68f30ea0d5c"
   }
  ]
 }

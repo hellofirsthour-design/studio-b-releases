@@ -32,6 +32,7 @@ const ui = {
           ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
           : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${INST_NAMES[b.inst.type]}</span>` : ''}
               <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" data-map="${b.id}|vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
+          ${r.h >= 58 && !V.autoMode && V.showM && r.kind !== 'take' ? hdrChips(b, isT) : ''}
           ${r.h >= 86 && !V.autoMode && V.showM ? `<div class="hrow hsm"><span class="lab">Pan</span><input type="range" class="hpan" min="-1" max="1" step="0.01" value="${b.pan || 0}" data-h="pan" aria-label="Pan">${isT && !V.showR ? `<span class="lab">A</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendA}" data-h="sendA" aria-label="Send A"><span class="lab">B</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendB}" data-h="sendB" aria-label="Send B">` : ''}</div>` : ''}
         </div>
         ${V.showIO && !b.collapsed ? ioColumn(r) : ''}${V.showR && !b.collapsed ? sendsColumn(r) : ''}${V.showD && !b.collapsed ? delayColumn(r) : ''}
@@ -100,6 +101,7 @@ function bindHeaders() {
   box.addEventListener('click', async e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id);
     switch (h.dataset.h) {
+      case 'chip': V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = V.detail === 'clip' ? 'both' : (V.detail || 'devices'); ui.all(); return;
       case 'mute': b.mute = !b.mute; break;
       case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; break;
       case 'arm': { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); break; }
@@ -328,3 +330,18 @@ function ioChange(b, h) {
 function syncRange(el) { const lo = +el.min || 0, hi = el.max === '' ? 100 : +el.max, v = +el.value; el.style.setProperty('--pct', ((v - lo) / ((hi - lo) || 1) * 100).toFixed(1) + '%'); }
 document.addEventListener('input', e => { if (e.target.type === 'range') syncRange(e.target); }, true);
 setInterval(() => document.querySelectorAll('input[type=range]').forEach(syncRange), 150);
+
+/* a compact line in each header: where the track's sound comes from and goes, and its device chain */
+function ioSummary(b, isT) {
+  const out = b.out === 'none' ? 'No output' : extParse(b.out) ? extLabel(b.out, 'out') : groupOf(b) ? groupOf(b).name : 'Main';
+  if (!isT || b.kind === 'group') return '→ ' + out;
+  let src;
+  if (b.kind === 'midi') { const m = b.midiIn || 'all'; src = m === 'all' ? 'All MIDI' : m === 'kb' ? 'Keyboard' : m === 'none' ? 'No input' : ((window.MIDI_INS || []).find(x => x.id === m) || { name: 'MIDI' }).name; if (b.midiCh) src += ' ch' + b.midiCh; }
+  else { const i = b.input || 'default'; src = i === 'resample' ? 'Resample' : i === 'none' ? 'No input' : i.startsWith('track:') ? ((busById(i.slice(6)) || {}).name || 'Track') : extParse(i) ? extLabel(i, 'in') : IO.native ? 'In 1/2' : 'Input'; }
+  return src + ' → ' + out;
+}
+function hdrChips(b, isT) {
+  const devs = (b.devices || []).filter(d => DEVICES[d.type] || d.type === 'plugin'), name = d => d.type === 'plugin' ? (d.p.name || 'Plug-in') : DEVICES[d.type].name;
+  const chips = devs.slice(0, 3).map(d => `<span class="chip ${d.on ? '' : 'off'}" data-h="chip" data-dev="${d.id}" title="${esc(name(d))}: click to show the devices">${esc(name(d))}</span>`).join('') + (devs.length > 3 ? `<span class="chip more" data-h="chip">+${devs.length - 3}</span>` : '');
+  return `<div class="hrow hchips"><span class="hiosum" title="Input and output">${esc(ioSummary(b, isT))}</span>${chips}</div>`;
+}

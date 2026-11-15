@@ -115,6 +115,7 @@ function deviceCard(o, d, i) {
   c.addEventListener('drop', e => { const f = e.dataTransfer.getData('gw/dev'); if (f === '') return; e.preventDefault(); const [x] = o.devices.splice(+f, 1); o.devices.splice(i, 0, x); rewire(o); ui.detail(); markDirty(); });
   c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [...(o._rack ? [] : d.type === 'rack' ? [{ label: 'Ungroup rack (keeps the selected chain)', run: () => ungroupRack(o, i) }] : [{ label: 'Group into a rack', key: 'Ctrl+G', run: () => groupIntoRack(o, i) }]), { label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
   if (d.type === 'plugin') { plugBody(body, o, d.id, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`); return c; }
+  devScreen(body, d, r);   // live screen for dynamics, reverbs and modulators
   if (d.type === 'rack') { rackView(body, o, d, r); return c; }
   if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (def.cols) { // one column per section, side by side (Patina)
