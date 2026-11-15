@@ -1,13 +1,13 @@
 {
- "version": "0.2.35",
+ "version": "0.2.36",
  "shell": 3,
- "date": "2026-11-15T19:44:16.700Z",
- "notes": "Space and movement: Taps, Motion, Spaces, Half, Stereo",
+ "date": "2026-11-15T19:52:14.821Z",
+ "notes": "Browser: names only, descriptions move to the tooltip",
  "files": [
   {
    "path": "css/base.css",
-   "size": 29411,
-   "sha256": "53fc7abf135a44eb1d438a46432e193d9fbd9b9eedec47972ecf7b807e0f9c0a"
+   "size": 29593,
+   "sha256": "09e6e6983561cd9af14198ce824e5a22c77d5f985d95471d37974f2c7d7fcb69"
   },
   {
    "path": "css/studio.css",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34295,
-   "sha256": "0f0f62e31d5e1b580852a060524de69ea4c4694f624d5c22ed11cbe060df78d2"
+   "size": 34303,
+   "sha256": "b81c6420d2f1226dfec3bf598d441842d11ea100f1e005ac104262222e58c77a"
   },
   {
    "path": "js/cards.js",
@@ -191,8 +191,8 @@
   },
   {
    "path": "js/space.js",
-   "size": 16535,
-   "sha256": "173b8a942f91051515ac4b88da12675eb0c0f78dded2d14857a020983a5abf75"
+   "size": 16536,
+   "sha256": "68b42be67b7da71d84df136ccf26478023101bc400e46f7a263d6633b68492dd"
   },
   {
    "path": "js/timeline.js",
@@ -232,7 +232,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "c9481aedf7c252b2f5813a0ef42e9207fd0264a00e9160566742b31c97cf2464"
+   "sha256": "438268b11d7d6ae42176bcb86bd3460f4f86cf200a2160f6689ec722f91a27e2"
   }
  ]
 }
