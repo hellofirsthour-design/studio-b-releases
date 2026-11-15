@@ -148,6 +148,18 @@ snd('Textures & FX', 'Glitch Bleeps', { type: 'fm', ratio: 7.1, index: 8, modDec
 snd('Textures & FX', 'Wind', C({ wave1: 'sine', wave2: 'sine', mix2: 0, noise: 1, cutoff: 900, res: 6, A: 1.5, Sus: 1, R: 2, lfoRate: 0.2, lfoAmt: 700, gain: 0.25 }), [VERB(0.4, 4)], 'wind air atmosphere ambient');
 
 /* ---------- Drum Kits ---------- */
+// Ember (analog poly) and Vast (wavetable)
+const EMB = o => ({ type: 'analog', ...o }), VST = o => ({ type: 'vast', ...o });
+snd('Strings & Brass', 'Poly Brass', EMB({ wave1: 'saw', wave2: 'saw', detune2: 9, cutoff: 900, res: 1.2, fenv: 2.2, fA: 0.06, fD: 0.5, fS: 0.45, A: 0.04, R: 0.3, polymod: 0.05 }), [VERB(0.15)], 'brass poly analog 80s synth prophet', ['Vintage']);
+snd('Pads', 'Prophet Pad', EMB({ wave1: 'pulse', pw1: 0.35, wave2: 'saw', detune2: 11, unison: 2, cutoff: 1300, fenv: 1, fA: 1.2, fD: 2, fS: 0.6, A: 0.9, D: 1, S: 0.85, R: 1.6, lfoDest: 'pitch', lfoAmt: 0.08, lfoRate: 0.4 }), [VERB(0.3, 3), ['chorus', { mix: 0.3 }]], 'pad warm analog prophet rnb worship', ['Vintage', 'Lo-fi']);
+snd('Leads', 'Sync-ish Lead', EMB({ wave1: 'saw', wave2: 'pulse', pw2: 0.2, semis2: 12, level2: 0.6, polymod: 0.5, cutoff: 2500, fenv: 2.5, fD: 0.3, fS: 0.3, glide: 0.04 }), [['delay', { mix: 0.18 }]], 'lead analog poly-mod sync 80s', []);
+snd('Bass & 808', 'Analog Bass', EMB({ wave1: 'saw', wave2: 'pulse', pw2: 0.5, semis2: -12, level2: 0.7, sub: 0.5, cutoff: 500, res: 3, fenv: 3, fD: 0.25, fS: 0.1, A: 0.002, D: 0.4, S: 0.6, R: 0.15 }), [], 'bass analog moog funk rnb', []);
+snd('Keys & Piano', 'Poly Keys', EMB({ wave1: 'pulse', pw1: 0.45, wave2: 'tri', level2: 0.5, cutoff: 2200, fenv: 1.5, fD: 0.8, fS: 0.25, A: 0.003, D: 1.2, S: 0.4, R: 0.5, drive: 0.25 }), [VERB(0.15)], 'keys poly analog soft 80s', ['Vintage']);
+snd('Pads', 'Vast Evolving Pad', VST({ table1: 'harmonic', pos1: 0.1, env1: 0.7, table2: 'glass', pos2: 0.3, lfo2: 0.5, level2: 0.5, mA: 3, mD: 4, mS: 0.6, A: 1.2, R: 2, cutoff: 4000, lfoRate: 0.15 }), [VERB(0.35, 4)], 'pad evolving wavetable cinematic ambient', ['Lo-fi']);
+snd('Leads', 'Growl Lead', VST({ table1: 'growl', pos1: 0.2, env1: 0.6, lfo1: 0.3, table2: 'basic', pos2: 0.9, level2: 0.4, semis2: -12, ftype: 'lowpass', cutoff: 3500, res: 4, drive: 0.6, lfoRate: 4, mA: 0.01, mD: 0.4, mS: 0.4 }), [['sat', { drive: 8 }]], 'growl lead dubstep edm wavetable', []);
+snd('Bass & 808', 'Reese Bass', VST({ table1: 'basic', pos1: 0.85, env1: 0, table2: 'basic', pos2: 0.85, semis2: 0, fine2: 18, level2: 1, unison: 3, spread: 22, cutoff: 900, res: 2, drive: 0.4, A: 0.005, R: 0.2 }), [], 'reese bass dnb edm detuned', []);
+snd('Textures & FX', 'Vocal Formant Swell', VST({ table1: 'formant', pos1: 0, env1: 1, table2: 'vocal', pos2: 0.5, lfo2: 0.4, level2: 0.4, mA: 2.5, mD: 3, mS: 0.8, A: 0.8, R: 1.5, cutoff: 6000 }), [VERB(0.4, 4)], 'vocal formant texture choir-ish wavetable', []);
+snd('Plucks', 'Metal Pluck', VST({ table1: 'metal', pos1: 0.3, env1: -0.3, table2: 'glass', pos2: 0.6, level2: 0.4, A: 0.001, D: 0.5, S: 0, R: 0.4, cutoff: 7000, envCut: 0.4, mD: 0.3, mS: 0 }), [['delay', { mix: 0.2 }], VERB(0.2)], 'pluck metallic bell wavetable trap', []);
 const KIT = (pads, fx = []) => ({ inst: { type: 'drums', pads: pads.map(([kind, tune = 0, decay = 1, level = 0.85, pan = 0]) => ({ kind, tune, decay, level, pan, sampleId: null })) }, fx });
 const kit = (name, k, tags) => SOUNDS.push({ cat: 'Drum Kits', name, inst: k.inst, fx: k.fx, tags });
 kit('Trap Kit', KIT([['Sub Kick', 0, 1.6, 0.95], ['Snare', 2, 0.8], ['Clap', 0, 1], ['Closed Hat', 3, 0.5, 0.7], ['Open Hat', 2, 0.8, 0.6], ['Tom', -5, 1.2], ['Rim', 4, 0.6, 0.7], ['Shaker', 0, 0.6, 0.6]]), 'trap 808 drill hip-hop');

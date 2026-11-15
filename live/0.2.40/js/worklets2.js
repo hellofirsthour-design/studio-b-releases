@@ -224,11 +224,12 @@ registerProcessor('gw-shift', GWShift);
 class GWGrain extends AudioWorkletProcessor {
   constructor() {
     super(); Object.assign(this, { time: 0.375, size: 0.09, density: 18, scatter: 0.06, fb: 0.35, octave: 0.2, reverse: 0.15 });
-    this.N = 1 << 18; this.buf = [new Float32Array(this.N), new Float32Array(this.N)]; this.w = 0; this.acc = 0; this.g = []; this.last = [0, 0];
+    this.N = 1 << 18; this.buf = null; this.w = 0; this.acc = 0; this.g = []; this.last = [0, 0];
     this.port.onmessage = e => Object.assign(this, e.data);
   }
   process(inputs, outputs) {
     const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    if (!this.buf) this.buf = [new Float32Array(this.N), new Float32Array(this.N)];
     const n = out[0].length, m = this.N - 1, sr = sampleRate, norm = 1 / Math.sqrt(Math.max(1, this.density * this.size));
     for (let i = 0; i < n; i++) {
       for (let c = 0; c < 2; c++) { const src = inp && (inp[c] || inp[0]); this.buf[c][this.w & m] = (src ? src[i] : 0) + this.last[c] * this.fb; }
@@ -275,10 +276,12 @@ registerProcessor('gw-sub', GWSub);
 // Half time: inside each window (a beat, half a bar or a bar, locked to the song) play the window's first half at half speed.
 // 'tape' drops the pitch an octave like a slowed record; 'keep' stretches with overlapping grains so the pitch stays.
 class GWHalf extends AudioWorkletProcessor {
-  constructor() { super(); Object.assign(this, { win: 8, mode: 'tape', mix: 1, on: false, t0: 0, p0: 0, bpm: 120 }); this.N = 1 << 20; this.buf = [new Float32Array(this.N), new Float32Array(this.N)]; this.frame = 0; this.port.onmessage = e => Object.assign(this, e.data); }
+  constructor() { super(); Object.assign(this, { win: 8, mode: 'tape', mix: 1, on: false, t0: 0, p0: 0, bpm: 120 }); this.N = 1 << 20; this.buf = null; /* allocated on first use */ this.frame = 0; this.port.onmessage = e => Object.assign(this, e.data); }
   read(c, p) { const i = Math.floor(p), f = p - i, m = this.N - 1, b = this.buf[c]; return b[i & m] * (1 - f) + b[(i + 1) & m] * f; }
   process(inputs, outputs) {
     const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    if (!this.on && !this.buf) { const src = inputs[0]; for (let c = 0; c < out.length; c++) out[c].set(src && (src[c] || src[0]) ? (src[c] || src[0]) : new Float32Array(out[c].length)); return true; }
+    if (!this.buf) this.buf = [new Float32Array(this.N), new Float32Array(this.N)];
     const n = out[0].length, sps = sampleRate * 15 / this.bpm, W = this.win * sps, G = 2048, m = this.N - 1, fade = sampleRate * 0.004;
     for (let i = 0; i < n; i++) {
       const fr = this.frame, xs = [];
@@ -303,4 +306,45 @@ class GWHalf extends AudioWorkletProcessor {
   }
 }
 registerProcessor('gw-half', GWHalf);
+
+// Stutter: per slot of the song (a 16th or an 8th) pick an edit from a repeatable pattern: repeat roll, reverse, tape stop, pitch rise or gate.
+class GWGlitch extends AudioWorkletProcessor {
+  constructor() { super(); Object.assign(this, { slot: 1, chance: 0.35, repeat: true, reverse: true, stop: true, rise: true, gate: true, roll: 0.25, seed: 1, mix: 1, on: false, t0: 0, p0: 0, bpm: 120 }); this.N = 1 << 19; this.buf = null; this.frame = 0; this.cur = -1; this.act = 'pass'; this.start = 0; this.port.onmessage = e => Object.assign(this, e.data); }
+  hash(a) { let x = (a * 374761393 + this.seed * 668265263) | 0; x = (x ^ (x >>> 13)) * 1274126177 | 0; return ((x ^ (x >>> 16)) >>> 0) / 4294967296; }
+  pick(slotIdx) {
+    if (this.hash(slotIdx * 7 + 1) > this.chance) return 'pass';
+    const acts = ['repeat', 'reverse', 'stop', 'rise', 'gate'].filter(a => this[a]); if (!acts.length) return 'pass';
+    return acts[Math.floor(this.hash(slotIdx * 13 + 5) * acts.length)];
+  }
+  read(c, p) { const i = Math.floor(p), f = p - i, m = this.N - 1, b = this.buf[c]; return b[i & m] * (1 - f) + b[(i + 1) & m] * f; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    if (!this.on && !this.buf) { for (let c = 0; c < out.length; c++) { const s = inp && (inp[c] || inp[0]); if (s) out[c].set(s); } return true; }
+    if (!this.buf) this.buf = [new Float32Array(this.N), new Float32Array(this.N)];
+    const n = out[0].length, sps = sampleRate * 15 / this.bpm, L = this.slot * sps, m = this.N - 1, fade = sampleRate * 0.002;
+    for (let i = 0; i < n; i++) {
+      const fr = this.frame, xs = [];
+      for (let c = 0; c < 2; c++) { const src = inp && (inp[c] || inp[0]); const x = src ? src[i] : 0; xs.push(x); this.buf[c][fr & m] = x; }
+      let ys = xs;
+      if (this.on) {
+        const pos = this.p0 + ((currentTime + i / sampleRate) - this.t0) * this.bpm / 15, idx = Math.floor(pos / this.slot), o = (pos / this.slot - idx) * L;
+        if (idx !== this.cur) { this.cur = idx; this.act = this.pick(idx); this.start = fr - o; }
+        const a = this.act, st = this.start, edge = Math.min(1, o / fade, (L - o) / fade);
+        if (a !== 'pass') {
+          let rp = null, g = 1;
+          if (a === 'repeat') { const rl = Math.max(64, L * this.roll); rp = st + (o % rl); }
+          else if (a === 'rise') { const rl = Math.max(64, L * this.roll), k = Math.floor(o / rl), rate = Math.pow(2, k / 4); rp = st + ((o % rl) * rate) % rl; }
+          else if (a === 'reverse') rp = st - 1 - o;
+          else if (a === 'stop') rp = st + o - (o * o) / (2 * L) * 0.95;
+          else if (a === 'gate') { rp = null; g = o < L / 2 ? 1 : 0; }
+          ys = rp == null ? xs.map(x => x * g) : [0, 1].map(c => this.read(c, Math.min(fr, rp)) * edge + xs[c] * (1 - edge));
+        }
+      }
+      for (let c = 0; c < out.length; c++) out[c][i] = ys[c ? 1 : 0] * this.mix + xs[c ? 1 : 0] * (1 - this.mix);
+      this.frame++;
+    }
+    return true;
+  }
+}
+registerProcessor('gw-glitch', GWGlitch);
 `;

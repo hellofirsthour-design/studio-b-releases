@@ -1,8 +1,8 @@
 {
- "version": "0.2.39",
+ "version": "0.2.40",
  "shell": 3,
- "date": "2026-11-15T20:16:11.200Z",
- "notes": "Writer: chord, melody, bass and beat generators",
+ "date": "2026-11-15T20:22:01.682Z",
+ "notes": "Stutter and Spectra; projects now save Zones and Spectra samples",
  "files": [
   {
    "path": "css/base.css",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34425,
-   "sha256": "75cfd0caea0851a2df167b2a77bc742ef686bcc96e228dcdcb79f129c0c19101"
+   "size": 34279,
+   "sha256": "32774f59bcb2590f920ed1f8104860367012460ffc5cc0e985d6f4127514070e"
   },
   {
    "path": "js/cards.js",
@@ -116,18 +116,18 @@
   },
   {
    "path": "js/instruments2.js",
-   "size": 22258,
-   "sha256": "07699bd32f6057a96223d8ffa13d6e08d84f466cad027832604b02bd8c8eafa2"
+   "size": 22982,
+   "sha256": "94b7381814c3753fb9b411b62e04a192752df5fb2df7d28899e30ceeb3c12b59"
   },
   {
    "path": "js/instruments3.js",
-   "size": 12904,
-   "sha256": "f9566c2e15674bd1b5dd36aaccc15d5e5a48dcb6ea6b5aa77659335c4b4e0eb3"
+   "size": 17831,
+   "sha256": "addb9b57dd5b03cef56e000de2593be6c35fb6a006a50b2603f7042009b30c47"
   },
   {
    "path": "js/io.js",
-   "size": 46425,
-   "sha256": "ff0cbb86d606c99fe18322b7213687dfd4a66bcee90aee6717c27b53f110940d"
+   "size": 46321,
+   "sha256": "90d65ad6cd472ae3fae7309587f282385e51a5a18ec85a08a4c5ab044a31f348"
   },
   {
    "path": "js/main.js",
@@ -196,8 +196,8 @@
   },
   {
    "path": "js/space.js",
-   "size": 16536,
-   "sha256": "68b42be67b7da71d84df136ccf26478023101bc400e46f7a263d6633b68492dd"
+   "size": 18465,
+   "sha256": "525029ea93e09f55a6af75498ac85e56629a29e43c70e6b3591f2eeafd70e957"
   },
   {
    "path": "js/timeline.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/worklets2.js",
-   "size": 23137,
-   "sha256": "f33731204cce01b34e9c607b8efe478e22e62a851ad3a23c8792d555f6d6ad4f"
+   "size": 26186,
+   "sha256": "78613d52dc632243647b852b2babfeeb155b0d2f470aca2fd852f5fefd429030"
   },
   {
    "path": "js/writer.js",
@@ -242,7 +242,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "74eb71767bdd72f6c200e7ead38b7e7ca1ef2d911fc5df704ed3616a151fdd0f"
+   "sha256": "92316c845cb642159c045e83c41525bdfbf5ab40a620e85c27c8d0d4163b525a"
   }
  ]
 }

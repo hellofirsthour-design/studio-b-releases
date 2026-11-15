@@ -69,7 +69,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 .bsort{color:var(--dim);font-size:9px}
 #blist{flex:1;overflow:auto;padding:2px 0 20px}
 .brow{display:flex;align-items:center;gap:6px;padding:3px 10px;cursor:default;white-space:nowrap}
-.brow b{font-weight:500;overflow:hidden;text-overflow:ellipsis} .brow .bmeta,.brow .bcount{margin-left:auto;color:var(--faint);font-size:10px;flex:none;padding-left:8px}
+.brow b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;min-width:40px} .brow .bmeta,.brow .bcount{margin-left:auto;color:var(--faint);font-size:10px;flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px}   /* the name keeps its room; extra info shrinks first */
 .brow:hover{background:var(--panel2)} .brow.sel{background:color-mix(in srgb,var(--cue) 22%,transparent)}
 .brow.playing b{color:var(--play)} .brow.dim{color:var(--faint)}
 .brow .tri{font-style:normal;color:var(--dim);width:10px;flex:none;margin-left:-14px}
