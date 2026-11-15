@@ -20,7 +20,7 @@ const ICON = {
   phones: '<path d="M3 10V8a5 5 0 0 1 10 0v2"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/>',
 };
 const ico = (k, cls = '') => `<svg class="bico ${cls}" viewBox="0 0 16 16" aria-hidden="true">${ICON[k] || ICON.file}</svg>`;
-const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat']], ['Dynamics', ['comp', 'gate', 'limit']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
+const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat', 'patina', 'punch']], ['Dynamics', ['comp', 'iron', 'bands', 'lift', 'apex', 'limit', 'gate', 'rider', 'deess', 'breath']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
 const SOUND_FOLDERS = [['Bass', ['Sub Bass', 'Reese']], ['Keys', ['Keys']], ['Lead', ['Saw Lead']], ['Pad', ['Warm Pad']], ['Pluck', ['Pluck']]];
 const DEFAULT_COLLECTIONS = [['Favorites', '#ff5d5d'], ['Orange', '#ff9a3c'], ['Yellow', '#f2d544'], ['Green', '#6fdc8c'], ['Blue', '#4ea3ff'], ['Purple', '#b18cff'], ['Gray', '#a7a3b8']];
 const DRUM_WORDS = /kick|snare|clap|hat|hh|perc|tom|rim|cymbal|crash|ride|808|shaker|snap|drum|bd|sd/i;
@@ -72,6 +72,7 @@ const browser = {
   },
   // building blocks for each category
   fxItem(k) { const v = DEVICES[k]; return { name: v.name, meta: v.blurb, drag: 'sb/device', val: k, act: 'fx', key: 'fx:' + k, icon: 'fx', title: 'Click to add to the selected track, or drag onto a track' }; },
+  soundItem(s) { const inst = INST_NAMES[s.inst.type] || 'Kit'; return { name: s.name, meta: inst, drag: 'sb/inst', val: 'sound:' + s.name, act: 'sound', key: 'inst:sound:' + s.name, icon: s.cat === 'Drum Kits' ? 'drums' : 'sounds', title: 'Click to hear it, double-click or drag onto the arrangement to load it' }; },
   instItem(v, name, meta) { return { name, meta, drag: 'sb/inst', val: v, act: 'inst', key: 'inst:' + v, icon: v.startsWith('drums') ? 'drums' : 'instruments', title: 'Click to add a track, or drag onto a MIDI track' }; },
   fileItem(f) { const isSet = /\.(als|sbproj)$/i.test(f.name); return isSet ? { name: f.name, path: f.path, act: 'openSet', key: 'file:' + f.path, icon: 'set', meta: /\.als$/i.test(f.name) ? 'Live Set' : 'Project', title: 'Double-click to open' } : { name: f.name, path: f.path, file: f.fileId, drag: 'sb/sample', val: JSON.stringify(f.fileId ? { fileId: f.fileId } : { path: f.path }), act: 'prev', key: 'file:' + (f.path || f.fileId), icon: 'file' }; },
   folderRows(id, name, path, depth, filter) {
@@ -103,15 +104,17 @@ const browser = {
       h = items.length ? items.map(o => this.row(o)).join('') : this.empty('Nothing tagged yet', `Right-click anything in the browser and choose <b>${esc(col.name)}</b> to collect it here.`);
     } else if (sel === 'sounds') {
       title = 'Sounds';
-      h = q ? SOUND_FOLDERS.flatMap(([, ps]) => ps).filter(m).map(p => this.row(this.instItem('synth:' + p, p, 'Contour'))).join('') : SOUND_FOLDERS.map(([f, ps]) => this.staticFolder('snd:' + f, f, ps.map(p => this.instItem('synth:' + p, p, 'Contour')))).join('');
+      const sm = s => !q || s.name.toLowerCase().includes(q) || s.tags.includes(q) || s.cat.toLowerCase().includes(q), list = SOUNDS.filter(s => s.cat !== 'Drum Kits');
+      const packs = PACK_MANIFEST.packs.filter(p => !q || p.name.toLowerCase().includes(q) || p.blurb.toLowerCase().includes(q)).map(p => packItem(p));
+      h = `<div class="muted small bhint">${list.length} sounds · click to hear, double-click or drag to load</div>` + (packs.length ? this.staticFolderOpen('Free sample packs', packs) : '') + (q ? list.filter(sm).map(s => this.row(this.soundItem(s))).join('') : SOUND_CATS.filter(c => c !== 'Drum Kits').map(c => this.staticFolder('snd:' + c, c, list.filter(s => s.cat === c).map(s => this.soundItem(s)))).join(''));
     } else if (sel === 'drums') {
       title = 'Drums';
       const kits = [this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Chopping sampler')].filter(o => m(o.name));
-      h = kits.map(o => this.row(o)).join('');
+      h = kits.map(o => this.row(o)).join('') + this.staticFolderOpen('Drum kits', SOUNDS.filter(s => s.cat === 'Drum Kits' && (m(s.name) || (q && s.tags.includes(q)))).map(s => this.soundItem(s)));
       if (IS_DESKTOP) { const hits = this.q ? this.searchHits(f => DRUM_WORDS.test(f.path)) : this.roots().flatMap(r => (this.index.get(r.path) || []).filter(f => DRUM_WORDS.test(f.name))).slice(0, 300); this.roots().forEach(r => this.ensureIndex(r.path)); h += this.staticFolderOpen('Drum samples in your folders', hits.map(f => this.fileItem(f))); }
     } else if (sel === 'instruments') {
       title = 'Instruments';
-      h = [this.instItem('synth', 'Contour', 'Synth'), this.instItem('fm', 'Facet', 'FM synth'), this.instItem('wave', 'Morph', 'Wavetable synth'), this.instItem('epiano', 'Tine', 'Electric piano'), this.instItem('pluck', 'String', 'Plucked string model'), this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Sampler'), this.instItem('multi', 'Zones', 'Multisampler')].filter(o => m(o.name)).map(o => this.row(o)).join('');
+      h = [this.instItem('synth', 'Contour', 'Synth'), this.instItem('fm', 'Facet', 'FM synth'), this.instItem('wave', 'Morph', 'Wavetable synth'), this.instItem('epiano', 'Tine', 'Electric piano'), this.instItem('pluck', 'String', 'Plucked string model'), this.instItem('organ', 'Drawbar', 'Tonewheel organ'), this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Sampler'), this.instItem('multi', 'Zones', 'Multisampler')].filter(o => m(o.name)).map(o => this.row(o)).join('');
     } else if (sel === 'fx') {
       title = 'Audio Effects';
       h = q ? Object.keys(DEVICES).filter(k => !DEVICES[k].hidden && m(DEVICES[k].name + ' ' + DEVICES[k].blurb)).map(k => this.row(this.fxItem(k))).join('')
@@ -203,6 +206,8 @@ const browser = {
     const a = e.target.closest('[data-act]'); if (!a) return; const act = a.dataset.act;
     if (act === 'sort') { this.sortDesc = !this.sortDesc; this.renderList(); return; }
     if (act === 'inst') return addInstrumentTrack(a.dataset.val, null);
+    if (act === 'pack') { const id = (a.dataset.key || '').slice(5); if (!PACK_STATE.installed.has(id)) downloadPack(id); else toast(`${packInfo(id).name} is installed. Its instruments are in the folders below.`); return; }
+    if (act === 'sound') { const n = (a.dataset.key || '').slice(11); if (e.detail >= 2) { stopSoundPreview(); return addSound(n, null); } document.querySelectorAll('#blist .brow.sel').forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) previewSound(n); return; }
     if (act === 'fx') { const b = busById([...V.selTracks][0]); if (!b) return toast('Select a track first'); pushUndo('Add device'); b.devices.push(newDevice(a.dataset.val)); rewire(b); V.detail = V.detail === 'clip' ? 'both' : V.detail; ui.detail(); return; }
     if (act === 'dir') { this.stopPreview();
       const id = a.dataset.id, p = a.dataset.path;

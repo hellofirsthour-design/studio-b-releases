@@ -128,8 +128,10 @@ function bindHeaders() {
   box.addEventListener('dblclick', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id);
     if (hd.dataset.lane && e.target.closest('.hname')) { const lane = b.takes.find(l => l.id === hd.dataset.lane); return askText('Take name', lane.name, v => { pushUndo('Rename take'); lane.name = v; ui.headers(); }); }
-    if (e.target.closest('.hname')) askText('Track name', b.name, v => { pushUndo('Rename'); b.name = v; ui.headers(); ui.detail(); });
-    if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); }
+    if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); return; }
+    if (e.target.closest('input, select, button, .hio')) return;
+    // double-click a track: show or hide the clip and devices panel for it (rename is Ctrl+R or the right-click menu)
+    const shown = !$('#app').classList.contains('nodetail'); if (!shown || V.selTracks.has(b.id)) setDetailShown(!shown); V.selTracks = new Set([b.id]); if (!shown) V.detail = V.detail || 'devices'; ui.all();
   });
   box.addEventListener('contextmenu', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; e.preventDefault(); const b = busById(hd.dataset.id); const isT = S.tracks.includes(b);
@@ -155,7 +157,8 @@ function bindHeaders() {
 function duplicateTrack(t) { if (t.kind === 'group') return toast('Duplicate the tracks inside the group instead'); pushUndo('Duplicate track'); const c = deep(t); c.id = uid(); c.name = t.name + ' copy'; c.arm = false; const idMap = {}; c.devices.forEach(d => { const n = uid(); idMap[d.id] = n; d.id = n; }); const remap = k => k.replace(/^(dev|eqf|eqg):([^:]+)/, (m, kind, id) => `${kind}:${idMap[id] || id}`); c.auto = Object.fromEntries(Object.entries(c.auto).map(([k, v]) => [remap(k), v])); if (c.autoShow) c.autoShow = remap(c.autoShow); delete c.frozen; c.clips.forEach(k => (k.id = uid())); S.tracks.splice(S.tracks.indexOf(t) + 1, 0, c); buildBus(c, 'track'); V.selTracks = new Set([c.id]); ui.all(); }
 function deleteTrack(t) { pushUndo('Delete track'); if (t.kind === 'group') S.tracks.forEach(x => { if (x.group === t.id) x.group = t.group || null; }); removeBus(t); S.tracks = S.tracks.filter(x => x !== t); if (V.editClip && !clipById(V.editClip)) V.editClip = null; if (t.kind === 'group') rebuildAll(); applyAllMix(); ui.all(); }
 function addTrack(kind, instType) { pushUndo('Insert track'); const t = newTrack(kind, instType); const after = S.tracks.findIndex(x => V.selTracks.has(x.id)); S.tracks.splice(after >= 0 ? after + 1 : S.tracks.length, 0, t); buildBus(t, 'track'); V.selTracks = new Set([t.id]); ui.all(); return t; }
-function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler" or "synth:Preset"
+function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler", "synth:Preset" or "sound:Name"
+  if (spec.startsWith('sound:')) return addSound(spec.slice(6), onto);
   const [type, preset] = spec.split(':');
   if (onto) { pushUndo('Replace instrument'); removeBus(onto); onto.inst = newInst(type); if (preset) Object.assign(onto.inst, SYNTH_PRESETS[preset], { preset }); buildBus(onto, 'track'); V.selTracks = new Set([onto.id]); V.detail = 'devices'; ui.all(); return; }
   const t = addTrack('midi', type); if (preset) { Object.assign(t.inst, SYNTH_DEFAULT, SYNTH_PRESETS[preset], { preset }); t.name = preset; RT.get(t.id).inst.update(); }
@@ -319,3 +322,8 @@ function ioChange(b, h) {
   else return false;
   markDirty(); ui.headers(); if (V.view === 'mix') mixer.render(); return true;
 }
+
+/* sliders draw their filled run from --pct (see theme.css) */
+function syncRange(el) { const lo = +el.min || 0, hi = el.max === '' ? 100 : +el.max, v = +el.value; el.style.setProperty('--pct', ((v - lo) / ((hi - lo) || 1) * 100).toFixed(1) + '%'); }
+document.addEventListener('input', e => { if (e.target.type === 'range') syncRange(e.target); }, true);
+setInterval(() => document.querySelectorAll('input[type=range]').forEach(syncRange), 150);

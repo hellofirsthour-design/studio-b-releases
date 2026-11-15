@@ -61,10 +61,9 @@ async function neStart() {
   }
   NE.I[4] = r.outputs; NE.I[5] = Math.max(1, r.inputs);
   const opt = { sab: NE.sab, ring: NE.L.ring, header: NE.L.header, maxCh: NE.L.maxCh };
-  if (NE.outNode) try { NE.outNode.disconnect(); } catch (e) { }
+  neRetire();   // the previous device's nodes must stop writing into the shared buffer, or the device hears them all at once
   NE.outNode = new AudioWorkletNode(LIVE_CTX, 'gw-out', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: r.outputs, channelCountMode: 'explicit', channelInterpretation: 'discrete', processorOptions: opt });
   NE.keep = NE.keep || LIVE_CTX.createGain(); NE.keep.gain.value = 0; NE.outNode.connect(NE.keep); NE.keep.connect(LIVE_CTX.destination);   // keeps the worklet running
-  if (NE.inNode) try { NE.inNode.disconnect(); } catch (e) { }
   NE.inNode = r.inputs ? new AudioWorkletNode(LIVE_CTX, 'gw-in', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [r.inputs], processorOptions: opt }) : null;
   if (NE.inNode) NE.inNode.connect(NE.keep);
   try { if (LIVE_CTX.setSinkId) await LIVE_CTX.setSinkId({ type: 'none' }); } catch (e) { }
@@ -72,8 +71,9 @@ async function neStart() {
   NE.on = true; S.tracks.forEach(routeOut); connectInputs(); neSyncProject(); neTransport();
   return true;
 }
+function neRetire() { [NE.outNode, NE.inNode].forEach(n => { if (!n) return; try { n.port.postMessage('stop'); } catch (e) { } try { n.disconnect(); } catch (e) { } }); NE.outNode = NE.inNode = null; }
 async function neStop() {
-  NE.on = false; IO.native = false; IO.outCh = 2; IO.inCh = 0; ioWire();
+  neRetire(); NE.on = false; IO.native = false; IO.outCh = 2; IO.inCh = 0; ioWire();
   try { if (LIVE_CTX.setSinkId) await LIVE_CTX.setSinkId(GP.outId || ''); } catch (e) { }
   await NATIVE.engine.close(); S.tracks.forEach(routeOut); connectInputs();
 }

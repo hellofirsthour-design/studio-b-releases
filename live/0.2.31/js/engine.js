@@ -96,7 +96,7 @@ function buildBus(b, kind) {
 }
 // Feed each sidechained compressor from its source bus (post-fader).
 function wireSidechains() {
-  allBuses().forEach(b => b.devices.forEach(d => { if (d.type !== 'comp') return; const r = DEV_RT.get(d.id); if (!r || !r.sc) return;
+  allBuses().forEach(b => b.devices.forEach(d => { if (d.type !== 'comp' && d.type !== 'iron') return; const r = DEV_RT.get(d.id); if (!r || !r.sc) return;
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
@@ -261,7 +261,8 @@ function startAudio(t, c, pos, when) {
   g.gain.setValueAtTime(startsClip ? 0 : clipGainAt(c, pos, sp), w0);
   if (startsClip) g.gain.linearRampToValueAtTime(clipGainAt(c, Math.min(segEnd, pos + 0.01), sp), at(Math.min(segEnd, pos + 0.01)));
   const end = c.start + c.len;
-  const bps = [c.start - hin, sp.fin ? c.start - hin + sp.fin : c.start + c.fadeIn, sp.fout ? end + hout - sp.fout : end - c.fadeOut, end + hout];
+  const e4 = 0.004 * bpmAt(c.start) / 15; // hold full level until just before the end, then the short edge fade (or the clip's own fade)
+  const bps = [c.start - hin, sp.fin ? c.start - hin + sp.fin : c.start + c.fadeIn, sp.fout ? end + hout - sp.fout : end - c.fadeOut, end + hout, c.start - hin + e4, end + hout - e4];
   const regs = [[c.start - hin, bps[1]], [bps[2], end + hout]]; if ((c.xfShape && c.xfShape !== 'linear') || (c.fadeShape && c.fadeShape !== 'linear') || (sp.outShape && sp.outShape !== 'linear')) regs.forEach(([a0, b0]) => { for (let k = 1; k < 8; k++) bps.push(a0 + (b0 - a0) * k / 8); });
   bps.filter(p => p > pos + 0.01 && p < segEnd - 1e-6).sort((x, y) => x - y)
     .forEach(p => g.gain.linearRampToValueAtTime(clipGainAt(c, p, sp), at(p)));
@@ -354,6 +355,17 @@ function click(time, accent) {
 
 function unfreezeForTempo() { const fz = S.tracks.filter(t => t.frozen); if (!fz.length) return; fz.forEach(t => { delete t.frozen; rewire(t); applyMix(t); }); toast(`Unfroze ${fz.map(t => t.name).join(', ')} because the tempo changed. Freeze again to re-render.`, 5000); }
 /* ---------- transport ---------- */
+// Record: press it and the song starts recording (after the count-in, if one is set). Press it again to stop recording and keep playing.
+async function recordButton() {
+  if (T.rec) { T.rec = false; if (T.recording) finishRecording(); ui.transport(); return; }
+  if (!S.tracks.some(t => t.arm)) { const t = S.tracks.find(x => V.selTracks.has(x.id) && (x.kind === 'audio' || x.kind === 'midi')); if (t) await armTrack(t, true); }
+  T.rec = true; if (T.playing) startRecording(nowPos()); else play(V.insert);
+  ui.transport();
+}
+function countInMenu(at) {
+  const cur = (S.prefs && S.prefs.countIn) || 0;
+  popMenu(at, [[0, 'No count-in'], [1, '1 bar'], [2, '2 bars'], [4, '4 bars']].map(([v, l]) => ({ label: (v === cur ? '✓  ' : '    ') + l, run: () => { S.prefs = S.prefs || {}; S.prefs.countIn = v; markDirty(); ui.transport(); } })));
+}
 function play(from = V.insert) {
   if (isOffline() || T.busy) return;
   if (ctx.state !== 'running') ctx.resume();
@@ -367,6 +379,7 @@ function play(from = V.insert) {
 }
 function stop(silent) {
   if (isOffline()) return;
+  if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
   clearMidiFxQueues(); T.playing = false; stopSources(now);

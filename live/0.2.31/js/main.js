@@ -159,7 +159,7 @@ function bindKeys() {
       if (KEYMAP[k] != null) { e.preventDefault(); if (e.repeat) return; const ts = midiTargets('kb', 0); if (!ts.length) return; const off = KEYMAP[k]; ts.forEach(t => liveNoteOn(k + ':' + t.id, isPitched(t) ? KB.oct * 12 + 12 + off : off, KB.vel, t)); return; }
     }
     if (k === ' ') { e.preventDefault(); if (e.repeat) return; e.shiftKey ? (T.playing ? stop() : continuePlay()) : togglePlay(); return; }
-    if (e.key === 'F9') { e.preventDefault(); T.rec = !T.rec; if (T.rec) { if (T.playing) startRecording(nowPos()); else play(); } else if (T.recording) finishRecording(); ui.transport(); return; }
+    if (e.key === 'F9') { e.preventDefault(); recordButton(); return; }
     if (e.key === 'Home') { seek(0); V.scrollX = 0; return; }
     if (e.key === 'End') { seek(songEnd()); return; }
     if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); cmd('toggleDetail'); return; }
@@ -225,7 +225,7 @@ function bindBar() {
   $('#stop').onclick = () => { if (T.playing) stop(); else seek(0); };
   $('#capture').onclick = () => captureMidi();
   $('#midiOd').onclick = () => { V.midiOd = !V.midiOd; ui.transport(); toast(V.midiOd ? 'MIDI overdub on: recording adds notes to the clips already there' : 'MIDI overdub off: recording replaces, and keeps takes'); };
-  $('#rec').onclick = () => { T.rec = !T.rec; if (T.rec && T.playing) startRecording(nowPos()); if (!T.rec && T.recording) finishRecording(); ui.transport(); };
+  $('#rec').onclick = () => recordButton();
   $('#metro').onclick = () => { S.metro = !S.metro; ui.transport(); };
   $('#loopBtn').onclick = () => { S.loop.on = !S.loop.on; ui.transport(); arr.draw(); };
   $('#follow').onclick = () => cmd('toggleFollow');
@@ -245,7 +245,7 @@ function bindBar() {
   $('#bpm').onchange = e => setBpm(+e.target.value || S.bpm);
   $('#sig').onchange = e => { const m = String(e.target.value).match(/(\d+)\s*\/\s*(\d+)/); if (m) setSig(+m[1], +m[2]); else ui.transport(); };
   $('#sig').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); };
-  $('#countIn').onclick = () => { S.prefs = S.prefs || {}; const seq = [0, 1, 2, 4], i = seq.indexOf(S.prefs.countIn || 0); S.prefs.countIn = seq[(i + 1) % seq.length]; markDirty(); ui.transport(); toast(S.prefs.countIn ? `Count-in: ${S.prefs.countIn} bar${S.prefs.countIn > 1 ? 's' : ''}` : 'Count-in off'); };
+  $('#countIn').onclick = e => countInMenu(e.currentTarget); $('#countIn').oncontextmenu = e => { e.preventDefault(); countInMenu(e.currentTarget); };
   $('#punchIn').onclick = () => { S.punch = S.punch || {}; S.punch.in = !S.punch.in; markDirty(); ui.transport(); if (S.punch.in) toast('Punch in: recording starts at the loop start. Set the range with the loop brace.'); };
   $('#punchOut').onclick = () => { S.punch = S.punch || {}; S.punch.out = !S.punch.out; markDirty(); ui.transport(); if (S.punch.out) toast('Punch out: recording stops at the loop end.'); };
   $('#bpm').onwheel = e => { e.preventDefault(); setBpm(S.bpm - Math.sign(e.deltaY) * (e.shiftKey ? 0.1 : 1)); };
@@ -325,10 +325,11 @@ async function demoProject() {
 (async function boot() {
   await audioReady; PITCH_OK = PITCH_OK || false;
   ioInit(); S = emptyProject(); buildMaster(); rebuildAll();
-  arr.init(); bindHeaders(); bindBar(); bindKeys(); await browser.init();
+  arr.init(); bindHeaders(); bindBar(); bindKeys(); await packsInit(); await browser.init();
   const pending = IS_DESKTOP ? await NATIVE.pendingOpen() : null;
-  if (pending) await openPath(pending); else if (!(await offerRecovery())) await loadProjectObj(await demoProject());
-  V.selTracks = new Set([S.tracks[0].id]); ui.all(); V.dirty = false; ui.title();
+  // every launch starts a fresh set (your default set if you saved one); the demo song is on the New menu. Tests ask for the demo with ?demo.
+  if (pending) await openPath(pending); else if (!(await offerRecovery())) { if (/[?&]demo/.test(location.search)) await loadProjectObj(await demoProject()); else await newProject(); }
+  V.selTracks = new Set(S.tracks[0] ? [S.tracks[0].id] : []); ui.all(); V.dirty = false; ui.title();
   if (IS_DESKTOP) { NATIVE.onMenu(c => { const a = document.activeElement, txt = a && (a.tagName === 'INPUT' && a.type !== 'range' || a.tagName === 'TEXTAREA'); const ed = { copy: 'copy', cut: 'cut', paste: 'paste', selectAll: 'selectAll', undo: 'undo', redo: 'redo', delete: 'delete' }[c]; if (txt && ed) { document.execCommand(ed); return; } cmd(c); }); NATIVE.onOpenPath(p => confirmLeave(() => openPath(p))); if (NATIVE.onUpdate) { NATIVE.onUpdate(showUpdate); NATIVE.appInfo().then(i => i.update && showUpdate(i.update)); } }
   requestAnimationFrame(frame);
   const resume = () => { if (ctx.state !== 'running') ctx.resume(); }; document.addEventListener('pointerdown', resume, { once: true }); document.addEventListener('keydown', resume, { once: true });

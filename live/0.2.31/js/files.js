@@ -238,6 +238,7 @@ async function templateMenu(e) {
   const ts = await listTemplates();
   popMenu(e, [
     { label: 'New project', key: 'Ctrl+N', run: () => cmd('new') },
+    { label: 'Open the demo song', run: () => confirmLeave(async () => { await loadProjectObj(await demoProject()); V.dirty = false; ui.title(); }) },
     ...ts.map(t => ({ label: `New from template: ${t.name}`, run: () => confirmLeave(() => newFromTemplate(t)) })),
     '-',
     { label: 'Save as template…', run: () => askText('Template name', S.name || 'My template', v => v && saveTemplate(v)) },

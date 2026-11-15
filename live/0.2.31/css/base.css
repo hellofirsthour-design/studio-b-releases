@@ -1,15 +1,15 @@
 /* Studio B — one dark studio look. Layout: transport across the top; browser | arrangement; detail view below. */
 :root{
   color-scheme:dark;
-  --bg:#141318; --panel:#1c1b22; --panel2:#25232c; --raise:#2f2c37; --line:#36323f; --fg:#ece8f2; --dim:#8e889c; --faint:#5c5768;
+  --bg:#0e0f12; --panel:#15161a; --panel2:#1c1d22; --raise:#26282e; --line:#26282e; --line2:#34363d; --fg:#ebe8e2; --dim:#8d8f96; --faint:#5b5e66; --well:#090a0c;
   --accent:#f2b544; --play:#7fd796; --rec:#ff5d5d; --cue:#56c2d6;
-  --lane:#17161c; --laneRow:#1b1a20; --laneBus:#18171d; --laneSel:#22202a;
-  --gridBar:rgba(255,255,255,.2); --gridBeat:rgba(255,255,255,.085); --gridFine:rgba(255,255,255,.045); --gridHair:rgba(255,255,255,.022); --barAlt:rgba(255,255,255,.022);
+  --lane:#111215; --laneRow:#141518; --laneBus:#121316; --laneSel:#1a1b20;
+  --gridBar:rgba(255,255,255,.13); --gridBeat:rgba(255,255,255,.055); --gridFine:rgba(255,255,255,.03); --gridHair:rgba(255,255,255,.016); --barAlt:rgba(255,255,255,.016);
   --loopShade:rgba(242,181,68,.05); --loopOn:#f2b544; --loopOff:#4a4552; --timeSel:rgba(120,165,255,.34); --timeSelEdge:#9cc0ff; --marker:rgba(255,255,255,.35);
   --env:#ff8a5c; --envIdle:rgba(255,138,92,.45); --insert:#ece8f2; --playhead:#7fd796; --muted:#5d5866;
-  --spec:rgba(150,170,255,.16); --roll:#1a1920; --rowblack:#16151b; --rowscale:#23212b; --rowscaleb:#1e1c25;
+  --spec:rgba(150,170,255,.16); --roll:#131417; --rowblack:#0f1013; --rowscale:#1b1c21; --rowscaleb:#17181c;
   --gridf:rgba(255,255,255,.045); --gridm:rgba(255,255,255,.1); --gridb:rgba(255,255,255,.24);
-  --keyw:#d8d3e2; --keyb:#2a2832; --chance:#b6a3ff; --selbox:rgba(242,181,68,.12);
+  --keyw:#d9d6cf; --keyb:#202126; --chance:#b6a3ff; --selbox:rgba(242,181,68,.12);
   --ui:"Inter","Segoe UI",system-ui,-apple-system,sans-serif; --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
   --hdrW:228px; --browserW:380px;
 }
@@ -332,3 +332,5 @@ body.desktop .webonly{display:none!important}
 .colTogs{display:flex;gap:2px;margin-right:4px}
 .colTogs .ct{width:auto;min-width:22px;padding:0 4px;font:700 10px var(--mono);height:22px}
 .colTogs .ct.on{color:#16141a;background:var(--accent);border-color:var(--accent)}
+
+.bhint{padding:4px 10px 6px}

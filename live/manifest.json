@@ -1,8 +1,8 @@
 {
- "version": "0.2.30",
+ "version": "0.2.31",
  "shell": 3,
- "date": "2026-11-15T19:06:43.940Z",
- "notes": "Fix smeared sound after changing the audio output; record button; new look",
+ "date": "2026-11-15T19:08:21.543Z",
+ "notes": "App icon: an extended chrome \"B\"",
  "files": [
   {
    "path": "css/base.css",
@@ -16,13 +16,23 @@
   },
   {
    "path": "css/theme.css",
-   "size": 5179,
-   "sha256": "4da4c877743ea2037956374d979b708f997cef9ea04176a56a058e5c514bdf68"
+   "size": 5260,
+   "sha256": "849d2b5524f8159c7a61c4a792ac8eda427c0265ec744a63be39bf30aac06418"
+  },
+  {
+   "path": "img/icon.png",
+   "size": 322165,
+   "sha256": "dfb9857726e396f41efe36a571c4377b1f3e85ba417a84585aff37e3814f3875"
+  },
+  {
+   "path": "img/icon.svg",
+   "size": 2355,
+   "sha256": "e05ea2089c5a75a4d648e439b64a66ef106f6cbd699d2cbc24c651857ac270d3"
   },
   {
    "path": "index.html",
-   "size": 20588,
-   "sha256": "61b0b37f375a42d4fa1947426afdea49431ea710dc5cbcf36c0accc38c88fdd9"
+   "size": 20957,
+   "sha256": "39e5a245135ce4f2a0d5ea4ccd3d1ba75dd026a4983146e84c5654528a94d899"
   },
   {
    "path": "js/arrange.js",
@@ -212,7 +222,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "48ea27df113a71cf57a3f52d1f9903011ddfb0e981431098b9b472d35dec70ca"
+   "sha256": "183109b82e66fbb0622bb9983119a452cad86c208d8d446b3707ddf8e8274981"
   }
  ]
 }
