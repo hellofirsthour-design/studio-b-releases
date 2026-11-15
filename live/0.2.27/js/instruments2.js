@@ -40,7 +40,7 @@ class FMSynth extends PolyBase {
     car.frequency.value = f; mod.frequency.value = f * p.ratio; lp.type = 'lowpass'; lp.frequency.value = p.cutoff;
     const depth = p.index * f * p.ratio * (0.5 + vel * 0.5); mg.gain.setValueAtTime(depth, time); mg.gain.setTargetAtTime(depth * p.modSustain, time + 0.002, Math.max(0.005, p.modDecay / 3));
     mod.connect(mg); mg.connect(car.frequency); const srcs = [car, mod];
-    if (p.index2 > 0) { const m2 = ctx.createOscillator(), g2 = ctx.createGain(); m2.frequency.value = f * p.ratio2; const d2 = p.index2 * f * p.ratio2; g2.gain.setValueAtTime(d2, time); g2.gain.setTargetAtTime(0, time + 0.002, 0.03); m2.connect(g2); g2.connect(car.frequency); m2.start(time); srcs.push(m2); }
+    if (p.index2 > 0) { const m2 = ctx.createOscillator(), g2 = ctx.createGain(); m2.frequency.value = f * p.ratio2; const d2 = p.index2 * f * p.ratio2; g2.gain.setValueAtTime(d2, time); g2.gain.setTargetAtTime(0, time + 0.002, 0.03); m2.connect(g2); g2.connect(car.frequency); srcs.push(m2); }
     mpeBend([car.frequency], time, dur, mpe, f);
     car.connect(lp); lp.connect(amp); amp.connect(this.out); adsr(amp, time, p, vel, 0.6); srcs.forEach(s => s.start(time));
     return this.finish({ amp, srcs }, time, dur, rv);
@@ -132,3 +132,36 @@ function inst2Card(t) {
   body.appendChild(paramGrid(INST2_PARAMS[type], t.inst, () => { inst.update && inst.update(); markDirty(); }));
   return c;
 }
+
+/* ---------- Drawbar: a tonewheel-style organ ----------
+   Nine drawbars (16', 5 1/3', 8', 4', 2 2/3', 2', 1 3/5', 1 1/3', 1'), percussion on the 2nd or 3rd harmonic,
+   key click, drive, and a rotary speaker (amplitude and pitch wobble, slow or fast). */
+INST_NAMES.organ = 'Drawbar'; INST_BLURB.organ = 'Tonewheel organ';
+INST2_DEF.organ = () => ({ type: 'organ', d1: 8, d2: 8, d3: 8, d4: 0, d5: 0, d6: 0, d7: 0, d8: 0, d9: 0, perc: 'off', percDecay: 0.4, percLevel: 0.5, click: 0.3, drive: 0.15, rotary: 'slow', rotaryDepth: 0.5, tone: 7000, gain: 0.45 });
+INST2_PARAMS.organ = [{ group: 'Drawbars' }, ...[["d1", "16'"], ["d2", "5⅓'"], ["d3", "8'"], ["d4", "4'"], ["d5", "2⅔'"], ["d6", "2'"], ["d7", "1⅗'"], ["d8", "1⅓'"], ["d9", "1'"]].map(([k, l]) => K(k, l, 0, 8, { step: 1, fmt: v => String(v) })),
+  { group: 'Percussion and voice' }, SEL('perc', 'Percussion', ['off', '2nd', '3rd']), K('percDecay', 'Perc decay', 0.08, 1.5, { scale: 'log', fmt: SEC }), K('percLevel', 'Perc level', 0, 1, { fmt: fPct }), K('click', 'Key click', 0, 1, { fmt: fPct }), K('drive', 'Drive', 0, 1, { fmt: fPct }), SEL('rotary', 'Rotary', ['off', 'slow', 'fast']), K('rotaryDepth', 'Rotary depth', 0, 1, { fmt: fPct }), K('tone', 'Tone', 1500, 14000, { scale: 'log', fmt: fHz }), K('gain', 'Volume', 0, 1, { fmt: fPct })];
+const ORGAN_HARM = [1, 3, 2, 4, 6, 8, 10, 12, 16];   // drawbar pitches as harmonics of the 16' (an octave below the note)
+class Organ extends PolyBase {
+  constructor(t) {
+    super(t); this.lp = ctx.createBiquadFilter(); this.lp.type = 'lowpass'; this.ws = ctx.createWaveShaper(); this.rot = ctx.createGain(); this.dly = ctx.createDelay(0.02); this.dly.delayTime.value = 0.004;
+    this.lfo = ctx.createOscillator(); this.lfoA = ctx.createGain(); this.lfoD = ctx.createGain(); this.lfo.connect(this.lfoA); this.lfo.connect(this.lfoD); this.lfoA.connect(this.rot.gain); this.lfoD.connect(this.dly.delayTime); this.lfo.start();
+    this.bus = ctx.createGain(); this.bus.connect(this.lp); this.lp.connect(this.ws); this.ws.connect(this.dly); this.dly.connect(this.rot); this.rot.connect(this.out); this.update();
+  }
+  update() {
+    super.update(); if (!this.lfo) return; const p = this.t.inst, rate = p.rotary === 'fast' ? 6.7 : p.rotary === 'slow' ? 0.8 : 0, depth = rate ? p.rotaryDepth : 0;
+    this.lfo.frequency.setTargetAtTime(rate || 0.01, ctx.currentTime, p.rotary === 'fast' ? 0.6 : 1.2); this.lfoA.gain.value = depth * 0.22; this.rot.gain.value = 1 - depth * 0.22; this.lfoD.gain.value = depth * 0.0012;
+    this.lp.frequency.value = p.tone; const k = 1 + p.drive * 12, c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i / 255.5 - 1; c[i] = Math.tanh(k * x) / Math.tanh(k); } this.ws.curve = c;
+    const key = ORGAN_HARM.map((_, i) => p['d' + (i + 1)]).join(','); if (key !== this.wkey) { this.wkey = key; const n = 18, re = new Float32Array(n), im = new Float32Array(n); ORGAN_HARM.forEach((h, i) => (im[h] += (p['d' + (i + 1)] || 0) / 8)); this.wave = ctx.createPeriodicWave(re, im); }
+  }
+  relTime() { return 0.03; }
+  noteOn(note, time, vel, dur, rv, mpe) {
+    const p = this.t.inst, f = mtof(note) / 2, o = ctx.createOscillator(), amp = ctx.createGain(), srcs = [o]; o.setPeriodicWave(this.wave); o.frequency.value = f; o.connect(amp); amp.connect(this.bus);
+    amp.gain.setValueAtTime(0, time); amp.gain.linearRampToValueAtTime(0.32, time + 0.004);
+    if (p.perc !== 'off') { const po = ctx.createOscillator(), pg = ctx.createGain(); po.frequency.value = f * (p.perc === '2nd' ? 4 : 6); pg.gain.setValueAtTime(0.35 * p.percLevel, time); pg.gain.setTargetAtTime(0, time + 0.002, p.percDecay / 3); po.connect(pg); pg.connect(amp); srcs.push(po); }
+    if (p.click > 0) { const n = ctx.createBufferSource(), cg = ctx.createGain(), bp = ctx.createBiquadFilter(); n.buffer = noiseBuffer(); bp.type = 'bandpass'; bp.frequency.value = 2500; cg.gain.setValueAtTime(p.click * 0.25, time); cg.gain.setTargetAtTime(0, time, 0.004); n.connect(bp); bp.connect(cg); cg.connect(this.bus); n.start(time, Math.random()); n.stop(time + 0.05); }
+    mpeBend([o.frequency], time, dur, mpe, f);
+    srcs.forEach(s => s.start(time)); return this.finish({ amp, srcs }, time, dur, rv);
+  }
+  dispose() { try { this.lfo.stop(); } catch (e) { } }
+}
+INST2_CLS.organ = Organ;

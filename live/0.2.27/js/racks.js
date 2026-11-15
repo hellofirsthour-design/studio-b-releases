@@ -19,7 +19,7 @@ class RackDev extends Base {
   set() {
     const p = this.d.p, solo = p.chains.some(c => c.solo);
     this.nodes.forEach(n => { const on = !n.ch.mute && (!solo || n.ch.solo); sm(n.out.gain, on ? n.ch.vol : 0); sm(n.pan.pan, n.ch.pan || 0); });
-    (p.map || []).forEach(m => { const t = findDevice(m.dev, rackDevices(this.d)); if (!t) return; const v = m.min + (m.max - m.min) * (p['m' + m.m] || 0), def = (DEVICES[t.type].params || []).find(q => q.k === m.k);
+    (p.map || []).forEach(m => { const t = findDevice(m.dev, rackDevices(this.d)); if (!t) return; const v = m.min + (m.max - m.min) * (p['m' + m.m] || 0), def = devParamDefs(t).find(q => q.k === m.k);
       const val = def && def.step ? Math.round(v / def.step) * def.step : v; if (t.p[m.k] !== val) { t.p[m.k] = val; devRT(t).set(); } });
   }
   dispose() { super.dispose(); this.nodes.forEach(n => { try { n.inp.disconnect(); n.out.disconnect(); n.pan.disconnect(); } catch (e) { } }); rackDevices(this.d).forEach(x => { const r = DEV_RT.get(x.id); if (r) { r.dispose(); DEV_RT.delete(x.id); } }); }
@@ -82,7 +82,7 @@ function rackView(body, o, d, r) {
 }
 function macroMenu(e, o, d, i) {
   const p = d.p, items = [];
-  rackDevices(d).forEach(x => (DEVICES[x.type].params || []).filter(q => q.min != null).forEach(q => {
+  rackDevices(d).forEach(x => devParamDefs(x).filter(q => q.min != null).forEach(q => {
     const on = (p.map || []).some(m => m.m === i && m.dev === x.id && m.k === q.k);
     items.push({ label: `${on ? '✓ ' : ''}${DEVICES[x.type].name}: ${q.label}`, run: () => { pushUndo('Macro mapping'); p.map = p.map || []; if (on) p.map = p.map.filter(m => !(m.m === i && m.dev === x.id && m.k === q.k)); else { p.map = p.map.filter(m => !(m.dev === x.id && m.k === q.k)); p.map.push({ m: i, dev: x.id, k: q.k, min: q.min, max: q.max }); p['m' + i] = clamp((x.p[q.k] - q.min) / (q.max - q.min || 1), 0, 1); } DEV_RT.get(d.id) && DEV_RT.get(d.id).set(); markDirty(); ui.detail(); } });
   }));

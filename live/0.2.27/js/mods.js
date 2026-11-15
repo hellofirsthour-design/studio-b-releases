@@ -23,7 +23,7 @@ function modTargets(b, self) {
   if (b.inst && b.inst.type === 'synth') ['cutoff', 'res', 'detune', 'mix2', 'noise'].forEach(k => out.push({ key: 'inst:' + k, label: 'Contour: ' + k }));
   const walk = (list, pre) => list.forEach(d => { if (d === self || MOD_TYPES.has(d.type) || d.type === 'plugin') return; const def = DEVICES[d.type];
     if (d.type === 'rack') { MACROS.forEach(i => out.push({ key: `dev:${d.id}:m${i}`, label: `${pre}${def.name}: ${d.p.names[i - 1]}` })); d.p.chains.forEach(ch => walk(ch.devices, `${pre}${ch.name} › `)); return; }
-    (def.params || []).filter(q => q.min != null && !(NO_MOD[d.type] || []).includes(q.k)).forEach(q => out.push({ key: `dev:${d.id}:${q.k}`, label: `${pre}${def.name}: ${q.label}` })); });
+    devParamDefs(d).filter(q => q.min != null && !(NO_MOD[d.type] || []).includes(q.k)).forEach(q => out.push({ key: `dev:${d.id}:${q.k}`, label: `${pre}${def.name}: ${q.label}` })); });
   walk(b.devices, ''); return out;
 }
 function modValue(d, r, time, pos) {
@@ -51,8 +51,8 @@ function applyMod(b, key, v) {
   if (key === 'pan' && rt) { sm(rt.pan.pan, clamp((b.pan || 0) + v, -1, 1)); return; }
   if (key.startsWith('inst:') && rt && rt.inst) { const k = key.slice(5), base = b.inst[k], rng = { cutoff: [40, 16000, 'log'], res: [0.3, 20], detune: [0, 50], mix2: [0, 1], noise: [0, 1] }[k]; if (!rng || base == null) return;
     const val = rng[2] === 'log' ? clamp(base * Math.pow(rng[1] / rng[0], v * 0.5), rng[0], rng[1]) : clamp(base + v * (rng[1] - rng[0]) / 2, rng[0], rng[1]); (rt.inst.modulate || (() => { }))(k, val); return; }
-  const [, id, k] = key.split(':'), t = findDevice(id, b.devices); if (!t) return; const def = (DEVICES[t.type].params || []).find(q => q.k === k); if (!def) return;
-  const base = t.p[k], val = def.scale === 'log' ? clamp(base * Math.pow(def.max / def.min, v * 0.5), def.min, def.max) : clamp(base + v * (def.max - def.min) / 2, def.min, def.max);
+  const [, id, k] = key.split(':'), t = findDevice(id, b.devices); if (!t) return; const def = devParamDefs(t).find(q => q.k === k); if (!def) return;
+  const base = t.p[k] != null ? t.p[k] : (((t.p.params || []).find(q => 'pp' + q.index === k) || {}).def || 0), val = def.scale === 'log' ? clamp(base * Math.pow(def.max / def.min, v * 0.5), def.min, def.max) : clamp(base + v * (def.max - def.min) / 2, def.min, def.max);
   const r = devRT(t); t.p[k] = val; r.set(); t.p[k] = base;
 }
 function runModulators(time, pos) {
@@ -61,7 +61,7 @@ function runModulators(time, pos) {
     const r = DEV_RT.get(d.id); if (!r) return; const v = modValue(d, r, time, pos); r.v = v; if (d.p.target) applyMod(b, d.p.target, v); }); walk(b.devices); });
 }
 // keep modulating while the transport is stopped (playback drives it from the scheduler)
-setInterval(() => { if (!S || T.playing || T.busy || isOffline()) return; runModulators(LIVE_CTX.currentTime, null); }, 40);
+setInterval(() => { if (typeof S === 'undefined' || !S || T.playing || T.busy || isOffline()) return; runModulators(LIVE_CTX.currentTime, null); }, 40);
 
 /* ---------- card ---------- */
 function modView(body, o, d, r, changed) {

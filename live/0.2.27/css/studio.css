@@ -101,3 +101,11 @@
 .empty-state{padding:24px;max-width:560px} .empty-state h3{margin:0 0 6px;font-size:15px} .empty-state p{color:var(--dim);margin:0 0 12px}
 #roll{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
 .kgroup{display:grid;gap:2px}
+
+.pcols{display:flex;gap:0;align-items:stretch}
+.pcol{padding:0 10px;border-left:1px solid var(--line);min-width:96px}
+.pcol:first-child{border-left:0;padding-left:0}
+.pcol .pgrid{max-width:150px}
+.pcol.main .pgrid{max-width:150px}
+.pcol .pgroup{border-top:0;padding-top:0;margin-top:0;color:var(--text)}
+.pcol.dim .pgrid>*:not(.pgroup):not(.tog){opacity:.4}

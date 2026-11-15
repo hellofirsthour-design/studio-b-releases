@@ -1,38 +1,38 @@
 {
- "version": "0.2.26",
+ "version": "0.2.27",
  "shell": 3,
- "date": "2026-11-14T20:13:02.118Z",
- "notes": "MIDI effects (Arpeggiator, Chord, Scale, Note Length, Random, Velocity, Pitch) on clips and live input; track header I/O column (MIDI From and channel, Audio From and channel, monitor, Audio To), sends, mixer and delay columns with I/O R M D toggles; per-track MIDI input routing; one-row toolbar with a fixed grid menu and engine CPU; file buttons removed on desktop (menu and shortcuts), templates in the browser",
+ "date": "2026-11-15T04:00:33.497Z",
+ "notes": "Add a 187-sound library, the Drawbar organ and Patina; fix FM render hang",
  "files": [
   {
    "path": "css/base.css",
-   "size": 29348,
-   "sha256": "bd449bfd9df4bb9f8371dcf377b8ef413e2ca1f4f89a8e7411391e0244b25e4d"
+   "size": 29378,
+   "sha256": "226d1044485ab734d3693f8fdea91b4270b6d7ee8d9136d6308dc64fb3da9a85"
   },
   {
    "path": "css/studio.css",
-   "size": 9082,
-   "sha256": "b5897859f4d98df3c22c6de9e6fc02b2c2e4aa1c45af8cc08f0c95709aaac004"
+   "size": 9441,
+   "sha256": "1b4d369ea7c7628da2f8d6f281fe55bddb099becc12b2d77992d6a50bc2ba681"
   },
   {
    "path": "index.html",
-   "size": 20245,
-   "sha256": "9477586938f61344e314c75736cae9709b1314fa13e20d6ba620ba12fe27fe1c"
+   "size": 20321,
+   "sha256": "9bf9026c7c95d4f91011ba580d827c29013ab812298cc495ff2820b587a399b1"
   },
   {
    "path": "js/arrange.js",
-   "size": 49854,
-   "sha256": "d8c93dbfe7b86e8ad746b250e32dfbce62cf22abc20277e9d5b45f3da731d2df"
+   "size": 49918,
+   "sha256": "eb7a8f5658b617e847e5a52434fbed2eba85b6e7f0464505ef2a2a502af4b155"
   },
   {
    "path": "js/browser.js",
-   "size": 32588,
-   "sha256": "18344c78938fe5aafcf637359a6a2e14f76515e858557f62e1943198e70365bf"
+   "size": 33668,
+   "sha256": "654b900b99ba3bd3865bfc4409e6180398d6580aa98b167cc03ae55e59a99594"
   },
   {
    "path": "js/cards.js",
-   "size": 37959,
-   "sha256": "05e29a89dbc9d713075d630683ec4928e73f518757053a5cbc57074033cefb70"
+   "size": 38697,
+   "sha256": "f378a4805240ca13a23af0b94720ca94c072b7cd64584a37e663e49126d5c179"
   },
   {
    "path": "js/convert.js",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/core.js",
-   "size": 19324,
-   "sha256": "61e5b094db5cb41c0393e6e48b11db5e9a7c6ff3f7f67d142125897bedbdc0c3"
+   "size": 20106,
+   "sha256": "2b70fa40fbcf5c11e2518996ddd2867f49709b9f98bf028ebb89bfcb99cc75da"
   },
   {
    "path": "js/devices.js",
@@ -53,6 +53,11 @@
    "path": "js/dsp.js",
    "size": 13395,
    "sha256": "dcd81f751209424e68a9fce5db19c86d759ffaeac4497e5a8ba8d38dbef12134"
+  },
+  {
+   "path": "js/effects2.js",
+   "size": 9704,
+   "sha256": "7571c8030f7e49d1a4f309f7fb812bf090562e776d168070c7ecf39e3ee46a0d"
   },
   {
    "path": "js/engine-worker.js",
@@ -91,13 +96,13 @@
   },
   {
    "path": "js/instruments2.js",
-   "size": 17810,
-   "sha256": "4fd4ea62ecd91f2c42058cb08bf9585883e5ecf19c41ac93fbf3389495e201b0"
+   "size": 22104,
+   "sha256": "9946135b2c686d8d3c4d35a02706c7cadb02dfc2677796ea746d820b12b57fbf"
   },
   {
    "path": "js/io.js",
-   "size": 46285,
-   "sha256": "898ee47ae9443bc8da718de51452d6f11e1956198a9643f9d5f455de4b47ad7b"
+   "size": 46404,
+   "sha256": "c36b795b18bb8c478a0ec2f2f33f7c44fb89462d7fa5b8dbbede201032a9091a"
   },
   {
    "path": "js/main.js",
@@ -150,14 +155,19 @@
    "sha256": "a996fd38d1847122cfdf4df23a1d8731247a4118324ea30d65b30f03a10e2924"
   },
   {
+   "path": "js/sounds.js",
+   "size": 34653,
+   "sha256": "19f878ff2bc822867cb4e6399a8c59c65767880faa28d3dc9f538c53df4c516d"
+  },
+  {
    "path": "js/timeline.js",
    "size": 5116,
    "sha256": "e34e60a252210717d15b8e516d38de2ecd14ee7c7a43128810111311ad5eaa67"
   },
   {
    "path": "js/ui.js",
-   "size": 43797,
-   "sha256": "887c08827dd6d772bff1d670a5015ca0166d307323eac2f1491e7b3224868124"
+   "size": 43882,
+   "sha256": "b1084412525a1b85213f3ac1b86aafa29a79302bbce994c34204fdd210387076"
   },
   {
    "path": "js/warp.js",
@@ -177,7 +187,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "24c5022600d135627f24f307d5a3581adb973476fb367e8d9e51b99f8f0ebb11"
+   "sha256": "4ebce59de3be6ebe8c0fb72d1f53e75ad36e8168f1e938fb8ba9e3ecee80633e"
   }
  ]
 }
