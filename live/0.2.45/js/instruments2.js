@@ -113,7 +113,6 @@ function rootFromName(name) { const m = String(name).match(/(?:^|[^A-Za-z])([A-G
 function spreadZones(inst) { const zs = [...inst.zones].sort((a, b) => a.root - b.root); zs.forEach((z, i) => { z.lo = i ? Math.floor((zs[i - 1].root + z.root) / 2) + 1 : 0; z.hi = i < zs.length - 1 ? Math.floor((z.root + zs[i + 1].root) / 2) : 127; }); inst.zones = zs; }
 function inst2Card(t) {
   const type = t.inst.type, c = cardShell(INST_NAMES[type], INST_BLURB[type], { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }), body = $('.cb', c), inst = RT.get(t.id).inst;
-  const tip = document.createElement('p'); tip.className = 'muted small'; tip.textContent = 'Play it from your computer keyboard (M turns it on) or a MIDI controller.'; body.appendChild(tip);
   if (type === 'spectra') {
     const row = document.createElement('div'); row.className = 'row tight';
     row.innerHTML = ['A', 'B'].map(L => `<button class="btn ghostb tiny" data-spl="${L}">Load layer ${L}…</button><span class="muted small">${esc((SAMPLES.get(t.inst['sid' + L]) || {}).name || 'empty')}</span>`).join('');

@@ -208,7 +208,7 @@ const browser = {
     if (act === 'inst') return addInstrumentTrack(a.dataset.val, null);
     if (act === 'pack') { const id = (a.dataset.key || '').slice(5); if (!PACK_STATE.installed.has(id)) downloadPack(id); else toast(`${packInfo(id).name} is installed. Its instruments are in the folders below.`); return; }
     if (act === 'sound') { const n = (a.dataset.key || '').slice(11); if (e.detail >= 2) { stopSoundPreview(); return addSound(n, null); } document.querySelectorAll('#blist .brow.sel').forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) previewSound(n); return; }
-    if (act === 'fx') { const b = busById([...V.selTracks][0]); if (!b) return toast('Select a track first'); pushUndo('Add device'); b.devices.push(newDevice(a.dataset.val)); rewire(b); V.detail = V.detail === 'clip' ? 'both' : V.detail; ui.detail(); return; }
+    if (act === 'fx') { const b = busById([...V.selTracks][0]); if (!b) return toast('Select a track first'); pushUndo('Add device'); b.devices.push(newDevice(a.dataset.val)); rewire(b); V.detail = 'devices'; ui.detail(); return; }
     if (act === 'dir') { this.stopPreview();
       const id = a.dataset.id, p = a.dataset.path;
       if (this.expanded.has(id)) { this.expanded.delete(id); if (id.startsWith('open:') || id.startsWith('sqroot:')) this.expanded.add('closed:' + id); }

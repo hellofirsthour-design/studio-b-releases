@@ -23,7 +23,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .muted{color:var(--dim)} .small{font-size:11px} .spacer{flex:1} .lab{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
 
-#app{height:100%;display:grid;grid-template-columns:var(--browserW) minmax(0,1fr);grid-template-rows:auto minmax(120px,1fr) 5px var(--detailH,300px);grid-template-areas:"bar bar" "browser arr" "split split" "detail detail";gap:0}
+#app{height:100%;display:grid;grid-template-columns:var(--browserW) minmax(0,1fr);grid-template-rows:auto minmax(120px,1fr) 5px var(--detailH,300px) 22px;grid-template-areas:"bar bar" "browser arr" "split split" "detail detail" "status status";gap:0}
 #app.nobrowser{grid-template-columns:0 minmax(0,1fr)} #app.nobrowser #browser{display:none}
 #bar{grid-area:bar;display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
 #browser{grid-area:browser;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
@@ -298,7 +298,7 @@ body.map-midi [data-mapped]::after,body.map-key [data-mapped]::after{content:att
 
 .grvamt{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px}.grvamt input{flex:1}.grvamt b{font-family:var(--mono);min-width:38px;text-align:right}
 
-#app.nodetail{grid-template-rows:auto minmax(120px,1fr) 16px 0}
+#app.nodetail{grid-template-rows:auto minmax(120px,1fr) 16px 0 22px}
 #app.nodetail #detail{display:none}
 #app.nodetail #split{cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--panel);border-top:1px solid var(--line)}
 #app.nodetail #split::after{content:"▴  Clip · Devices";font:600 10px var(--ui);color:var(--dim);letter-spacing:.04em}

@@ -1,8 +1,8 @@
 {
- "version": "0.2.44",
+ "version": "0.2.45",
  "shell": 4,
- "date": "2026-11-15T22:47:29.763Z",
- "notes": "Fix double-click on tracks; Escape closes windows; a real-mouse bug sweep",
+ "date": "2026-11-15T23:07:25.252Z",
+ "notes": "Devices without inner scrolling, compact drum pads, separate clip/device views",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 9825,
-   "sha256": "3ea999e7ae2904dfb946aeefbd0f40c73c2e9d87ba306eb5a87a40255cd90982"
+   "size": 11017,
+   "sha256": "0cd10368c95c62094f457e75ed12261271a2fe481cdbdd27722777fea6390772"
   },
   {
    "path": "img/b-mark.svg",
@@ -36,23 +36,23 @@
   },
   {
    "path": "index.html",
-   "size": 24484,
-   "sha256": "f4277f42ad1b48d4b6e8510e7cae6978eb584f235a69a3df810cb0e24bbcc09d"
+   "size": 24449,
+   "sha256": "c65740355c912383768ef0a21760a10899106bbf7cbd08be7f7a4ce42e629b41"
   },
   {
    "path": "js/arrange.js",
-   "size": 50085,
-   "sha256": "226698a26f14c3f9a634a6bd857fce2fcbbe57d351e513fd724214e144224e2f"
+   "size": 50381,
+   "sha256": "aba02d4ee0a99817e40d823ace7b2c25a0589f2ee6c4191bdd784a2ffae63000"
   },
   {
    "path": "js/browser.js",
-   "size": 34279,
-   "sha256": "32774f59bcb2590f920ed1f8104860367012460ffc5cc0e985d6f4127514070e"
+   "size": 34249,
+   "sha256": "ceb17fcfb81e4914381bf7b97ac5147bc37685337cc3574e19f6b05001c13351"
   },
   {
    "path": "js/cards.js",
-   "size": 41168,
-   "sha256": "b9fbad2472410b53496d48f83d015cbf35c1611ad7606fca1278c812bf7b7c28"
+   "size": 41893,
+   "sha256": "3f6b4dbc542f5a24ef3cf3ae2ea138a6f8a42d02239b0ada69be94fced46c866"
   },
   {
    "path": "js/convert.js",
@@ -151,8 +151,8 @@
   },
   {
    "path": "js/midifx.js",
-   "size": 11988,
-   "sha256": "5816e3274ef5b3e7e362318b41d8538867e801cb8909b9c3c33a645e2c1dd3f4"
+   "size": 11958,
+   "sha256": "f3a50035ef26cc9ea12b3398e60462e4be5e81517606c1c7813735e12bfefd45"
   },
   {
    "path": "js/mixer.js",
@@ -181,8 +181,8 @@
   },
   {
    "path": "js/plugins.js",
-   "size": 8666,
-   "sha256": "0dda99c363541555c62bca07868280fdd46fc6c7f2ddeae285518ecdc4243d52"
+   "size": 8636,
+   "sha256": "4d13f162565944c0782d5057b5ca7d2cf2abd58f4ec141e3ad3fb67326baf33e"
   },
   {
    "path": "js/prefs.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 48555,
-   "sha256": "37e3a320510b2d70ce8eb9a4b1629fda6829901a9b96d97fc7f0661838f3baa1"
+   "size": 49292,
+   "sha256": "4cecb167d9200f10f2e0ce4a8b10ff0856ea2021fdd800852b1731fead7a32e8"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "4c196320a75dfc06f695034c5745035b279cb4c02bcd67d968ece1b42fad57ad"
+   "sha256": "3afbae03614a3bbc9c2d0e60c576d29b07ec4a741f793225d096eb4ec1913ef3"
   }
  ]
 }
