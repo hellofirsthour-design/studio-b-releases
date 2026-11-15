@@ -1,8 +1,8 @@
 {
- "version": "0.2.37",
+ "version": "0.2.38",
  "shell": 3,
- "date": "2026-11-15T19:57:34.848Z",
- "notes": "Ember (analog poly) and Vast (wavetable) instruments",
+ "date": "2026-11-15T20:09:35.919Z",
+ "notes": "Stop devices' oscillators on rebuild; release offline render processors",
  "files": [
   {
    "path": "css/base.css",
@@ -56,13 +56,13 @@
   },
   {
    "path": "js/core.js",
-   "size": 20509,
-   "sha256": "0e316bebdeb29b8ac7f28605c14a600bdb5aa88a41241e9a15e4b93d446ab604"
+   "size": 21305,
+   "sha256": "e826c21d820f603d81b2322403f098e2047a681489f36900be53f8af29fab36e"
   },
   {
    "path": "js/devices.js",
-   "size": 31363,
-   "sha256": "fce618852c52a1a99257557a667befa9878a2b68e369bd50b8afc0711701c2a3"
+   "size": 32086,
+   "sha256": "5d36b260fe0e44efa853fe0fb0761450d68d4b09fe7be317169ccd96cb441ac3"
   },
   {
    "path": "js/dsp.js",
@@ -116,8 +116,8 @@
   },
   {
    "path": "js/instruments2.js",
-   "size": 22192,
-   "sha256": "230a1c590301fa013ac26bc96d31c60520358b98d5b93eab5372adef0501bf12"
+   "size": 22258,
+   "sha256": "07699bd32f6057a96223d8ffa13d6e08d84f466cad027832604b02bd8c8eafa2"
   },
   {
    "path": "js/instruments3.js",
@@ -126,8 +126,8 @@
   },
   {
    "path": "js/io.js",
-   "size": 46404,
-   "sha256": "c36b795b18bb8c478a0ec2f2f33f7c44fb89462d7fa5b8dbbede201032a9091a"
+   "size": 46425,
+   "sha256": "ff0cbb86d606c99fe18322b7213687dfd4a66bcee90aee6717c27b53f110940d"
   },
   {
    "path": "js/main.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/worklets2.js",
-   "size": 22834,
-   "sha256": "453f1107bc584638c867c50ff48ab14c6d7de374259c505c73b40de8a7d68047"
+   "size": 23137,
+   "sha256": "f33731204cce01b34e9c607b8efe478e22e62a851ad3a23c8792d555f6d6ad4f"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -237,7 +237,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "529579b243401ea39d99ee531ba1299238c99e86c60344d997d74a144f351d0a"
+   "sha256": "86407a271a6bc8e0c892eb6a06a55766e7d137b98ed7c17b9c30be31ec6b3db6"
   }
  ]
 }

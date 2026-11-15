@@ -149,11 +149,14 @@ function devLatency(d) { // seconds this device delays its signal
   if (!d.on) return 0;
   if (d.type === 'plugin') { const s = NE.on && NE.slots.get(d.id); if (!s) return 0; return (NE.lag * 128 + (s.ready ? (NE.I[neSlotBase(s.slot) + 6] | 0) : 0)) / sr0(); }
   if (d.type === 'rack') return Math.max(0, ...d.p.chains.map(c => c.devices.reduce((a, x) => a + devLatency(x), 0)));
+  if (d.type === 'eq' && d.p.linear) return (EQ_FIR_N / 2) / sr0();
+  if (d.type === 'apex') return Math.round(sr0() * 0.0015) / sr0();
   return 0;
 }
 function busLatency(b) { let l = b.devices.reduce((a, d) => a + devLatency(d), 0); if (b.inst && b.inst.type === 'plugin' && NE.on) { const s = NE.slots.get('inst:' + b.id); if (s) l += (NE.lag * 128 + (s.ready ? NE.I[neSlotBase(s.slot) + 6] | 0 : 0)) / sr0(); } return l; }
 // Tracks are delayed so every path reaches the main output at the same moment; returns are lined up the same way.
 function applyPDC() {
+  if (isOffline() || T.busy) return schedulePDC();   // never touch the mix in the middle of a render; try again when it is done
   const on = GP.pdc !== false; const path = t => busLatency(t) + ancestors(t).reduce((a, g) => a + busLatency(g), 0);
   const leaves = S.tracks.filter(t => t.kind !== 'group'), maxT = on ? Math.max(0, ...leaves.map(path)) : 0, maxR = on ? Math.max(0, ...S.returns.map(busLatency)) : 0;
   S.tracks.forEach(t => (t._pdc = on && t.kind !== 'group' ? maxT - path(t) : 0));

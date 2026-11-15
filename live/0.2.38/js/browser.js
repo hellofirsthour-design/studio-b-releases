@@ -20,7 +20,7 @@ const ICON = {
   phones: '<path d="M3 10V8a5 5 0 0 1 10 0v2"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/>',
 };
 const ico = (k, cls = '') => `<svg class="bico ${cls}" viewBox="0 0 16 16" aria-hidden="true">${ICON[k] || ICON.file}</svg>`;
-const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat', 'patina', 'punch']], ['Dynamics', ['comp', 'iron', 'bands', 'lift', 'apex', 'limit', 'gate', 'rider', 'deess', 'breath']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb', 'orbit']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
+const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay', 'taps', 'half']], ['Drive & Color', ['sat', 'patina', 'punch']], ['Dynamics', ['comp', 'iron', 'bands', 'lift', 'apex', 'limit', 'gate', 'rider', 'deess', 'breath']], ['EQ & Filters', ['eq', 'console', 'lowend', 'filter']], ['Channel Strips', ['strip']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan', 'motion']], ['Reverb & Resonance', ['verb', 'spaces', 'orbit']], ['Utilities', ['utility', 'stereo', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
 const SOUND_FOLDERS = [['Bass', ['Sub Bass', 'Reese']], ['Keys', ['Keys']], ['Lead', ['Saw Lead']], ['Pad', ['Warm Pad']], ['Pluck', ['Pluck']]];
 const DEFAULT_COLLECTIONS = [['Favorites', '#ff5d5d'], ['Orange', '#ff9a3c'], ['Yellow', '#f2d544'], ['Green', '#6fdc8c'], ['Blue', '#4ea3ff'], ['Purple', '#b18cff'], ['Gray', '#a7a3b8']];
 const DRUM_WORDS = /kick|snare|clap|hat|hh|perc|tom|rim|cymbal|crash|ride|808|shaker|snap|drum|bd|sd/i;
@@ -71,9 +71,9 @@ const browser = {
     return `<div class="brow ${o.cls || ''}" style="padding-left:${pad + 14}px" draggable="${o.drag ? 'true' : 'false'}" ${o.drag ? `data-drag="${o.drag}" data-val='${esc(o.val)}'` : ''} data-act="${o.act || ''}" data-key="${esc(o.key || '')}" ${o.path ? `data-path="${esc(o.path)}"` : ''} ${o.sid ? `data-sid="${o.sid}"` : ''} ${o.file ? `data-file="${o.file}"` : ''} title="${esc(o.title || '')}">${ico(o.icon || 'file')}<b>${esc(o.name)}</b>${tagDots}${o.meta ? `<span class="bmeta">${esc(o.meta)}</span>` : ''}</div>`;
   },
   // building blocks for each category
-  fxItem(k) { const v = DEVICES[k]; return { name: v.name, meta: v.blurb, drag: 'sb/device', val: k, act: 'fx', key: 'fx:' + k, icon: 'fx', title: 'Click to add to the selected track, or drag onto a track' }; },
-  soundItem(s) { const inst = INST_NAMES[s.inst.type] || 'Kit'; return { name: s.name, meta: inst, drag: 'sb/inst', val: 'sound:' + s.name, act: 'sound', key: 'inst:sound:' + s.name, icon: s.cat === 'Drum Kits' ? 'drums' : 'sounds', title: 'Click to hear it, double-click or drag onto the arrangement to load it' }; },
-  instItem(v, name, meta) { return { name, meta, drag: 'sb/inst', val: v, act: 'inst', key: 'inst:' + v, icon: v.startsWith('drums') ? 'drums' : 'instruments', title: 'Click to add a track, or drag onto a MIDI track' }; },
+  fxItem(k) { const v = DEVICES[k]; return { name: v.name, drag: 'sb/device', val: k, act: 'fx', key: 'fx:' + k, icon: 'fx', title: v.blurb + '. Click to add to the selected track, or drag onto a track' }; },
+  soundItem(s) { const inst = INST_NAMES[s.inst.type] || 'Kit'; return { name: s.name, drag: 'sb/inst', val: 'sound:' + s.name, act: 'sound', key: 'inst:sound:' + s.name, icon: s.cat === 'Drum Kits' ? 'drums' : 'sounds', title: 'Click to hear it, double-click or drag onto the arrangement to load it' }; },
+  instItem(v, name, meta) { return { name, drag: 'sb/inst', val: v, act: 'inst', key: 'inst:' + v, icon: v.startsWith('drums') ? 'drums' : 'instruments', title: (meta ? meta + '. ' : '') + 'Click to add a track, or drag onto a MIDI track' }; },
   fileItem(f) { const isSet = /\.(als|sbproj)$/i.test(f.name); return isSet ? { name: f.name, path: f.path, act: 'openSet', key: 'file:' + f.path, icon: 'set', meta: /\.als$/i.test(f.name) ? 'Live Set' : 'Project', title: 'Double-click to open' } : { name: f.name, path: f.path, file: f.fileId, drag: 'sb/sample', val: JSON.stringify(f.fileId ? { fileId: f.fileId } : { path: f.path }), act: 'prev', key: 'file:' + (f.path || f.fileId), icon: 'file' }; },
   folderRows(id, name, path, depth, filter) {
     const out = [this.row({ dir: true, id, name, path }, depth)];
@@ -114,13 +114,13 @@ const browser = {
       if (IS_DESKTOP) { const hits = this.q ? this.searchHits(f => DRUM_WORDS.test(f.path)) : this.roots().flatMap(r => (this.index.get(r.path) || []).filter(f => DRUM_WORDS.test(f.name))).slice(0, 300); this.roots().forEach(r => this.ensureIndex(r.path)); h += this.staticFolderOpen('Drum samples in your folders', hits.map(f => this.fileItem(f))); }
     } else if (sel === 'instruments') {
       title = 'Instruments';
-      h = [this.instItem('synth', 'Contour', 'Synth'), this.instItem('fm', 'Facet', 'FM synth'), this.instItem('wave', 'Morph', 'Wavetable synth'), this.instItem('epiano', 'Tine', 'Electric piano'), this.instItem('pluck', 'String', 'Plucked string model'), this.instItem('organ', 'Drawbar', 'Tonewheel organ'), this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Sampler'), this.instItem('multi', 'Zones', 'Multisampler')].filter(o => m(o.name)).map(o => this.row(o)).join('');
+      h = [this.instItem('synth', 'Contour', 'Synth'), this.instItem('analog', 'Ember', 'Analog poly synth'), this.instItem('vast', 'Vast', 'Wavetable synth, two oscillators'), this.instItem('fm', 'Facet', 'FM synth'), this.instItem('wave', 'Morph', 'Wavetable synth'), this.instItem('epiano', 'Tine', 'Electric piano'), this.instItem('pluck', 'String', 'Plucked string model'), this.instItem('organ', 'Drawbar', 'Tonewheel organ'), this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Sampler'), this.instItem('multi', 'Zones', 'Multisampler')].filter(o => m(o.name)).map(o => this.row(o)).join('');
     } else if (sel === 'fx') {
       title = 'Audio Effects';
       h = q ? Object.keys(DEVICES).filter(k => !DEVICES[k].hidden && m(DEVICES[k].name + ' ' + DEVICES[k].blurb)).map(k => this.row(this.fxItem(k))).join('')
         : FX_FOLDERS.map(([f, ks]) => this.staticFolder('fx:' + f, f, ks.map(k => this.fxItem(k)))).join('');
     } else if (sel === 'midifx') {
-      title = 'MIDI Effects'; h = Object.entries(MIDIFX).filter(([, v]) => m(v.name)).map(([k, v]) => this.row({ name: v.name, meta: v.blurb, drag: 'sb/midifx', val: k, act: 'midifx', key: 'midifx:' + k, icon: 'midifx', title: 'Click to add to the selected MIDI track, or drag onto one' })).join('');
+      title = 'MIDI Effects'; h = Object.entries(MIDIFX).filter(([, v]) => m(v.name)).map(([k, v]) => this.row({ name: v.name, title: v.blurb, drag: 'sb/midifx', val: k, act: 'midifx', key: 'midifx:' + k, icon: 'midifx', title: 'Click to add to the selected MIDI track, or drag onto one' })).join('');
     } else if (sel === 'plugins') {
       title = 'Plug-Ins';
       const pi = x => ({ name: x.name, meta: `${x.vendor ? x.vendor + ' · ' : ''}${x.format}`, drag: 'sb/plugin', val: JSON.stringify({ ref: refOf(x), instrument: !!x.instrument }), act: 'plugin', key: 'plug:' + x.format + x.uid, icon: x.instrument ? 'instruments' : 'plugins', title: x.instrument ? 'Click for a new MIDI track with this instrument, or drag onto a MIDI track' : 'Click to add to the selected track, or drag onto a track' });

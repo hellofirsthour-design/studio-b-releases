@@ -1,13 +1,22 @@
 /* ============ audio effects ============ */
 const sm = (param, v, t = 0.015) => param.setTargetAtTime(v, ctx.currentTime, t);
+// Stop every source a device or instrument started and disconnect every node it owns, so a rebuilt graph leaves nothing running behind.
+const RELEASE_SKIP = new Set(['scSrc']);   // nodes a device only borrows (another track's output)
+function releaseNodes(o) { Object.entries(o).forEach(([k, v]) => { if (RELEASE_SKIP.has(k)) return; const list = Array.isArray(v) ? v : [v]; list.forEach(n => { if (n instanceof AudioScheduledSourceNode) { try { n.stop(); } catch (e) { } } if (n instanceof AudioNode) { try { n.disconnect(); } catch (e) { } if (n.port) { try { n.port.onmessage = null; } catch (e) { } } } else if (n && typeof n === 'object' && !Array.isArray(v) && n.constructor === Object && Object.values(n).some(x => x instanceof AudioNode)) releaseNodes(n); }); }); }
 class Base {
   constructor(d) { this.d = d; this.input = ctx.createGain(); this.output = ctx.createGain(); }
   wetDry() { this.dry = ctx.createGain(); this.wet = ctx.createGain(); this.input.connect(this.dry); this.dry.connect(this.output); this.wet.connect(this.output); }
   mix(m) { sm(this.dry.gain, Math.cos(m * Math.PI / 2)); sm(this.wet.gain, Math.sin(m * Math.PI / 2)); }
-  onTempo() { } dispose() { try { this.input.disconnect(); this.output.disconnect(); } catch (e) { } }
+  onTempo() { } dispose() { releaseNodes(this); }
 }
 
 /* --- Prism EQ: 8-band parametric with analyzer --- */
+const EQ_FIR_N = 4096;
+function fft(re, im, inverse) { // in place, radix 2
+  const n = re.length; for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= n; len <<= 1) { const a = (inverse ? 2 : -2) * Math.PI / len, wr = Math.cos(a), wi = Math.sin(a);
+    for (let i = 0; i < n; i += len) { let cr = 1, ci = 0; for (let j = 0; j < len / 2; j++) { const ur = re[i + j], ui = im[i + j], k = i + j + len / 2, vr = re[k] * cr - im[k] * ci, vi = re[k] * ci + im[k] * cr; re[i + j] = ur + vr; im[i + j] = ui + vi; re[k] = ur - vr; im[k] = ui - vi; const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t; } } }
+}
 const EQ_TYPES = { bell: 'peaking', 'low shelf': 'lowshelf', 'high shelf': 'highshelf', 'low cut': 'highpass', 'high cut': 'lowpass', notch: 'notch', 'band pass': 'bandpass' };
 class EQDev extends Base {
   constructor(d) {
@@ -15,7 +24,7 @@ class EQDev extends Base {
     this.an = ctx.createAnalyser(); this.an.fftSize = 4096; this.an.smoothingTimeConstant = 0.8; this.post.connect(this.an);
     this.bandF = []; this.sig = ''; this.rebuild();
   }
-  sigOf() { return this.d.p.bands.map(b => [b.on, b.type, b.slope].join()).join('|'); }
+  sigOf() { return (this.d.p.linear ? 'L|' : '') + this.d.p.bands.map(b => [b.on, b.type, b.slope].join()).join('|'); }
   rebuild() {
     try { this.input.disconnect(); } catch (e) { }
     this.bandF.flat().forEach(f => f.disconnect()); this.bandF = [];
@@ -24,11 +33,14 @@ class EQDev extends Base {
       const arr = [];
       if (b.on) {
         const cut = b.type === 'low cut' || b.type === 'high cut', n = cut ? b.slope / 12 : 1;
-        for (let i = 0; i < n; i++) { const f = ctx.createBiquadFilter(); f.type = EQ_TYPES[b.type]; prev.connect(f); prev = f; arr.push(f); }
+        for (let i = 0; i < n; i++) { const f = ctx.createBiquadFilter(); f.type = EQ_TYPES[b.type]; if (!this.d.p.linear) { prev.connect(f); prev = f; } arr.push(f); }
       }
       this.bandF.push(arr);
     }
-    prev.connect(this.post); this.sig = this.sigOf(); this.apply(true);
+    if (this.conv) { try { this.conv.disconnect(); } catch (e) { } this.conv = null; }
+    if (this.d.p.linear) { this.conv = ctx.createConvolver(); this.conv.normalize = false; this.input.connect(this.conv); this.conv.connect(this.post); }
+    else prev.connect(this.post);
+    const was = this.sig; this.sig = this.sigOf(); this.apply(true); if (this.d.p.linear) this.makeFIR(); if (was && (was[0] === 'L') !== !!this.d.p.linear && !isOffline()) schedulePDC();
   }
   apply(now) {
     this.d.p.bands.forEach((b, i) => (this.bandF[i] || []).forEach(f => {
@@ -38,7 +50,15 @@ class EQDev extends Base {
     }));
     sm(this.post.gain, dbToGain(this.d.p.out));
   }
-  set() { if (this.sigOf() !== this.sig) this.rebuild(); else this.apply(); }
+  set() { if (this.sigOf() !== this.sig) this.rebuild(); else if (this.d.p.linear) { this.apply(true); clearTimeout(this._firT); this._firT = setTimeout(() => this.makeFIR(), 60); } else this.apply(); }
+  // Linear phase: one symmetric filter with the same curve and no phase shift. It delays the signal by half its length; delay compensation lines everything else up.
+  makeFIR() {
+    if (!this.conv) return; const c = this.conv.context, N = EQ_FIR_N, half = N / 2, sr = c.sampleRate, fr = new Float32Array(half + 1); for (let k = 0; k <= half; k++) fr[k] = Math.max(1, k * sr / N);
+    const mag = this.response(fr), re = new Float64Array(N), im = new Float64Array(N); for (let k = 0; k <= half; k++) { re[k] = mag[k]; if (k && k < half) re[N - k] = mag[k]; }
+    fft(re, im, true); const ir = c.createBuffer(2, N, sr), h = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const j = (i + half) % N, w = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)) + 0.08 * Math.cos(4 * Math.PI * i / (N - 1)); h[i] = re[j] / N * w; }
+    ir.copyToChannel(h, 0); ir.copyToChannel(h, 1); this.conv.buffer = ir;
+  }
   response(freqs) {
     const mag = new Float32Array(freqs.length).fill(1), tmp = new Float32Array(freqs.length), ph = new Float32Array(freqs.length);
     this.bandF.flat().forEach(f => { f.getFrequencyResponse(freqs, tmp, ph); for (let i = 0; i < mag.length; i++) mag[i] *= tmp[i]; });

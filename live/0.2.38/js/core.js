@@ -73,6 +73,11 @@ GP._bootBuffer = GP.buffer || null;
 function saveGP() { try { const o = { ...GP }; delete o._bootBuffer; localStorage.setItem('sb-prefs', JSON.stringify(o)); } catch (e) { } }
 let ctx = (() => { const AC = window.AudioContext || window.webkitAudioContext, sr = GP.sr || undefined; try { return new AC({ latencyHint: GP.buffer ? GP.buffer / (sr || 48000) : 'interactive', sampleRate: sr }); } catch (e) { return new AC({ latencyHint: 'interactive' }); } })();
 const LIVE_CTX = ctx;
+// Processors made for an offline render are listed so the render can close their message ports when it finishes;
+// an open port keeps the whole finished render (graph, buffers, worklet thread) alive.
+const OFF_NODES = new Map();
+if (window.AudioWorkletNode) { const AWN = window.AudioWorkletNode; window.AudioWorkletNode = class extends AWN { constructor(c, n, o) { super(c, n, o); if (c !== LIVE_CTX) { if (!OFF_NODES.has(c)) OFF_NODES.set(c, []); OFF_NODES.get(c).push(this); } } }; }
+function releaseOffline(c) { (OFF_NODES.get(c) || []).forEach(n => { try { n.port.onmessage = null; n.port.close(); } catch (e) { } try { n.disconnect(); } catch (e) { } }); OFF_NODES.delete(c); }
 function setCtx(c) { ctx = c; }
 const isOffline = () => ctx !== LIVE_CTX;
 let PITCH_OK = false;
@@ -285,11 +290,12 @@ class GWPlug extends AudioWorkletProcessor {  // one plug-in slot: send each blo
 }
 registerProcessor('gw-plug', GWPlug);
 `;
+let WORKLET_URL = null;
 const WORKLET_DONE = new WeakSet();
 async function loadWorklets(c) {
   if (WORKLET_DONE.has(c)) return true;
   try {
-    try { await c.audioWorklet.addModule(URL.createObjectURL(new Blob([PITCH_WORKLET + (typeof DYN_WORKLET === 'string' ? DYN_WORKLET : '')], { type: 'application/javascript' }))); }
+    try { WORKLET_URL = WORKLET_URL || URL.createObjectURL(new Blob([PITCH_WORKLET + (typeof DYN_WORKLET === 'string' ? DYN_WORKLET : '')], { type: 'application/javascript' })); await c.audioWorklet.addModule(WORKLET_URL); }   // one copy of the code for every context
     catch (e1) { await c.audioWorklet.addModule('data:application/javascript;charset=utf-8,' + encodeURIComponent(PITCH_WORKLET + (typeof DYN_WORKLET === 'string' ? DYN_WORKLET : ''))); }
     WORKLET_DONE.add(c); return true;
   } catch (e) { console.warn('worklets', e && e.message); return false; }

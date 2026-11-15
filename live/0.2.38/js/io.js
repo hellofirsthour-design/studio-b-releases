@@ -90,7 +90,7 @@ async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = 
   } finally {
     S.loop.on = loopWas; T.render = null; T.playing = false; T.srcs = []; setCtx(live); Object.assign(T, saved);
     if (NE.on) { NE.slots.forEach(s => Atomics.store(NE.I, neSlotBase(s.slot) + 5, 0)); await neRenderEnd(); }
-    buildMaster(); rebuildAll(); applyAllMix(); T.busy = false; document.body.classList.remove('busy');
+    buildMaster(); rebuildAll(); applyAllMix(); releaseOffline(off); T.busy = false; document.body.classList.remove('busy');
   }
 }
 // Silence everything except one bus. For a return, tracks still feed its send but not the main output.

@@ -224,11 +224,12 @@ registerProcessor('gw-shift', GWShift);
 class GWGrain extends AudioWorkletProcessor {
   constructor() {
     super(); Object.assign(this, { time: 0.375, size: 0.09, density: 18, scatter: 0.06, fb: 0.35, octave: 0.2, reverse: 0.15 });
-    this.N = 1 << 18; this.buf = [new Float32Array(this.N), new Float32Array(this.N)]; this.w = 0; this.acc = 0; this.g = []; this.last = [0, 0];
+    this.N = 1 << 18; this.buf = null; this.w = 0; this.acc = 0; this.g = []; this.last = [0, 0];
     this.port.onmessage = e => Object.assign(this, e.data);
   }
   process(inputs, outputs) {
     const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    if (!this.buf) this.buf = [new Float32Array(this.N), new Float32Array(this.N)];
     const n = out[0].length, m = this.N - 1, sr = sampleRate, norm = 1 / Math.sqrt(Math.max(1, this.density * this.size));
     for (let i = 0; i < n; i++) {
       for (let c = 0; c < 2; c++) { const src = inp && (inp[c] || inp[0]); this.buf[c][this.w & m] = (src ? src[i] : 0) + this.last[c] * this.fb; }
@@ -252,4 +253,57 @@ class GWGrain extends AudioWorkletProcessor {
   }
 }
 registerProcessor('gw-grain', GWGrain);
+
+// Sub-octave: flips the sign of the (low-passed) input on every other upward zero crossing, which halves its frequency; the input's own envelope keeps it musical.
+class GWSub extends AudioWorkletProcessor {
+  constructor() { super(); this.f = 120; this.st = [[0, 0], [0, 0]]; this.prev = 0; this.flip = 1; this.cnt = 0; this.env = 0; this.k = biq('lp', this.f); this.port.onmessage = e => { Object.assign(this, e.data); this.k = biq('lp', this.f); }; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    const n = out[0].length, eC = coef(8);
+    for (let i = 0; i < n; i++) {
+      const a = inp && inp[0] ? inp[0][i] : 0, b = inp && (inp[1] || inp[0]) ? (inp[1] || inp[0])[i] : a;
+      const x = run(this.k, this.st[1], run(this.k, this.st[0], (a + b) * 0.5)), ax = Math.abs(x);
+      this.env = ax > this.env ? ax + (this.env - ax) * coef(1) : ax + (this.env - ax) * eC;
+      if (this.prev <= 0 && x > 0) this.flip = -this.flip;   // one flip per cycle: a square at half the frequency
+      this.prev = x; const y = this.flip * this.env;
+      for (let c = 0; c < out.length; c++) out[c][i] = y;
+    }
+    return true;
+  }
+}
+registerProcessor('gw-sub', GWSub);
+
+// Half time: inside each window (a beat, half a bar or a bar, locked to the song) play the window's first half at half speed.
+// 'tape' drops the pitch an octave like a slowed record; 'keep' stretches with overlapping grains so the pitch stays.
+class GWHalf extends AudioWorkletProcessor {
+  constructor() { super(); Object.assign(this, { win: 8, mode: 'tape', mix: 1, on: false, t0: 0, p0: 0, bpm: 120 }); this.N = 1 << 20; this.buf = null; /* allocated on first use */ this.frame = 0; this.port.onmessage = e => Object.assign(this, e.data); }
+  read(c, p) { const i = Math.floor(p), f = p - i, m = this.N - 1, b = this.buf[c]; return b[i & m] * (1 - f) + b[(i + 1) & m] * f; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    if (!this.on && !this.buf) { const src = inputs[0]; for (let c = 0; c < out.length; c++) out[c].set(src && (src[c] || src[0]) ? (src[c] || src[0]) : new Float32Array(out[c].length)); return true; }
+    if (!this.buf) this.buf = [new Float32Array(this.N), new Float32Array(this.N)];
+    const n = out[0].length, sps = sampleRate * 15 / this.bpm, W = this.win * sps, G = 2048, m = this.N - 1, fade = sampleRate * 0.004;
+    for (let i = 0; i < n; i++) {
+      const fr = this.frame, xs = [];
+      for (let c = 0; c < 2; c++) { const src = inp && (inp[c] || inp[0]); const x = src ? src[i] : 0; xs.push(x); this.buf[c][fr & m] = x; }
+      let ys = xs;
+      if (this.on) {
+        const pos = this.p0 + ((currentTime + i / sampleRate) - this.t0) * this.bpm / 15, into = ((pos % this.win) + this.win) % this.win, k = into * sps, ws = fr - k;   // frames since the window began
+        if (k >= 0 && ws >= fr - this.N + 4) {
+          const edge = Math.min(1, k / fade, (W - k) / fade);
+          if (this.mode === 'tape') ys = [0, 1].map(c => this.read(c, ws + k / 2) * edge);
+          else { // keep pitch: two grains, each replaying from the half-speed position, crossfaded
+            // a grain that started g samples ago began reading at the half-speed position of that moment and has read g samples since
+            const pa = (k % G) / G, pb = (pa + 0.5) % 1, at = g => ws + (k - g) / 2 + g;
+            ys = [0, 1].map(c => (this.read(c, Math.min(fr - 1, at(pa * G))) * Math.sin(Math.PI * pa) + this.read(c, Math.min(fr - 1, at(pb * G))) * Math.sin(Math.PI * pb)) * edge);
+          }
+        }
+      }
+      for (let c = 0; c < out.length; c++) out[c][i] = ys[c ? 1 : 0] * this.mix + xs[c ? 1 : 0] * (1 - this.mix);
+      this.frame++;
+    }
+    return true;
+  }
+}
+registerProcessor('gw-half', GWHalf);
 `;
