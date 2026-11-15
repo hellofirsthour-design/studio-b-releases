@@ -39,6 +39,14 @@ function toggleEl(label, on, onChange) {
   b.onclick = () => { on = !on; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); onChange(on); }; return b;
 }
 function paramGrid(defs, obj, onChange, mapPre) {
+  // grouped parameters become sections side by side (Oscillators | Filter | Amp ...), each filling its columns top to bottom
+  if (defs.some(d => d.group) && defs.length > 1) {
+    const box = document.createElement('div'); box.className = 'pgrid psecs'; let cur = null, sec = null;
+    const open = name => { sec = document.createElement('div'); sec.className = 'psec'; if (name) { const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = name; sec.appendChild(h); } cur = []; sec._defs = cur; box.appendChild(sec); };
+    defs.forEach(d => { if (d.group) open(d.group); else { if (!sec) open(null); cur.push(d); } });
+    [...box.children].forEach(s => s.appendChild(paramGrid(s._defs, obj, onChange, mapPre)));
+    return box;
+  }
   const g = document.createElement('div'); g.className = 'pgrid';
   for (const d of defs) {
     if (d.group) { const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = d.group; g.appendChild(h); continue; }
@@ -115,6 +123,7 @@ function deviceCard(o, d, i) {
   c.addEventListener('drop', e => { const f = e.dataTransfer.getData('gw/dev'); if (f === '') return; e.preventDefault(); const [x] = o.devices.splice(+f, 1); o.devices.splice(i, 0, x); rewire(o); ui.detail(); markDirty(); });
   c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [...(o._rack ? [] : d.type === 'rack' ? [{ label: 'Ungroup rack (keeps the selected chain)', run: () => ungroupRack(o, i) }] : [{ label: 'Group into a rack', key: 'Ctrl+G', run: () => groupIntoRack(o, i) }]), { label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
   if (d.type === 'plugin') { plugBody(body, o, d.id, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`); return c; }
+  devScreen(body, d, r);   // live screen for dynamics, reverbs and modulators
   if (d.type === 'rack') { rackView(body, o, d, r); return c; }
   if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (def.cols) { // one column per section, side by side (Patina)
@@ -266,7 +275,6 @@ function instrumentCard_(t) {
     const c = cardShell('Contour', 'Synth', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
     const top = document.createElement('div'); top.className = 'row';
     top.appendChild(selectEl(['Init', ...Object.keys(SYNTH_PRESETS)], t.inst.preset, v => { Object.assign(t.inst, SYNTH_DEFAULT, SYNTH_PRESETS[v] || {}, { preset: v }); inst.update(); ui.detail(); markDirty(); }, 'Preset'));
-    const tip = document.createElement('span'); tip.className = 'muted'; tip.textContent = 'Play it from your computer keyboard: A W S E D F T G Y H U J K. Z and X change octave.'; top.appendChild(tip);
     body.appendChild(top);
     const W = ['sine', 'triangle', 'sawtooth', 'square'];
     const defs = [{ group: 'Oscillators' }, SEL('wave1', 'Osc 1', W), SEL('wave2', 'Osc 2', W), K('oct2', 'Osc 2 oct', -2, 2, { step: 1, fmt: v => (v > 0 ? '+' : '') + v }), K('detune', 'Detune', 0, 50, { fmt: v => v.toFixed(0) + 'c' }), K('mix2', 'Osc 2 level', 0, 1, { fmt: fPct }), K('sub', 'Sub', 0, 1, { fmt: fPct }), K('noise', 'Noise', 0, 0.5, { fmt: fPct }),

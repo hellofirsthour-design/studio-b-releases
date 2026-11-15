@@ -1,8 +1,8 @@
 {
- "version": "0.2.42",
+ "version": "0.2.43",
  "shell": 4,
- "date": "2026-11-15T21:40:46.861Z",
- "notes": "Device screens, a help and status bar, denser track headers",
+ "date": "2026-11-15T22:00:54.595Z",
+ "notes": "Device chain like Ableton: one row, every device fits the panel height",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 7772,
-   "sha256": "16e3d9962fa6564da9af446933114688e2a201907c123b398843a49287f18cfd"
+   "size": 9825,
+   "sha256": "3ea999e7ae2904dfb946aeefbd0f40c73c2e9d87ba306eb5a87a40255cd90982"
   },
   {
    "path": "img/b-mark.svg",
@@ -51,8 +51,8 @@
   },
   {
    "path": "js/cards.js",
-   "size": 40612,
-   "sha256": "4cb1b93e069dd2f394e3050696a81e1ac9f8b95a05786eba079e5fcc62839a37"
+   "size": 41168,
+   "sha256": "b9fbad2472410b53496d48f83d015cbf35c1611ad7606fca1278c812bf7b7c28"
   },
   {
    "path": "js/convert.js",
@@ -121,8 +121,8 @@
   },
   {
    "path": "js/instruments2.js",
-   "size": 22982,
-   "sha256": "94b7381814c3753fb9b411b62e04a192752df5fb2df7d28899e30ceeb3c12b59"
+   "size": 22790,
+   "sha256": "1f67371d8776e1099a7d56358ac99b2cd434f04cb15897c58cf8d074bcb7a6ca"
   },
   {
    "path": "js/instruments3.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 46582,
-   "sha256": "c5fd4254ba094e761b65e89cb79ff71bafac01b32968598b0fbcb5a6f91c45d7"
+   "size": 47985,
+   "sha256": "d7ac0fd8c15d01cff023a60673d40b5e33d55e3cf9bcbc0961b37461515b8aba"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "8788ebccf3c213413ccacff4cfc075415cc111850e0521424148e68f30ea0d5c"
+   "sha256": "b5714df4e5a1c6676817d614f5757dedb06ea883a67bfca7c96194341aa3b685"
   }
  ]
 }

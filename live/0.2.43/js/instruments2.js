@@ -113,7 +113,12 @@ function rootFromName(name) { const m = String(name).match(/(?:^|[^A-Za-z])([A-G
 function spreadZones(inst) { const zs = [...inst.zones].sort((a, b) => a.root - b.root); zs.forEach((z, i) => { z.lo = i ? Math.floor((zs[i - 1].root + z.root) / 2) + 1 : 0; z.hi = i < zs.length - 1 ? Math.floor((z.root + zs[i + 1].root) / 2) : 127; }); inst.zones = zs; }
 function inst2Card(t) {
   const type = t.inst.type, c = cardShell(INST_NAMES[type], INST_BLURB[type], { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }), body = $('.cb', c), inst = RT.get(t.id).inst;
-  const tip = document.createElement('p'); tip.className = 'muted small'; tip.textContent = 'Play it from your computer keyboard (M turns it on) or a MIDI controller.'; body.appendChild(tip);
+  if (type === 'spectra') {
+    const row = document.createElement('div'); row.className = 'row tight';
+    row.innerHTML = ['A', 'B'].map(L => `<button class="btn ghostb tiny" data-spl="${L}">Load layer ${L}…</button><span class="muted small">${esc((SAMPLES.get(t.inst['sid' + L]) || {}).name || 'empty')}</span>`).join('');
+    row.onclick = async e => { const b = e.target.closest('[data-spl]'); if (!b) return; const fs = await pickFile('audio', 'audio/*', false); if (!fs.length) return; const sid = await loadAudioFile(fs[0]); if (!sid) return; pushUndo('Spectra sample'); t.inst['sid' + b.dataset.spl] = sid; t.inst.root = rootFromName(fs[0].name) || 60; markDirty(); ui.detail(); };
+    body.appendChild(row);
+  }
   if (type === 'multi') {
     const zl = document.createElement('div'); zl.className = 'zones';
     zl.innerHTML = (t.inst.zones.length ? t.inst.zones.map((z, i) => `<div class="zone"><b>${esc((SAMPLES.get(z.sampleId) || {}).name || 'Missing sample')}</b><label>Root <input type="number" min="0" max="127" value="${z.root}" data-zk="root" data-zi="${i}"></label><span class="muted">${noteName(z.lo)}–${noteName(z.hi)}</span><label>Vel <input type="number" min="0" max="127" value="${z.vlo || 0}" data-zk="vlo" data-zi="${i}">–<input type="number" min="0" max="127" value="${z.vhi == null ? 127 : z.vhi}" data-zk="vhi" data-zi="${i}"></label><button class="hb" data-zdel="${i}" title="Remove zone">✕</button></div>`).join('') : '<p class="muted">Drop samples here from the browser or your desktop. Each one becomes a zone; a note name in the file name (like "Piano C3") sets its root.</p>') +

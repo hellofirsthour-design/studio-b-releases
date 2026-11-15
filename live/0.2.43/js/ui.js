@@ -32,6 +32,7 @@ const ui = {
           ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
           : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${INST_NAMES[b.inst.type]}</span>` : ''}
               <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" data-map="${b.id}|vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
+          ${r.h >= 58 && !V.autoMode && V.showM && r.kind !== 'take' ? hdrChips(b, isT) : ''}
           ${r.h >= 86 && !V.autoMode && V.showM ? `<div class="hrow hsm"><span class="lab">Pan</span><input type="range" class="hpan" min="-1" max="1" step="0.01" value="${b.pan || 0}" data-h="pan" aria-label="Pan">${isT && !V.showR ? `<span class="lab">A</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendA}" data-h="sendA" aria-label="Send A"><span class="lab">B</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendB}" data-h="sendB" aria-label="Send B">` : ''}</div>` : ''}
         </div>
         ${V.showIO && !b.collapsed ? ioColumn(r) : ''}${V.showR && !b.collapsed ? sendsColumn(r) : ''}${V.showD && !b.collapsed ? delayColumn(r) : ''}
@@ -57,11 +58,16 @@ const ui = {
     const rack = document.createElement('div'); rack.className = 'rack'; pane.appendChild(rack);
     if (o.kind === 'midi') { (o.midifx || []).forEach((f, i) => rack.appendChild(midiFxCard(o, f, i))); rack.appendChild(instrumentCard(o)); }
     o.devices.forEach((d, i) => rack.appendChild(deviceCard(o, d, i)));
-    const add = document.createElement('div'); add.className = 'card addcard';
-    add.innerHTML = `<div class="ch"><span class="cname">Add effect</span></div><div class="addlist">${Object.entries(DEVICES).filter(([, v]) => !v.hidden).map(([k, v]) => `<button data-dev="${k}"><b>${v.name}</b><span>${v.blurb}</span></button>`).join('')}</div>`;
-    add.onclick = e => { const b = e.target.closest('[data-dev]'); if (!b) return; pushUndo('Add device'); o.devices.push(newDevice(b.dataset.dev)); rewire(o); ui.devices(); rack.scrollLeft = rack.scrollWidth; };
+    // the end of the chain: drop effects here, or pick one from the + menu (by category, like the browser)
+    const add = document.createElement('div'); add.className = 'dropzone'; add.title = 'Drop audio effects here, or click + to pick one';
+    add.innerHTML = '<button class="dzadd" aria-label="Add an effect">+</button><span>Drop audio effects here</span>';
+    const addFx = k => { pushUndo('Add device'); o.devices.push(newDevice(k)); rewire(o); ui.devices(); const r2 = $('#pane-dev .rack'); if (r2) r2.scrollLeft = r2.scrollWidth; };
+    add.querySelector('.dzadd').onclick = e => popMenu(e, FX_FOLDERS.map(([f, ks]) => ({ label: f + '  ›', run: () => popMenu(e, ks.filter(k => DEVICES[k]).map(k => ({ label: DEVICES[k].name, run: () => addFx(k) }))) })));
     rack.appendChild(add);
-    rack.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('sb/device')) e.preventDefault(); });
+    rack.querySelectorAll(':scope > .card').forEach(rackify);
+    fitRack(); if (!pane._ro) { pane._ro = new ResizeObserver(() => fitRack()); pane._ro.observe(pane); }
+    rack.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('sb/device')) { e.preventDefault(); add.classList.add('over'); } });
+    rack.addEventListener('dragleave', e => { if (!rack.contains(e.relatedTarget)) add.classList.remove('over'); });
     rack.addEventListener('drop', e => { const d = e.dataTransfer.getData('sb/device'); if (!d) return; e.preventDefault(); pushUndo('Add device'); o.devices.push(newDevice(d)); rewire(o); ui.devices(); });
   },
 };
@@ -100,6 +106,7 @@ function bindHeaders() {
   box.addEventListener('click', async e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id);
     switch (h.dataset.h) {
+      case 'chip': V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = V.detail === 'clip' ? 'both' : (V.detail || 'devices'); ui.all(); return;
       case 'mute': b.mute = !b.mute; break;
       case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; break;
       case 'arm': { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); break; }
@@ -328,3 +335,28 @@ function ioChange(b, h) {
 function syncRange(el) { const lo = +el.min || 0, hi = el.max === '' ? 100 : +el.max, v = +el.value; el.style.setProperty('--pct', ((v - lo) / ((hi - lo) || 1) * 100).toFixed(1) + '%'); }
 document.addEventListener('input', e => { if (e.target.type === 'range') syncRange(e.target); }, true);
 setInterval(() => document.querySelectorAll('input[type=range]').forEach(syncRange), 150);
+
+/* a compact line in each header: where the track's sound comes from and goes, and its device chain */
+function ioSummary(b, isT) {
+  const out = b.out === 'none' ? 'No output' : extParse(b.out) ? extLabel(b.out, 'out') : groupOf(b) ? groupOf(b).name : 'Main';
+  if (!isT || b.kind === 'group') return '→ ' + out;
+  let src;
+  if (b.kind === 'midi') { const m = b.midiIn || 'all'; src = m === 'all' ? 'All MIDI' : m === 'kb' ? 'Keyboard' : m === 'none' ? 'No input' : ((window.MIDI_INS || []).find(x => x.id === m) || { name: 'MIDI' }).name; if (b.midiCh) src += ' ch' + b.midiCh; }
+  else { const i = b.input || 'default'; src = i === 'resample' ? 'Resample' : i === 'none' ? 'No input' : i.startsWith('track:') ? ((busById(i.slice(6)) || {}).name || 'Track') : extParse(i) ? extLabel(i, 'in') : IO.native ? 'In 1/2' : 'Input'; }
+  return src + ' → ' + out;
+}
+function hdrChips(b, isT) {
+  const devs = (b.devices || []).filter(d => DEVICES[d.type] || d.type === 'plugin'), name = d => d.type === 'plugin' ? (d.p.name || 'Plug-in') : DEVICES[d.type].name;
+  const chips = devs.slice(0, 3).map(d => `<span class="chip ${d.on ? '' : 'off'}" data-h="chip" data-dev="${d.id}" title="${esc(name(d))}: click to show the devices">${esc(name(d))}</span>`).join('') + (devs.length > 3 ? `<span class="chip more" data-h="chip">+${devs.length - 3}</span>` : '');
+  return `<div class="hrow hchips"><span class="hiosum" title="Input and output">${esc(ioSummary(b, isT))}</span>${chips}</div>`;
+}
+
+// Lay a device out like a hardware unit: its screen, selectors and other panels in a column on the left, its knobs to the right.
+function rackify(card) {
+  const cb = card.querySelector(':scope > .cb'); if (!cb || cb._racked) return; cb._racked = true;
+  const side = document.createElement('div'); side.className = 'cside';
+  [...cb.children].forEach(el => { if (!el.matches('.pgrid, .pcols')) side.appendChild(el); });
+  if (side.children.length) cb.insertBefore(side, cb.firstChild);
+}
+// How many rows of knobs fit in the device panel: the device body's height, less its padding and section labels, over one knob's height.
+function fitRack() { const rack = $('#pane-dev .rack'); if (!rack) return; const cb = rack.querySelector('.card .cb'), h = cb ? cb.clientHeight : rack.clientHeight - 47; rack.style.setProperty('--prow', clamp(Math.floor((h - 36) / 69), 1, 8)); }
