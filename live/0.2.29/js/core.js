@@ -210,6 +210,13 @@ class GWDyn extends AudioWorkletProcessor {
 registerProcessor('gw-dyn', GWDyn);
 class GWBurn extends AudioWorkletProcessor { constructor(){ super(); this.n=0; this.port.onmessage=e=>{ this.n=e.data.n|0; }; } process(){ let x=0; for(let k=0;k<this.n;k++) x+=Math.sin(k); if(x===1.2345) this.port.postMessage(x); return true; } }
 registerProcessor('gw-burn', GWBurn);
+// Bit depth and sample-rate reduction (Patina's Digital module).
+class GWCrush extends AudioWorkletProcessor { constructor(){ super(); this.bits=32; this.rate=0; this.ph=0; this.h=[0,0]; this.port.onmessage=e=>Object.assign(this,e.data); }
+  process(inputs, outputs){ const inp=inputs[0], out=outputs[0]; if(!out||!out[0]) return true; const n=out[0].length, step=this.rate>0?this.rate/sampleRate:1, q=this.bits<24?Math.pow(2,this.bits-1):0;
+    for(let i=0;i<n;i++){ this.ph+=step; const take=this.ph>=1; if(take) this.ph-=Math.floor(this.ph);
+      for(let ch=0;ch<out.length;ch++){ const src=inp&&(inp[ch]||inp[0]); const x=src?src[i]:0; if(take||step>=1) this.h[ch]=q?Math.round(x*q)/q:x; out[ch][i]=this.h[ch]; } }
+    return true; } }
+registerProcessor('gw-crush', GWCrush);
 
 // ---- native engine bridge (Studio B 0.3+): rings in a SharedArrayBuffer, see native/src/shared.h ----
 class GWOut extends AudioWorkletProcessor {   // mix and routed tracks -> device outputs
@@ -280,8 +287,8 @@ const WORKLET_DONE = new WeakSet();
 async function loadWorklets(c) {
   if (WORKLET_DONE.has(c)) return true;
   try {
-    try { await c.audioWorklet.addModule(URL.createObjectURL(new Blob([PITCH_WORKLET], { type: 'application/javascript' }))); }
-    catch (e1) { await c.audioWorklet.addModule('data:application/javascript;charset=utf-8,' + encodeURIComponent(PITCH_WORKLET)); }
+    try { await c.audioWorklet.addModule(URL.createObjectURL(new Blob([PITCH_WORKLET + (typeof DYN_WORKLET === 'string' ? DYN_WORKLET : '')], { type: 'application/javascript' }))); }
+    catch (e1) { await c.audioWorklet.addModule('data:application/javascript;charset=utf-8,' + encodeURIComponent(PITCH_WORKLET + (typeof DYN_WORKLET === 'string' ? DYN_WORKLET : ''))); }
     WORKLET_DONE.add(c); return true;
   } catch (e) { console.warn('worklets', e && e.message); return false; }
 }

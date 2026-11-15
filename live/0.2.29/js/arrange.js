@@ -14,6 +14,7 @@ const arr = {
   x(pos) { return (pos - V.scrollX) * V.pps; },
   pos(x) { return x / V.pps + V.scrollX; },
   gridStep() {
+    if (V.fixedGrid) { const f = V.fixedGrid, b = SPB(), v = f === 'bar' ? b : f === 'bar2' ? 2 * b : f === 'bar4' ? 4 * b : +f; return V.triplet && v < b ? v * 2 / 3 : v; }   // a fixed size from the toolbar
     const c = gridCandidates(); const min = 11 * Math.pow(2, V.grid);
     return c.find(s => s * V.pps >= min) || c[c.length - 1];
   },
@@ -415,7 +416,7 @@ const px = v => Math.round(v * (devicePixelRatio || 1)) / (devicePixelRatio || 1
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // A collapsed track is a thin strip: its clips still show, with their names.
 const rowH = b => (b.collapsed ? 22 : b.h || 40);
-const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, sp = GP.zoomSpeed || 1; return clamp(Math.exp(-d * 0.0021 * sp), 0.8, 1.25); };
+const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, sp = GP.zoomSpeed || 1, pinch = e.deltaMode === 0 && Math.abs(d) < 40; return clamp(Math.exp(-d * (pinch ? 0.011 : 0.0021) * sp), 0.7, 1.4); };
 /* Smooth zoom: the view eases toward the target zoom over a few frames, keeping the point under the pointer fixed. */
 const ZOOM = { t: null, raf: 0 };
 function zoomSmooth(target, pos, x) {
@@ -448,6 +449,7 @@ async function dropOnTimeline(e, r, at) {
   if (typeof browser !== 'undefined' && browser.stopPreview) browser.stopPreview();
   const dt = e.dataTransfer, track = r && r.kind === 'track' ? r.b : null;
   const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst'), sbp = dt.getData('sb/plugin');
+  const sbm = dt.getData('sb/midifx'); if (sbm) return addMidiFx(sbm, track && track.kind === 'midi' ? track : null);
   if (sbp) { const o = JSON.parse(sbp); if (!NE.on) return toast('Turn on the native engine in Settings → Audio to use plug-ins'); return addPlugin(o.ref, o.instrument, track || (r ? r.b : null)); }
   if (sbd) { const b = r ? r.b : null; if (b) { pushUndo('Add device'); b.devices.push(newDevice(sbd)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.all(); } return; }
   if (sbi) { addInstrumentTrack(sbi, track && track.kind === 'midi' ? track : null); return; }

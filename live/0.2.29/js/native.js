@@ -51,7 +51,7 @@ function neDefaultBackend() { const b = NE.avail.backends.filter(x => x.id !== '
 async function neStart() {
   const backend = GP.driver && NE.avail.backends.some(b => b.id === GP.driver) ? GP.driver : neDefaultBackend();
   const r = await NATIVE.engine.open({ backend, output: GP.outName || '', input: GP.inId === 'none' ? 'none' : (GP.inName || ''), sampleRate: GP.sr || LIVE_CTX.sampleRate, buffer: GP.buffer || 256, rendererRate: LIVE_CTX.sampleRate });
-  if (!r.ok) { NE.error = r.error; toast('Native audio: ' + r.error + ' Using the built-in engine for now.', 6000); return false; }
+  if (!r.ok) { NE.error = r.error; toast('Native audio: ' + r.error.replace(/\.?$/, '.') + ' Using the built-in engine for now.', 6000); return false; }
   NE.dev = { ...r, backend }; NE.error = null;
   if (!NE.sab) {
     NE.sab = new SharedArrayBuffer(NE.L.bytes); NE.I = new Int32Array(NE.sab);
@@ -157,4 +157,15 @@ function applyPDC() {
   S.returns.forEach(r => (r._pdc = on ? maxR - busLatency(r) : 0));
   if (M.direct) M.direct.delayTime.value = Math.min(1.9, on ? maxR : 0);
   NE.pdcTotal = maxT + maxR; applyAllMix();
+}
+
+/* ---------- Audio From / Audio To ---------- */
+const outLabel = b => (b.out === 'none' ? 'No Output' : extParse(b.out) ? extLabel(b.out, 'out') : groupOf(b) ? groupOf(b).name : 'Main');
+const inLabel = t => (t.input === 'none' ? 'No Input' : t.input === 'resample' ? 'Main' : String(t.input || '').startsWith('track:') ? ((busById(t.input.slice(6)) || {}).name || 'track') : extParse(t.input) ? extLabel(t.input, 'in') : IO.native ? 'In 1/2' : 'Mic');
+function chooseOutput(b, e) {
+  const set = v => { pushUndo('Output'); if (v) b.out = v; else delete b.out; routeOut(b); ui.all(); if (V.view === 'mix') mixer.render(); };
+  const items = [{ label: (!b.out ? '✓ ' : '') + (groupOf(b) ? 'Group: ' + groupOf(b).name : 'Main'), run: () => set(null) }];
+  if (IO.native) items.push('-', ...outChoices().map(([v, l]) => ({ label: (b.out === v ? '✓ ' : '') + 'Ext. ' + l, run: () => set(v) })));
+  else items.push('-', { label: NE.avail && NE.avail.ok ? 'Other outputs: turn on the native engine (Settings → Audio)' : 'Other outputs need the native engine', run: () => showPrefs() });
+  popMenu(e || lastPointer, items);
 }

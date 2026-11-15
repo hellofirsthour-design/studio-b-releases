@@ -1,8 +1,8 @@
 {
- "version": "0.2.28",
+ "version": "0.2.29",
  "shell": 3,
- "date": "2026-11-15T17:14:43.172Z",
- "notes": "Free sample packs and a fresh session on every launch",
+ "date": "2026-11-15T18:08:11.312Z",
+ "notes": "Dynamics suite and a fix for audio clips fading out over their length",
  "files": [
   {
    "path": "css/base.css",
@@ -11,13 +11,13 @@
   },
   {
    "path": "css/studio.css",
-   "size": 9441,
-   "sha256": "1b4d369ea7c7628da2f8d6f281fe55bddb099becc12b2d77992d6a50bc2ba681"
+   "size": 9997,
+   "sha256": "9f3c736a27588273dc89c24092c2eed987073f1e0a6eb667128354e60cad4fe6"
   },
   {
    "path": "index.html",
-   "size": 20464,
-   "sha256": "67de95c2db07d6b9ae17012a6a908e49c9817f4f8850b17a07650bd18679684f"
+   "size": 20543,
+   "sha256": "1b43ef53b4b6dbdf91d8524cd099ca83b877657ee7eb754d49f3773d720320be"
   },
   {
    "path": "js/arrange.js",
@@ -26,13 +26,13 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34118,
-   "sha256": "57fc7a49437a40f4d252065995b5e9478c7b808d0a46aed831e6ee6a9b54cdb8"
+   "size": 34188,
+   "sha256": "4df8c24a7ba2f0a9e523aa280fc5398897091dac418e74920a319234c4387c92"
   },
   {
    "path": "js/cards.js",
-   "size": 38697,
-   "sha256": "f378a4805240ca13a23af0b94720ca94c072b7cd64584a37e663e49126d5c179"
+   "size": 39988,
+   "sha256": "effe1308b4cde5c05cf05e3cd1465fe62fd971eb0fd1929c653950d6b922ea18"
   },
   {
    "path": "js/convert.js",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/core.js",
-   "size": 20106,
-   "sha256": "2b70fa40fbcf5c11e2518996ddd2867f49709b9f98bf028ebb89bfcb99cc75da"
+   "size": 20216,
+   "sha256": "e41a4a5ed8b2f8d9cdc74be41523346f678394c0c5a2286ec298df263fb3489c"
   },
   {
    "path": "js/devices.js",
@@ -53,6 +53,11 @@
    "path": "js/dsp.js",
    "size": 13395,
    "sha256": "dcd81f751209424e68a9fce5db19c86d759ffaeac4497e5a8ba8d38dbef12134"
+  },
+  {
+   "path": "js/dynamics.js",
+   "size": 12941,
+   "sha256": "e7067b480b5004f9de45ebe72601850aa866ce0a967197a51f8c3ccbfe77126e"
   },
   {
    "path": "js/effects2.js",
@@ -66,8 +71,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 52972,
-   "sha256": "cb87b04b76adb16edd76842632bba654d60dbdc78ca1fcda6f7bb51913e27cac"
+   "size": 53168,
+   "sha256": "eb3440437500666b60c0dbe848a7dba46604e034e5f993c7313b4ca80291e6d7"
   },
   {
    "path": "js/features.js",
@@ -185,6 +190,11 @@
    "sha256": "a8ade3e7c0540eb54d30bee5a376cc21b1543a6c375e8b4af3062932a630ece8"
   },
   {
+   "path": "js/worklets2.js",
+   "size": 15758,
+   "sha256": "5638f59b5b5de6d46898032255a0fcd5a0e75ceb2b02ed1231315b9ca56f419c"
+  },
+  {
    "path": "vendor/lamejs/lame.min.js",
    "size": 156043,
    "sha256": "15d285e2587b3bdbfd18a68de6ce07cc074f7480a82c3815da2dc1c348ec6df4"
@@ -197,7 +207,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "d4d592d26354e8e8b3736a333c71482f99f63cab61f5c48495bdfd725a215ef9"
+   "sha256": "7be8d99abf9f42737a15343c15913c1b9b156ca4b754d5b2240625ee26ab21cb"
   }
  ]
 }

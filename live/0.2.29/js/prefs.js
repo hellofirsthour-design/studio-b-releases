@@ -42,12 +42,13 @@ const PREF_PANES = {
   },
   audio: {
     async html() {
+      if (NE.avail && NE.avail.ok && GP.engine !== 'web') return nativeAudioHtml();
       let devs = []; try { devs = await navigator.mediaDevices.enumerateDevices(); } catch (e) { }
       const outs = devs.filter(x => x.kind === 'audiooutput' && x.deviceId !== 'default'), ins = devs.filter(x => x.kind === 'audioinput' && x.deviceId !== 'default');
       const plat = /Mac/i.test(navigator.platform) ? 'Core Audio' : /Win/i.test(navigator.platform) ? 'Windows Audio' : 'System audio';
       const L = latMs(), dec = S.prefs.latencyMs != null ? S.prefs.latencyMs : 0, lab = (x, f) => esc(x.label || f);
       const sr = GP.sr || LIVE_CTX.sampleRate, buf = GP.buffer || 0;
-      return psec('Audio device') +
+      return psec('Audio device') + (NE.avail && NE.avail.ok ? prow('Audio engine', psel('pfEng', [['native', 'Native (recommended)'], ['web', 'Built-in (browser audio)']], 'web')) : '') +
         prow('Driver type', psel('pfDrv', [['sys', plat]], 'sys'), 'Studio B uses your system audio') +
         prow('Audio input device', psel('pfIn', [['default', 'System default'], ['none', 'No device'], ...ins.map(x => [x.deviceId, lab(x, 'Input (allow access to see names)')])], GP.inId || 'default') + (ins.length && !ins[0].label ? '<button class="btn ghostb tiny" id="pfAllow">Allow</button>' : '')) +
         prow('Audio output device', psel('pfOut', [['default', 'System default'], ...outs.map(x => [x.deviceId, lab(x, 'Output')])], GP.outId || 'default')) +
@@ -69,6 +70,8 @@ const PREF_PANES = {
         prow('CPU usage simulator', `<input id="pfCpu" type="range" min="0" max="90" step="5" value="${GP.cpuSim || 0}"><b class="pfval" id="pfCpuV">${GP.cpuSim || 0}%</b>`, 'Loads the audio thread to test for dropouts');
     },
     bind() {
+      if (NE.avail && NE.avail.ok && GP.engine !== 'web') return nativeAudioBind();
+      if ($('#pfEng')) $('#pfEng').onchange = async e => { GP.engine = e.target.value; saveGP(); if (GP.engine === 'native') { const on = await neStart(); if (on) toast('Native audio on'); } showPrefs(); };
       $('#pfIn').onchange = async e => { GP.inId = e.target.value === 'default' ? null : e.target.value; saveGP(); await reopenDefaultInput(); toast(e.target.value === 'none' ? 'Audio input off' : 'Input changed'); };
       if ($('#pfAllow')) $('#pfAllow').onclick = async () => { try { await getInput('default'); showPrefs(); } catch (e) { toast('Input access was refused'); } };
       $('#pfOut').onchange = async e => { GP.outId = e.target.value === 'default' ? null : e.target.value; saveGP(); const ok = await applyOutputDevice(); toast(ok ? 'Output changed' : 'This build cannot switch outputs; use your system sound settings.'); };
@@ -135,9 +138,29 @@ const PREF_PANES = {
     },
   },
   plugins: {
-    html: () => psec('Plug-ins') +
-      `<p class="pftext">Studio B can't load VST or Audio Unit plug-ins yet. That needs a native audio engine, which is on the roadmap.</p>` +
-      `<p class="pftext">When you open an Ableton set, plug-ins show as placeholders and pass audio through. To hear them, freeze those tracks in Ableton before you save the set: Studio B plays the frozen audio.</p>`,
+    async html() {
+      if (!NE.avail || !NE.avail.ok) return psec('Plug-ins') + `<p class="pftext">${!IS_DESKTOP ? 'VST3 and Audio Unit plug-ins run in the desktop app.' : !NE.avail ? 'This copy of Studio B is older than the native engine. Download the newest installer once to run VST3 and Audio Unit plug-ins; after that, updates arrive on their own.' : 'The native engine did not load on this computer: ' + esc(NE.avail.error || '')}</p>`;
+      const mac = NE.avail.platform === 'darwin', n = nePlugins().length, f = (NE.catalog.failed || []).length;
+      return psec('Plug-in sources') +
+        prow('Use VST3 plug-ins', ptog('pfVst3', GP.useVST3 !== false)) +
+        (mac ? prow('Use Audio Units', ptog('pfAU', GP.useAU !== false)) : '') +
+        prow('Custom VST3 folders', `<span class="pfpath">${esc((GP.vst3Folders || []).join(', ') || 'None (the standard folders are always searched)')}</span><button class="btn ghostb tiny" id="pfAddFolder">Add…</button>${(GP.vst3Folders || []).length ? '<button class="btn ghostb tiny" id="pfClearFolders">Clear</button>' : ''}`) +
+        prow('Plug-ins found', `<b class="pfval">${n}</b>${f ? ` <span class="pfnote">${f} could not load</span>` : ''}<button class="btn prim tiny" id="pfRescan">Rescan</button>`, NE.catalog.scannedAt ? 'Last scan ' + new Date(NE.catalog.scannedAt).toLocaleString() : 'Not scanned yet') +
+        psec('Timing') +
+        prow('Delay compensation', ptog('pfPdc', GP.pdc !== false), 'Delays the other tracks to match each plug-in\'s latency') +
+        prow('Plug-in buffer', psel('pfLag', [[2, '2 blocks (lowest latency)'], [3, '3 blocks (default)'], [4, '4 blocks (safest)']], GP.plugLag || 3), 'Raise it if plug-ins crackle') +
+        (f ? psec('Could not load') + (NE.catalog.failed || []).slice(0, 30).map(x => prow(esc(basename(x.path)), `<span class="pfnote">${esc(x.error)}</span>`)).join('') : '');
+    },
+    bind() {
+      if (!NE.avail || !NE.avail.ok) return;
+      tog('pfVst3', () => GP.useVST3 !== false, v => { GP.useVST3 = v; saveGP(); });
+      tog('pfAU', () => GP.useAU !== false, v => { GP.useAU = v; saveGP(); });
+      $('#pfAddFolder').onclick = async () => { const d = await NATIVE.folderDialog(); if (!d) return; GP.vst3Folders = [...new Set([...(GP.vst3Folders || []), d])]; saveGP(); showPrefs(); };
+      if ($('#pfClearFolders')) $('#pfClearFolders').onclick = () => { GP.vst3Folders = []; saveGP(); showPrefs(); };
+      $('#pfRescan').onclick = async () => { await neScan(); showPrefs(); };
+      tog('pfPdc', () => GP.pdc !== false, v => { GP.pdc = v; saveGP(); applyPDC(); });
+      $('#pfLag').onchange = e => { GP.plugLag = +e.target.value; NE.lag = GP.plugLag; saveGP(); rebuildAll(); schedulePDC(); };
+    },
   },
   record: {
     html: () => psec('Record') +
@@ -207,3 +230,54 @@ function cpuSimulator(pct) {
 }
 // the test tone only plays while Settings is open
 document.getElementById('prefs').addEventListener('click', e => { const d = e.currentTarget; if (e.target === d || e.target.closest('[data-close]')) testTone(false); });
+
+/* ---------- Audio settings with the native engine ---------- */
+async function nativeAudioHtml() {
+  const backends = NE.avail.backends.filter(b => b.id !== 'null' || GP.driver === 'null'), cur = NE.dev ? NE.dev.backend : (GP.driver || neDefaultBackend());
+  let devs = { outputs: [], inputs: [] }; try { devs = await NATIVE.engine.devices(cur); } catch (e) { }
+  const outs = devs.outputs || [], ins = devs.inputs || [], d = NE.dev || {}, st = NE.on ? await neStatus() : null;
+  const dec = S.prefs.latencyMs != null ? S.prefs.latencyMs : 0, plug = NE.lag * 128 / LIVE_CTX.sampleRate * 1000;
+  const pairs = n => { const o = []; for (let c = 1; c <= n; c += 2) o.push(['ext:' + c, `${c}/${Math.min(c + 1, n)}`]); return o; };
+  return psec('Audio device') +
+    prow('Audio engine', psel('pfEng', [['native', 'Native (recommended)'], ['web', 'Built-in (browser audio)']], 'native'), 'Native runs plug-ins, uses every channel of your interface and sets the buffer size') +
+    prow('Driver type', psel('pfDrv', backends.map(b => [b.id, b.name]), cur)) +
+    prow('Audio input device', psel('pfIn', [['', 'System default'], ['none', 'No device'], ...ins.map(x => [x.name, `${x.name} (${x.channels} in)`])], GP.inId === 'none' ? 'none' : (GP.inName || ''))) +
+    prow('Audio output device', psel('pfOut', [['', 'System default'], ...outs.map(x => [x.name, `${x.name} (${x.channels} out)`])], GP.outName || '')) +
+    prow('Main output', psel('pfMainOut', pairs(IO.outCh || 2).map(([v, l]) => [v, 'Out ' + l]), GP.mainOut || 'ext:1'), 'Where the main mix plays') +
+    prow('Cue output', psel('pfCueOut', pairs(IO.outCh || 2).map(([v, l]) => [v, 'Out ' + l]), GP.cueOut || GP.mainOut || 'ext:1'), 'Browser preview, and the metronome when it is sent to cue') +
+    prow('Metronome to cue', ptog('pfClickCue', !!GP.clickCue)) +
+    psec('Sample rate') +
+    prow('In/out sample rate', psel('pfSr', [[44100, '44100'], [48000, '48000'], [88200, '88200'], [96000, '96000']], d.sampleRate || GP.sr || LIVE_CTX.sampleRate) + ((d.sampleRate && d.sampleRate !== LIVE_CTX.sampleRate) ? ` <span class="pfnote">mixer at ${LIVE_CTX.sampleRate}: restart to match</span>` : '')) +
+    psec('Latency') +
+    prow('Buffer size', psel('pfBuf', [[64, '64 samples'], [128, '128 samples'], [256, '256 samples'], [512, '512 samples'], [1024, '1024 samples'], [2048, '2048 samples']], d.buffer || GP.buffer || 256)) +
+    prow('Input latency', `<b class="pfval">${(d.inLatency || 0).toFixed(2)} ms</b>`) +
+    prow('Output latency', `<b class="pfval">${(d.outLatency || 0).toFixed(1)} ms</b>`) +
+    prow('Driver error compensation', `<input id="pfDec" type="number" step="0.1" min="-200" max="500" value="${dec}"><span class="pfunit">ms</span>`, 'Shifts recordings so they line up with what you heard') +
+    prow('Overall latency', `<b class="pfval" id="pfOver">${((d.inLatency || 0) + (d.outLatency || 0) + plug + dec).toFixed(1)} ms</b>`, `Includes ${plug.toFixed(1)} ms of plug-in buffer`) +
+    prow('Status', `<span class="pfnote" id="pfStat">${NE.on ? `${esc(d.outputName || '')} · ${d.outputs} out / ${d.inputs} in · CPU ${Math.round((st && st.cpu || 0) * 100)}% · dropouts ${st ? st.underruns : 0}` : esc(NE.error || 'Not running')}</span>`) +
+    (d.sampleRate && d.sampleRate !== LIVE_CTX.sampleRate ? `<div class="pfwarn">Studio B's mixer runs at ${LIVE_CTX.sampleRate} Hz and converts to ${d.sampleRate} Hz. Restart to run both at the same rate. <button class="btn prim tiny" id="pfRestart">Restart now</button></div>` : '') +
+    psec('Test') +
+    prow('Test tone', ptog('pfTone', !!PREFS_TONE.osc)) +
+    prow('Tone volume', `<input id="pfToneVol" type="range" min="-60" max="0" step="1" value="${GP.toneDb != null ? GP.toneDb : -36}"><b class="pfval" id="pfToneVolV">${GP.toneDb != null ? GP.toneDb : -36} dB</b>`) +
+    prow('Tone frequency', `<input id="pfToneHz" type="range" min="20" max="2000" step="1" value="${GP.toneHz || 440}"><b class="pfval" id="pfToneHzV">${GP.toneHz || 440} Hz</b>`) +
+    prow('CPU usage simulator', `<input id="pfCpu" type="range" min="0" max="90" step="5" value="${GP.cpuSim || 0}"><b class="pfval" id="pfCpuV">${GP.cpuSim || 0}%</b>`, 'Loads the audio thread to test for dropouts');
+}
+function nativeAudioBind() {
+  const reopen = async () => { showBusy('Opening the audio device…'); try { await neRestart(); } finally { showBusy(null); } showPrefs(); };
+  $('#pfEng').onchange = async e => { GP.engine = e.target.value; saveGP(); if (GP.engine === 'web') { await neStop(); toast('Using the built-in engine. Plug-ins are paused.'); } showPrefs(); };
+  $('#pfDrv').onchange = e => { GP.driver = e.target.value; GP.outName = ''; GP.inName = ''; saveGP(); reopen(); };
+  $('#pfIn').onchange = e => { if (e.target.value === 'none') GP.inId = 'none'; else { GP.inId = null; GP.inName = e.target.value; } saveGP(); reopen(); };
+  $('#pfOut').onchange = e => { GP.outName = e.target.value; saveGP(); reopen(); };
+  $('#pfMainOut').onchange = e => { GP.mainOut = e.target.value; saveGP(); ioWire(); };
+  $('#pfCueOut').onchange = e => { GP.cueOut = e.target.value; saveGP(); ioWire(); };
+  tog('pfClickCue', () => !!GP.clickCue, v => { GP.clickCue = v; saveGP(); buildMaster(); rebuildAll(); });
+  $('#pfSr').onchange = e => { GP.sr = +e.target.value; saveGP(); reopen(); };
+  $('#pfBuf').onchange = e => { GP.buffer = +e.target.value; saveGP(); reopen(); };
+  $('#pfDec').onchange = e => { S.prefs.latencyMs = +e.target.value; markDirty(); };
+  if ($('#pfRestart')) $('#pfRestart').onclick = () => confirmLeave(() => { V.dirty = false; NATIVE.restart(); });
+  tog('pfTone', () => !!PREFS_TONE.osc, v => testTone(v));
+  $('#pfToneVol').oninput = e => { GP.toneDb = +e.target.value; $('#pfToneVolV').textContent = GP.toneDb + ' dB'; saveGP(); if (PREFS_TONE.g) PREFS_TONE.g.gain.setTargetAtTime(dbToGain(GP.toneDb), LIVE_CTX.currentTime, 0.02); };
+  $('#pfToneHz').oninput = e => { GP.toneHz = +e.target.value; $('#pfToneHzV').textContent = GP.toneHz + ' Hz'; saveGP(); if (PREFS_TONE.osc) PREFS_TONE.osc.frequency.setTargetAtTime(GP.toneHz, LIVE_CTX.currentTime, 0.02); };
+  $('#pfCpu').oninput = e => { GP.cpuSim = +e.target.value; $('#pfCpuV').textContent = GP.cpuSim + '%'; cpuSimulator(GP.cpuSim); };
+  clearInterval(nativeAudioBind._t); nativeAudioBind._t = setInterval(async () => { const el = $('#pfStat'); if (!el || $('#prefs').hidden) return clearInterval(nativeAudioBind._t); const st = await neStatus(); if (st && NE.dev) el.textContent = `${NE.dev.outputName} · ${NE.dev.outputs} out / ${NE.dev.inputs} in · CPU ${Math.round(st.cpu * 100)}% · dropouts ${st.underruns}`; }, 1000);
+}

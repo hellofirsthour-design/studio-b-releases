@@ -17,7 +17,7 @@ class PlugDev2 extends Base {
   dispose() { super.dispose(); if (this.node) try { this.node.disconnect(); } catch (e) { } }
 }
 DEVICES.plugin.cls = PlugDev2;
-function plugAdopt(p, info) { p.name = info.name || p.name; p.vendor = info.vendor; p.params = (info.params || []).map(q => ({ index: q.index, name: q.name, auto: q.auto })); p.latency = info.latency; p.hasEditor = info.hasEditor; if (!p.shown) p.shown = p.params.filter(q => q.auto).slice(0, 8).map(q => q.index); }
+function plugAdopt(p, info) { p.name = info.name || p.name; p.vendor = info.vendor; p.params = (info.params || []).map(q => ({ index: q.index, name: q.name, auto: q.auto, def: q.def })); p.latency = info.latency; p.hasEditor = info.hasEditor; if (!p.shown) p.shown = p.params.filter(q => q.auto).slice(0, 8).map(q => q.index); }
 
 // The instrument. Notes go into the slot's event ring with their exact sample position.
 class PlugInst {
