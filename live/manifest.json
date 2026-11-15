@@ -1,8 +1,8 @@
 {
- "version": "0.2.32",
+ "version": "0.2.33",
  "shell": 3,
- "date": "2026-11-15T19:17:46.441Z",
- "notes": "Don't open the audio input until something needs it",
+ "date": "2026-11-15T19:27:34.344Z",
+ "notes": "Orbit: a Pluto-style multi-effect for melodies",
  "files": [
   {
    "path": "css/base.css",
@@ -41,8 +41,8 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34188,
-   "sha256": "4df8c24a7ba2f0a9e523aa280fc5398897091dac418e74920a319234c4387c92"
+   "size": 34197,
+   "sha256": "c1fd3b6211c01c3749b73e2bed734d2e814586a98fd91ff04822664b872c14e2"
   },
   {
    "path": "js/cards.js",
@@ -76,8 +76,8 @@
   },
   {
    "path": "js/effects2.js",
-   "size": 9704,
-   "sha256": "7571c8030f7e49d1a4f309f7fb812bf090562e776d168070c7ecf39e3ee46a0d"
+   "size": 20079,
+   "sha256": "46b9f6da2c06079421d287c3fac323c424c714c48bbc8a5114fbc98f32544a9f"
   },
   {
    "path": "js/engine-worker.js",
@@ -206,8 +206,8 @@
   },
   {
    "path": "js/worklets2.js",
-   "size": 15758,
-   "sha256": "5638f59b5b5de6d46898032255a0fcd5a0e75ceb2b02ed1231315b9ca56f419c"
+   "size": 19267,
+   "sha256": "6367466a8d6d6f04d8045b19dd23fe3a9e1d20beabc945f8c1884ecbd5e6cfb4"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -222,7 +222,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "5f6caa0d0eb0dd6658a0629ef150e8f2a96301974c0c8b6b0ee358ad37b335f9"
+   "sha256": "f4137eddc19df18c714401f6f176af2656f97834c12868ea4210ea891e760a85"
   }
  ]
 }
