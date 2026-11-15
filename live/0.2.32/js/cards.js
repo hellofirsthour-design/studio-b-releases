@@ -78,10 +78,11 @@ function savePreset(kind, name, params) {
 function deletePreset(kind, name) { const all = presetStore(); if (all[kind]) delete all[kind][name]; lsSet('sb-presets', JSON.stringify(all)); }
 // kind: preset family; get(): current params; apply(params|null for defaults)
 function presetMenu(e, kind, get, apply, label = 'preset') {
-  const ups = userPresets(kind);
+  const ups = userPresets(kind), fk = kind.startsWith('dev:') ? kind.slice(4) : null, fp = (fk && DEVICES[fk] && DEVICES[fk].presets) || {};
   popMenu(e, [
     { label: `Save ${label}…`, run: () => askText('Preset name', 'My ' + label, v => v && savePreset(kind, v, get())) },
     { label: 'Default settings', run: () => apply(null) },
+    ...(Object.keys(fp).length ? ['-', ...Object.keys(fp).map(n => ({ label: n, run: () => apply({ ...DEVICES[fk].def(), ...deep(fp[n]), sc: get().sc || '' }) }))] : []),
     ...(Object.keys(ups).length ? ['-', ...Object.keys(ups).sort().map(n => ({ label: n, run: () => apply(deep(ups[n])) }))] : []),
     ...(Object.keys(ups).length ? ['-', { label: 'Delete a preset…', run: () => popMenu(e, Object.keys(ups).map(n => ({ label: 'Delete ' + n, danger: true, run: () => deletePreset(kind, n) }))) }] : []),
   ]);
@@ -117,17 +118,24 @@ function deviceCard(o, d, i) {
   if (d.type === 'rack') { rackView(body, o, d, r); return c; }
   if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (def.cols) { // one column per section, side by side (Patina)
+    if (def.meters) bandMeters(body, r, def.meters);
     const row = document.createElement('div'); row.className = 'pcols'; let cur = [];
     const flush = () => { if (!cur.length) return; const col = document.createElement('div'); col.className = 'pcol' + (cur[0].group ? '' : ' main'); col.appendChild(paramGrid(cur, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); if (k.endsWith('On')) col.classList.toggle('dim', !v); }, `${o.id}|dev:${d.id}:`)); const tg = cur.find(q => q.toggle && q.k.endsWith('On')); if (tg) col.classList.toggle('dim', !d.p[tg.k]); row.appendChild(col); cur = []; };
     def.params.forEach(q => { if (q.group) flush(); cur.push(q); }); flush(); body.appendChild(row); return c; }
   if (d.type === 'eq') eqEditor(body, d, r, changed);
   else if (d.type === 'tune') { tuneView(body, d, r); body.appendChild(paramGrid(def.params, d.p, changed, `${o.id}|dev:${d.id}:`)); }
   else {
-    if (d.type === 'comp' || d.type === 'limit' || d.type === 'gate') grMeter(body, r);
-    if (d.type === 'comp') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
+    if (['comp', 'limit', 'gate', 'iron', 'apex', 'deess', 'breath'].includes(d.type)) grMeter(body, r);
+    if (def.meters) bandMeters(body, r, def.meters);
+    if (d.type === 'comp' || d.type === 'iron') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
     body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`));
   }
   return c;
+}
+// per-band gain (Bands, Lift) or the current ride (Rider): bars around 0 dB
+function bandMeters(body, r, kind) {
+  const m = document.createElement('div'); m.className = 'bmeters'; const names = kind === 'ride' ? ['Ride'] : (r.gs || [0]).length > 1 ? ['Low', 'Mid', 'High'] : ['Gain']; m.innerHTML = names.map(n => `<div class="bm"><span>${n}</span><div class="bmbar"><i></i></div><b>0.0</b></div>`).join(''); body.appendChild(m);
+  VIS.add(() => { if (!m.isConnected) return false; const gs = kind === 'ride' ? [r.g || 0] : r.gs || [0]; m.querySelectorAll('.bm').forEach((el, i) => { const g = gs[i] || 0, w = clamp(Math.abs(g) / 24, 0, 1) * 50, bar = el.querySelector('i'); bar.style.left = (g < 0 ? 50 - w : 50) + '%'; bar.style.width = w + '%'; bar.className = g < 0 ? 'dn' : 'up'; el.querySelector('b').textContent = (g > 0 ? '+' : '') + g.toFixed(1); }); });
 }
 function grMeter(body, r) {
   const m = document.createElement('div'); m.className = 'gr'; m.innerHTML = '<span>Gain reduction</span><div class="grbar"><i></i></div><b>0.0 dB</b>'; body.appendChild(m);

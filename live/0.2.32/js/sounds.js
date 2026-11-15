@@ -165,20 +165,23 @@ kit('Pop Kit', KIT([['Kick', 0, 1, 0.95], ['Snare', 1, 1], ['Clap', 0, 1.2], ['C
 const soundByName = n => SOUNDS.find(s => s.name === n);
 // Level trims measured by rendering each sound (a full-velocity chord, a low bass note or a drum pattern), so the library sits at an even level.
 const SOUND_TRIM = {"808 Clean": 1.85, "808 Long Glide": 1.85, "Sub Bass": 1.92, "Reese": 1.9, "Moog-ish Bass": 1.62, "Funk Pluck Bass (Vintage)": 0.65, "Upright Bass (Vintage)": 0.48, "Fretless": 1.22, "Fretless (Vintage)": 0.78, "FM Bass": 1.29, "Deep House Bass": 1.9, "Synth Bass Brass": 2.4, "Rubber Bass": 1.57, "Dark Drone Bass": 1.96, "Suitcase EP (Vintage)": 0.59, "Soft Rhodes (Vintage)": 0.57, "Bright Tine (Vintage)": 0.51, "Gospel EP": 0.73, "Gospel EP (Vintage)": 0.41, "Wurly (Vintage)": 0.74, "Dyno EP": 0.66, "Felt Piano": 0.47, "Honky Keys": 0.39, "Honky Keys (Vintage)": 0.25, "Toy Piano": 0.65, "Clavinet (Vintage)": 0.76, "Jazz Keys": 0.76, "Jazz Keys (Vintage)": 0.61, "DX Ballad Piano": 0.5, "DX Ballad Piano (Vintage)": 0.39, "Gospel B3 (888) (Vintage)": 0.55, "Jazz Organ (Vintage)": 0.67, "Soul Organ (Vintage)": 0.6, "Combo Organ (Vintage)": 0.65, "Trap Bell": 0.63, "Glass Bell": 0.65, "Tubular Bell": 0.65, "Music Box": 0.65, "Celesta": 0.66, "Vibraphone (Vintage)": 0.71, "Marimba": 0.64, "Kalimba": 0.65, "Steel Drum": 0.64, "Glockenspiel": 0.65, "Dark Bell Pad": 0.62, "Warm Pad": 1.2, "Worship Swell": 3, "Strings Pad": 1.42, "Dark Trap Pad": 1.6, "Lo-fi Haze (Lo-fi)": 1.22, "Ambient Drift": 2.07, "Neo Soul Pad": 1.92, "Neo Soul Pad (Lo-fi)": 1.31, "Noise Wash": 1.97, "Supersaw Lead": 0.61, "Flute Lead": 0.71, "Flute Lead (Vintage)": 0.66, "Soft Pluck (Vintage)": 0.76, "Nylon Guitar": 0.45, "Nylon Guitar (Vintage)": 0.58, "Steel Guitar": 0.27, "Muted Guitar": 0.28, "Muted Guitar (Vintage)": 0.39, "Harp": 0.28, "Koto": 0.37, "Pizzicato": 0.48, "Sitar-ish": 0.21, "String Section": 1.23, "Horn Section": 0.68, "Horn Section (Vintage)": 0.55, "Muted Trumpet": 0.78, "Muted Trumpet (Vintage)": 0.68, "Riser": 3, "Impact": 0.39, "Vinyl Noise Bed": 3, "Space Drone": 0.49, "Tape Stop Pad": 1.2, "Glitch Bleeps": 0.69, "Wind": 1.44, "Trap Kit": 0.73, "Boom Bap Kit": 0.42, "909 House Kit": 0.68, "Experimental Kit": 0.51, "Pop Kit": 0.64};
-function soundInst(s) { const base = s.inst.type === 'synth' ? { ...SYNTH_DEFAULT } : s.inst.type === 'drums' ? {} : newInst(s.inst.type), o = { ...deep(base), ...deep(s.inst), preset: s.name }, tr = SOUND_TRIM[s.name] || 1;
+function soundInst(s) { const base = s.inst.type === 'synth' ? { ...SYNTH_DEFAULT } : s.inst.type === 'drums' ? {} : newInst(s.inst.type), o = { ...deep(base), ...deep(s.inst), preset: s.name }, tr = SOUND_TRIM[s.name] || 1; if (s.pack) o.zones = packZones(s);
   if (tr !== 1) { if (o.pads) o.pads.forEach(p => (p.level = +(p.level * tr).toFixed(3))); else if (o.gain != null) o.gain = +(o.gain * tr).toFixed(3); }
   return o; }
 function soundDevices(s) { return s.fx.filter(([k, p]) => DEVICES[k] && p).map(([k, p]) => newDevice(k, { ...DEVICES[k].def(), ...p })); }
 function addSound(name, onto) {
   const s = soundByName(name); if (!s) return;
+  if (s.pack && !packReady(s)) { toast(`Loading ${s.name}…`, 1500); return packLoad(s).then(ok => ok && addSound(name, onto)); }
   if (onto && onto.kind === 'midi') { pushUndo('Load sound'); removeBus(onto); onto.inst = soundInst(s); onto.devices = [...soundDevices(s), ...onto.devices.filter(d => d.type === 'plugin')]; onto.name = s.name; buildBus(onto, 'track'); routeOut(onto); V.selTracks = new Set([onto.id]); V.detail = 'devices'; ui.all(); return; }
   const t = addTrack('midi', s.inst.type === 'drums' ? 'drums' : 'synth'); removeBus(t); t.inst = soundInst(s); t.devices = soundDevices(s); t.name = s.name; buildBus(t, 'track'); routeOut(t);
   V.selTracks = new Set([t.id]); V.detail = 'devices'; ui.all();
 }
 // Clicking a sound in the browser plays a short phrase through the cue output.
 let _snd = null;
+let _sndWant = null;
 function previewSound(name) {
-  const s = soundByName(name); if (!s || isOffline()) return; stopSoundPreview(); if (LIVE_CTX.state !== 'running') LIVE_CTX.resume();
+  const s = soundByName(name); if (!s || isOffline()) return;
+  if (s.pack && !packReady(s)) { const want = name; _sndWant = want; return packLoad(s).then(ok => ok && _sndWant === want && previewSound(name)); } stopSoundPreview(); if (LIVE_CTX.state !== 'running') LIVE_CTX.resume();
   const t = { id: 'preview', name, kind: 'midi', inst: soundInst(s), devices: soundDevices(s), auto: {} }, inst = makeInstrument(t), out = LIVE_CTX.createGain(); out.gain.value = browser.pVol != null ? browser.pVol : 0.8;
   chain(inst.out, t.devices, out); out.connect(M.cue);
   const now = LIVE_CTX.currentTime + 0.05, beat = 60 / (S.bpm || 100), cat = s.cat, n = [];

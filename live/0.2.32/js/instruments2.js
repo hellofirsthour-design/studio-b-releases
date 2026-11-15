@@ -99,9 +99,9 @@ class PluckString extends PolyBase {
 class MultiSampler extends PolyBase {
   relTime() { return this.t.inst.R; }
   noteOn(note, time, vel, dur, rv, mpe) {
-    const p = this.t.inst, zs = (p.zones || []).filter(z => note >= z.lo && note <= z.hi && vel * 127 >= (z.vlo || 0) && vel * 127 <= (z.vhi == null ? 127 : z.vhi) && SAMPLES.get(z.sampleId)); if (!zs.length) return null;
+    const p = this.t.inst, v7 = Math.round(vel * 127), zs = (p.zones || []).filter(z => note >= z.lo && note <= z.hi && v7 >= (z.vlo || 0) && v7 <= (z.vhi == null ? 127 : z.vhi) && SAMPLES.get(z.sampleId)); if (!zs.length) return null;
     const amp = ctx.createGain(), srcs = []; amp.connect(this.out); amp.gain.setValueAtTime(0, time); amp.gain.linearRampToValueAtTime(vel, time + p.A);
-    zs.forEach(z => { const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = SAMPLES.get(z.sampleId).buf; const r0 = Math.pow(2, (note - z.root) / 12); s.playbackRate.value = r0; g.gain.value = dbToGain(z.gain || 0); s.connect(g); g.connect(amp); s.start(time); srcs.push(s);
+    zs.forEach(z => { const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = SAMPLES.get(z.sampleId).buf; if (z.le > z.ls) { s.loop = true; s.loopStart = z.ls; s.loopEnd = z.le; } const r0 = Math.pow(2, (note - z.root) / 12); s.playbackRate.value = r0; g.gain.value = dbToGain(z.gain || 0); s.connect(g); g.connect(amp); s.start(time); srcs.push(s);
       if (mpe && mpe.pb && mpe.pb.length && dur) { s.playbackRate.setValueAtTime(r0 * Math.pow(2, mpe.pb[0].v / 12), time); mpe.pb.forEach(q => s.playbackRate.linearRampToValueAtTime(r0 * Math.pow(2, q.v / 12), time + q.t * dur)); } });
     return this.finish({ amp, srcs }, time, dur, rv);
   }

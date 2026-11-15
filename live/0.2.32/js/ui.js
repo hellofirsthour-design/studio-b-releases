@@ -128,8 +128,10 @@ function bindHeaders() {
   box.addEventListener('dblclick', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id);
     if (hd.dataset.lane && e.target.closest('.hname')) { const lane = b.takes.find(l => l.id === hd.dataset.lane); return askText('Take name', lane.name, v => { pushUndo('Rename take'); lane.name = v; ui.headers(); }); }
-    if (e.target.closest('.hname')) askText('Track name', b.name, v => { pushUndo('Rename'); b.name = v; ui.headers(); ui.detail(); });
-    if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); }
+    if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); return; }
+    if (e.target.closest('input, select, button, .hio')) return;
+    // double-click a track: show or hide the clip and devices panel for it (rename is Ctrl+R or the right-click menu)
+    const shown = !$('#app').classList.contains('nodetail'); if (!shown || V.selTracks.has(b.id)) setDetailShown(!shown); V.selTracks = new Set([b.id]); if (!shown) V.detail = V.detail || 'devices'; ui.all();
   });
   box.addEventListener('contextmenu', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; e.preventDefault(); const b = busById(hd.dataset.id); const isT = S.tracks.includes(b);
@@ -163,6 +165,7 @@ function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler", 
   V.detail = 'devices'; ui.all();
 }
 async function chooseInput(t) {
+  if (IO.native && !IO.inCh) await neWantInput();   // the input opens the first time you ask for it
   if (IO.native) { // the device's own channels, plus the internal sources
     const set = v => { pushUndo('Input'); t.input = v; connectInputs(); ui.headers(); if (V.view === 'mix') mixer.render(); };
     const others = S.tracks.filter(x => x !== t && x.kind !== 'group').map(x => ({ label: (t.input === 'track:' + x.id ? '✓ ' : '') + 'Track: ' + x.name, run: () => set('track:' + x.id) }));
@@ -312,11 +315,16 @@ function ioChange(b, h) {
   if (!b) return false; const k = h.dataset.h, v = h.value;
   if (k === 'midiIn') { pushUndo('MIDI from'); b.midiIn = v; }
   else if (k === 'midiCh') { pushUndo('MIDI channel'); b.midiCh = +v; }
-  else if (k === 'inT') { pushUndo('Audio from'); b.input = v === 'ext' ? (IO.native ? 'ext:1' : 'default') : v; connectInputs(); }
-  else if (k === 'inC') { pushUndo('Input channel'); b.input = v; connectInputs(); }
+  else if (k === 'inT') { pushUndo('Audio from'); b.input = v === 'ext' ? (IO.native ? 'ext:1' : 'default') : v; if (IO.native && extParse(b.input)) neWantInput().then(connectInputs); else connectInputs(); }
+  else if (k === 'inC') { pushUndo('Input channel'); b.input = v; if (IO.native && extParse(v)) neWantInput().then(connectInputs); else connectInputs(); }
   else if (k === 'outT') { pushUndo('Audio to'); if (v) b.out = v; else delete b.out; routeOut(b); }
   else if (k === 'mainOut') { GP.mainOut = v; saveGP(); ioWire(); }
   else if (k === 'delay') { pushUndo('Track delay'); b.delayMs = clamp(+v || 0, -500, 500); applyAllMix(); }
   else return false;
   markDirty(); ui.headers(); if (V.view === 'mix') mixer.render(); return true;
 }
+
+/* sliders draw their filled run from --pct (see theme.css) */
+function syncRange(el) { const lo = +el.min || 0, hi = el.max === '' ? 100 : +el.max, v = +el.value; el.style.setProperty('--pct', ((v - lo) / ((hi - lo) || 1) * 100).toFixed(1) + '%'); }
+document.addEventListener('input', e => { if (e.target.type === 'range') syncRange(e.target); }, true);
+setInterval(() => document.querySelectorAll('input[type=range]').forEach(syncRange), 150);

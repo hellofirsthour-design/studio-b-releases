@@ -109,3 +109,12 @@
 .pcol.main .pgrid{max-width:150px}
 .pcol .pgroup{border-top:0;padding-top:0;margin-top:0;color:var(--text)}
 .pcol.dim .pgrid>*:not(.pgroup):not(.tog){opacity:.4}
+
+.bmeters{display:flex;flex-direction:column;gap:3px;margin:2px 0 8px}
+.bm{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:6px;font-size:10px;color:var(--dim)}
+.bmbar{position:relative;height:6px;background:var(--line);border-radius:3px}
+.bmbar:after{content:'';position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:var(--dim)}
+.bmbar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.bmbar i.dn{background:var(--accent)}
+.bmbar i.up{background:#6fcf97}
+.bm b{font-weight:500;text-align:right;color:var(--text)}

@@ -20,7 +20,7 @@ const ICON = {
   phones: '<path d="M3 10V8a5 5 0 0 1 10 0v2"/><rect x="2.5" y="9.5" width="2.5" height="4" rx=".8"/><rect x="11" y="9.5" width="2.5" height="4" rx=".8"/>',
 };
 const ico = (k, cls = '') => `<svg class="bico ${cls}" viewBox="0 0 16 16" aria-hidden="true">${ICON[k] || ICON.file}</svg>`;
-const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat', 'patina']], ['Dynamics', ['comp', 'gate', 'limit']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
+const FX_FOLDERS = [['Delay & Loop', ['tape', 'delay']], ['Drive & Color', ['sat', 'patina', 'punch']], ['Dynamics', ['comp', 'iron', 'bands', 'lift', 'apex', 'limit', 'gate', 'rider', 'deess', 'breath']], ['EQ & Filters', ['eq', 'filter']], ['Pitch & Modulation', ['tune', 'chorus', 'phaser', 'autopan']], ['Reverb & Resonance', ['verb']], ['Utilities', ['utility', 'rack']], ['Modulators', ['lfo', 'envf', 'shaper']]];
 const SOUND_FOLDERS = [['Bass', ['Sub Bass', 'Reese']], ['Keys', ['Keys']], ['Lead', ['Saw Lead']], ['Pad', ['Warm Pad']], ['Pluck', ['Pluck']]];
 const DEFAULT_COLLECTIONS = [['Favorites', '#ff5d5d'], ['Orange', '#ff9a3c'], ['Yellow', '#f2d544'], ['Green', '#6fdc8c'], ['Blue', '#4ea3ff'], ['Purple', '#b18cff'], ['Gray', '#a7a3b8']];
 const DRUM_WORDS = /kick|snare|clap|hat|hh|perc|tom|rim|cymbal|crash|ride|808|shaker|snap|drum|bd|sd/i;
@@ -105,7 +105,8 @@ const browser = {
     } else if (sel === 'sounds') {
       title = 'Sounds';
       const sm = s => !q || s.name.toLowerCase().includes(q) || s.tags.includes(q) || s.cat.toLowerCase().includes(q), list = SOUNDS.filter(s => s.cat !== 'Drum Kits');
-      h = `<div class="muted small bhint">${list.length} sounds · click to hear, double-click or drag to load</div>` + (q ? list.filter(sm).map(s => this.row(this.soundItem(s))).join('') : SOUND_CATS.filter(c => c !== 'Drum Kits').map(c => this.staticFolder('snd:' + c, c, list.filter(s => s.cat === c).map(s => this.soundItem(s)))).join(''));
+      const packs = PACK_MANIFEST.packs.filter(p => !q || p.name.toLowerCase().includes(q) || p.blurb.toLowerCase().includes(q)).map(p => packItem(p));
+      h = `<div class="muted small bhint">${list.length} sounds · click to hear, double-click or drag to load</div>` + (packs.length ? this.staticFolderOpen('Free sample packs', packs) : '') + (q ? list.filter(sm).map(s => this.row(this.soundItem(s))).join('') : SOUND_CATS.filter(c => c !== 'Drum Kits').map(c => this.staticFolder('snd:' + c, c, list.filter(s => s.cat === c).map(s => this.soundItem(s)))).join(''));
     } else if (sel === 'drums') {
       title = 'Drums';
       const kits = [this.instItem('drums', 'Kit', 'Drum rack'), this.instItem('sampler', 'Cutline', 'Chopping sampler')].filter(o => m(o.name));
@@ -205,6 +206,7 @@ const browser = {
     const a = e.target.closest('[data-act]'); if (!a) return; const act = a.dataset.act;
     if (act === 'sort') { this.sortDesc = !this.sortDesc; this.renderList(); return; }
     if (act === 'inst') return addInstrumentTrack(a.dataset.val, null);
+    if (act === 'pack') { const id = (a.dataset.key || '').slice(5); if (!PACK_STATE.installed.has(id)) downloadPack(id); else toast(`${packInfo(id).name} is installed. Its instruments are in the folders below.`); return; }
     if (act === 'sound') { const n = (a.dataset.key || '').slice(11); if (e.detail >= 2) { stopSoundPreview(); return addSound(n, null); } document.querySelectorAll('#blist .brow.sel').forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) previewSound(n); return; }
     if (act === 'fx') { const b = busById([...V.selTracks][0]); if (!b) return toast('Select a track first'); pushUndo('Add device'); b.devices.push(newDevice(a.dataset.val)); rewire(b); V.detail = V.detail === 'clip' ? 'both' : V.detail; ui.detail(); return; }
     if (act === 'dir') { this.stopPreview();
