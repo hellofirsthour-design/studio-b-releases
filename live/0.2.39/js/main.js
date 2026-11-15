@@ -194,6 +194,7 @@ function bindKeys() {
     if (k === 'a') { cmd('toggleAuto'); return; }
     if (k === 'm' && !e.repeat) { KB.on = !KB.on; $('#kbBtn').classList.toggle('on', KB.on); toast(KB.on ? 'Computer MIDI keyboard on: A W S E D F T G Y H U J K, Z/X octave' : 'Computer MIDI keyboard off'); return; }
     if (k === 'o' && !e.shiftKey) { S.metro = !S.metro; ui.transport(); return; }
+    if (k === 'w' && e.shiftKey) { writerOpen(); return; }
     if (k === '0') return cmd('deactivate');
     if (k === 'r' && !e.shiftKey && selectedClips().some(x => x.c.type === 'audio')) return reverseClips();
     if (e.key === 'PageDown') { e.preventDefault(); return jumpLocator(1); }
@@ -226,6 +227,7 @@ function bindBar() {
   $('#capture').onclick = () => captureMidi();
   $('#midiOd').onclick = () => { V.midiOd = !V.midiOd; ui.transport(); toast(V.midiOd ? 'MIDI overdub on: recording adds notes to the clips already there' : 'MIDI overdub off: recording replaces, and keeps takes'); };
   $('#rec').onclick = () => recordButton();
+  $('#writerBtn').onclick = () => writerOpen();
   $('#metro').onclick = () => { S.metro = !S.metro; ui.transport(); };
   $('#loopBtn').onclick = () => { S.loop.on = !S.loop.on; ui.transport(); arr.draw(); };
   $('#follow').onclick = () => cmd('toggleFollow');

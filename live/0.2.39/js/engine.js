@@ -382,7 +382,7 @@ function stop(silent) {
   if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
-  clearMidiFxQueues(); T.playing = false; stopSources(now);
+  clearMidiFxQueues(); T.playing = false; stopSources(now); DEV_RT.forEach(r => r.transport && r.transport(null));
   S.tracks.forEach(t => { const r = RT.get(t.id); if (r && r.inst) r.inst.allOff(now); });
   releaseAutomation();
   if (!silent) { ui.transport(); arr.draw(); }

@@ -127,6 +127,7 @@ function deviceCard(o, d, i) {
   else {
     if (['comp', 'limit', 'gate', 'iron', 'apex', 'deess', 'breath'].includes(d.type)) grMeter(body, r);
     if (def.meters) bandMeters(body, r, def.meters);
+    if (d.type === 'spaces') { const row = document.createElement('div'); row.className = 'row tight'; row.innerHTML = `<button class="btn ghostb tiny">Load impulse response…</button><span class="muted small">${d.p.type === 'file' && d.p.irName ? esc(d.p.irName) : 'WAV or AIFF, from any reverb library or your own recordings'}</span>`; row.querySelector('button').onclick = () => spacesPickIR(d); body.appendChild(row); }
     if (d.type === 'comp' || d.type === 'iron') { const row = document.createElement('label'); row.className = 'psel scsel'; row.innerHTML = '<span>Sidechain from</span>'; const opts = [['', 'Off (its own input)'], ...S.tracks.filter(t => t !== o).map(t => [t.id, t.name]), ...S.returns.filter(t => t !== o).map(t => [t.id, t.name])]; row.appendChild(selectEl(opts, d.p.sc || '', v => { pushUndo('Sidechain'); d.p.sc = v || null; r.set(); wireSidechains(); markDirty(); }, 'Sidechain source')); body.appendChild(row); }
     body.appendChild(paramGrid(def.params, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`));
   }

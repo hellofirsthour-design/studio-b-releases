@@ -57,6 +57,7 @@ function applyMod(b, key, v) {
 }
 function runModulators(time, pos) {
   if (!S) return;
+  if (pos != null) DEV_RT.forEach(r => r.transport && r.transport(time, pos));   // tempo-locked devices (Half) follow the song
   allBuses().forEach(b => { const walk = list => list.forEach(d => { if (d.type === 'rack') return d.p.chains.forEach(ch => walk(ch.devices)); if (!MOD_TYPES.has(d.type) || !d.on) return;
     const r = DEV_RT.get(d.id); if (!r) return; const v = modValue(d, r, time, pos); r.v = v; if (d.p.target) applyMod(b, d.p.target, v); }); walk(b.devices); });
 }

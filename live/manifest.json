@@ -1,8 +1,8 @@
 {
- "version": "0.2.38",
+ "version": "0.2.39",
  "shell": 3,
- "date": "2026-11-15T20:09:35.919Z",
- "notes": "Stop devices' oscillators on rebuild; release offline render processors",
+ "date": "2026-11-15T20:16:11.200Z",
+ "notes": "Writer: chord, melody, bass and beat generators",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 5260,
-   "sha256": "849d2b5524f8159c7a61c4a792ac8eda427c0265ec744a63be39bf30aac06418"
+   "size": 6273,
+   "sha256": "cdec050e14bf923db71395dd9dd073ffab6d7505823b27876a0e88972ffb2efc"
   },
   {
    "path": "img/icon.png",
@@ -31,8 +31,8 @@
   },
   {
    "path": "index.html",
-   "size": 21071,
-   "sha256": "5229891233e40a811a99b0ef34ae47cd77fbc4fad6256be38852768c78e5539a"
+   "size": 21240,
+   "sha256": "066bd696303e11b825779b42a7de46b24310cb6ae37508f916d5817dc1e29431"
   },
   {
    "path": "js/arrange.js",
@@ -131,8 +131,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 35733,
-   "sha256": "38e23da7a9fc9e39f220c53337886c157a924df5b98a075a23096aa44c43a2a1"
+   "size": 35840,
+   "sha256": "c5af6d00ae5a9888f7b4a09426768ce15a677416b7e5445fc3d5495cca4720f7"
   },
   {
    "path": "js/mapping.js",
@@ -225,6 +225,11 @@
    "sha256": "f33731204cce01b34e9c607b8efe478e22e62a851ad3a23c8792d555f6d6ad4f"
   },
   {
+   "path": "js/writer.js",
+   "size": 19775,
+   "sha256": "5fecaae6b4a87b51338799ffcac273c8d72bd43ade295f52f3a0cb6aed0961f1"
+  },
+  {
    "path": "vendor/lamejs/lame.min.js",
    "size": 156043,
    "sha256": "15d285e2587b3bdbfd18a68de6ce07cc074f7480a82c3815da2dc1c348ec6df4"
@@ -237,7 +242,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "86407a271a6bc8e0c892eb6a06a55766e7d137b98ed7c17b9c30be31ec6b3db6"
+   "sha256": "74eb71767bdd72f6c200e7ead38b7e7ca1ef2d911fc5df704ed3616a151fdd0f"
   }
  ]
 }

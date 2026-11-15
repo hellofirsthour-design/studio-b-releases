@@ -26,6 +26,7 @@ const relEnv = (g, t, R) => { hold(g.gain, t); g.gain.setTargetAtTime(0, t, Math
 function mpeBend(params, time, dur, mpe, f0) { if (!mpe || !mpe.pb || !mpe.pb.length || !dur) return; params.forEach(pr => { pr.setValueAtTime(f0 * Math.pow(2, mpe.pb[0].v / 12), time); mpe.pb.forEach(q => pr.linearRampToValueAtTime(f0 * Math.pow(2, q.v / 12), time + q.t * dur)); }); }
 class PolyBase {
   constructor(t) { this.t = t; this.out = ctx.createGain(); this.voices = []; this.update(); }
+  dispose() { this.allOff(ctx.currentTime); releaseNodes(this); }
   update() { this.out.gain.value = this.t.inst.gain != null ? this.t.inst.gain : 0.7; }
   track(v, end) { this.voices.push(v); if (this.voices.length > 32) this.kill(this.voices[0], ctx.currentTime); }
   kill(v, time) { if (v.done) return; v.done = true; relEnv(v.amp, time, 0.01); (v.srcs || []).forEach(s => { try { s.stop(time + 0.05); } catch (e) { } }); this.voices = this.voices.filter(x => x !== v); }
