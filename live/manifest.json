@@ -1,8 +1,8 @@
 {
- "version": "0.2.40",
- "shell": 3,
- "date": "2026-11-15T20:22:01.682Z",
- "notes": "Stutter and Spectra; projects now save Zones and Spectra samples",
+ "version": "0.2.41",
+ "shell": 4,
+ "date": "2026-11-15T20:30:07.731Z",
+ "notes": "App icon: your organic \"B\"; the app sets its own icon (shell 4)",
  "files": [
   {
    "path": "css/base.css",
@@ -16,23 +16,28 @@
   },
   {
    "path": "css/theme.css",
-   "size": 6273,
-   "sha256": "cdec050e14bf923db71395dd9dd073ffab6d7505823b27876a0e88972ffb2efc"
+   "size": 6244,
+   "sha256": "ca4087309ad0066113e5e8565b61698898c185dfb44bc6175ec327b56106b97e"
+  },
+  {
+   "path": "img/b-mark.svg",
+   "size": 3778,
+   "sha256": "fecdda9a5d875380eb9d42c4f323bd39577ed740aeed40a1d85bc7615d9a5a89"
   },
   {
    "path": "img/icon.png",
-   "size": 322165,
-   "sha256": "dfb9857726e396f41efe36a571c4377b1f3e85ba417a84585aff37e3814f3875"
+   "size": 649745,
+   "sha256": "007f47e786a6568d59bac25c6d5bede41255546f0873d584e7eff6a7ff74e17e"
   },
   {
    "path": "img/icon.svg",
-   "size": 2355,
-   "sha256": "e05ea2089c5a75a4d648e439b64a66ef106f6cbd699d2cbc24c651857ac270d3"
+   "size": 4566,
+   "sha256": "c90748be9a72572d64484128b7837d7399e4808325081736d5c0a9fd1af1c375"
   },
   {
    "path": "index.html",
-   "size": 21240,
-   "sha256": "066bd696303e11b825779b42a7de46b24310cb6ae37508f916d5817dc1e29431"
+   "size": 24367,
+   "sha256": "e3c2563e15aef1ac813f854035f89a8c92ece06a6ce5f444364016163bc04d4f"
   },
   {
    "path": "js/arrange.js",
@@ -242,7 +247,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "92316c845cb642159c045e83c41525bdfbf5ab40a620e85c27c8d0d4163b525a"
+   "sha256": "21aa6989d3fab81e9e2d2b45240d3e76d55603da1c3a12a1701e0a9151bc412b"
   }
  ]
 }
