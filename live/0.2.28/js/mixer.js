@@ -20,7 +20,7 @@ const mixer = {
       ${io}
       <div class="mxdevs">${devs}<button class="mxdev add" data-act="adddev">+ Effect</button></div>
       <div class="mxknobs">${isT ? S.returns.map((r, i) => `<span data-k="${sendKey(i)}"></span>`).join('') : ''}${kind !== 'master' ? '<span data-k="pan"></span>' : ''}</div>
-      ${isT ? `<div class="mxrow">${b.kind === 'audio' ? `<button class="btn ghostb tiny" data-act="input" title="Where this track records from">${b.input === 'resample' ? 'In: Main' : String(b.input || '').startsWith('track:') ? 'In: ' + esc((busById(b.input.slice(6)) || {}).name || 'track') : 'In: Mic'}</button>` : ''}<label class="mxdly" title="Track delay in milliseconds (negative plays earlier)"><span>Delay</span><input type="number" step="1" min="-500" max="500" value="${b.delayMs || 0}" data-act="delay"></label></div>` : kind === 'return' ? `<div class="mxrow"><button class="btn ghostb tiny ${b.pre ? 'on' : ''}" data-act="pre">${b.pre ? 'Pre fader' : 'Post fader'}</button></div>` : ''}
+      ${isT ? `<div class="mxrow">${b.kind === 'audio' ? `<button class="btn ghostb tiny" data-act="input" title="Where this track records from">${b.input === 'resample' ? 'In: Main' : String(b.input || '').startsWith('track:') ? 'In: ' + esc((busById(b.input.slice(6)) || {}).name || 'track') : 'In: ' + esc(inLabel(b))}</button>` : ''}<button class="btn ghostb tiny" data-act="output" title="Where this track plays to">Out: ${esc(outLabel(b))}</button><label class="mxdly" title="Track delay in milliseconds (negative plays earlier)"><span>Delay</span><input type="number" step="1" min="-500" max="500" value="${b.delayMs || 0}" data-act="delay"></label></div>` : kind === 'return' ? `<div class="mxrow"><button class="btn ghostb tiny ${b.pre ? 'on' : ''}" data-act="pre">${b.pre ? 'Pre fader' : 'Post fader'}</button><button class="btn ghostb tiny" data-act="output" title="Where this return plays to">Out: ${esc(outLabel(b))}</button></div>` : ''}
       ${loud}
       <div class="mxfader">
         <div class="mxscale">${scale}</div>
@@ -53,6 +53,7 @@ const mixer = {
       if (act === 'solo') { if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; }
       if (act === 'arm') { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); }
       if (act === 'input') { V.selTracks = new Set([b.id]); return chooseInput(b); }
+      if (act === 'output') return chooseOutput(b, e);
       if (act === 'pre') { pushUndo('Send position'); b.pre = !b.pre; rebuildAll(); this.render(); ui.headers(); return; }
       if (act === 'delay') return;
       if (act === 'lreset') { if (M.loud) M.loud.port.postMessage({ reset: true }); M.loudData = null; this.peaks.clear(); return; }

@@ -1,8 +1,8 @@
 {
- "version": "0.2.27",
+ "version": "0.2.28",
  "shell": 3,
- "date": "2026-11-15T04:00:33.497Z",
- "notes": "Add a 187-sound library, the Drawbar organ and Patina; fix FM render hang",
+ "date": "2026-11-15T17:14:43.172Z",
+ "notes": "Free sample packs and a fresh session on every launch",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "index.html",
-   "size": 20321,
-   "sha256": "9bf9026c7c95d4f91011ba580d827c29013ab812298cc495ff2820b587a399b1"
+   "size": 20464,
+   "sha256": "67de95c2db07d6b9ae17012a6a908e49c9817f4f8850b17a07650bd18679684f"
   },
   {
    "path": "js/arrange.js",
@@ -26,8 +26,8 @@
   },
   {
    "path": "js/browser.js",
-   "size": 33668,
-   "sha256": "654b900b99ba3bd3865bfc4409e6180398d6580aa98b167cc03ae55e59a99594"
+   "size": 34118,
+   "sha256": "57fc7a49437a40f4d252065995b5e9478c7b808d0a46aed831e6ee6a9b54cdb8"
   },
   {
    "path": "js/cards.js",
@@ -81,8 +81,8 @@
   },
   {
    "path": "js/files.js",
-   "size": 20946,
-   "sha256": "fbe1ad5cdf29f671b8884291aa6d3d56217e96b4b19f5066464a9620cdebe8a2"
+   "size": 21097,
+   "sha256": "1da85ad4999242b3244ac6c223371cbc27d53c3174bab49647a29f3b258f3862"
   },
   {
    "path": "js/groove.js",
@@ -96,8 +96,8 @@
   },
   {
    "path": "js/instruments2.js",
-   "size": 22104,
-   "sha256": "9946135b2c686d8d3c4d35a02706c7cadb02dfc2677796ea746d820b12b57fbf"
+   "size": 22192,
+   "sha256": "230a1c590301fa013ac26bc96d31c60520358b98d5b93eab5372adef0501bf12"
   },
   {
    "path": "js/io.js",
@@ -106,8 +106,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 35889,
-   "sha256": "3f00fa1f1bda6f878a225ec9707d22ed6a773d56cfd9e1ef580c703519543d6d"
+   "size": 36137,
+   "sha256": "535ecd773cb847de29dfffb1d3dddc16c95767369d3dbecdc1c0a2f0e291bafb"
   },
   {
    "path": "js/mapping.js",
@@ -135,6 +135,16 @@
    "sha256": "ae8b23c8562c330b0f1a2ecb1884e2364888ab8ba90eb88f72b75b86b4c57758"
   },
   {
+   "path": "js/packs-data.js",
+   "size": 60945,
+   "sha256": "e61c7240b06675c86dbac0d4655451b58cb482cfa2a881665696e94bd215f9ca"
+  },
+  {
+   "path": "js/packs.js",
+   "size": 9699,
+   "sha256": "c22b4f1ccf5a946b6e6d225c8726d269b4f0fe11c1caf6b192170308e1a7c048"
+  },
+  {
    "path": "js/plugins.js",
    "size": 8666,
    "sha256": "0dda99c363541555c62bca07868280fdd46fc6c7f2ddeae285518ecdc4243d52"
@@ -156,8 +166,8 @@
   },
   {
    "path": "js/sounds.js",
-   "size": 34653,
-   "sha256": "19f878ff2bc822867cb4e6399a8c59c65767880faa28d3dc9f538c53df4c516d"
+   "size": 34990,
+   "sha256": "9dea7b72f906e234183281c7a4194bc02a2ecca682226714209fe166ab723c7d"
   },
   {
    "path": "js/timeline.js",
@@ -187,7 +197,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "4ebce59de3be6ebe8c0fb72d1f53e75ad36e8168f1e938fb8ba9e3ecee80633e"
+   "sha256": "d4d592d26354e8e8b3736a333c71482f99f63cab61f5c48495bdfd725a215ef9"
   }
  ]
 }

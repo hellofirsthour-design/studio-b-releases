@@ -80,7 +80,7 @@ let AUTO_DIR = null;
 async function autosaveDir() { if (!IS_DESKTOP) return null; if (!AUTO_DIR) { const p = await NATIVE.paths(); AUTO_DIR = joinPath(joinPath(p.music, 'Studio B'), 'Autosave'); } return AUTO_DIR; }
 async function autosaveNow() {
   if (!V.dirty || T.recording) return; const dir = await autosaveDir(); if (!dir) return;
-  try { const file = joinPath(dir, 'Recovered.sbproj'); await writeRecordings(file); const P = serialise(); P.autosave = { at: Date.now(), name: S.name, path: S.path || null }; await NATIVE.write(file, JSON.stringify(P)); } catch (e) { console.warn('autosave', e.message); }
+  try { await neSaveStates(); const file = joinPath(dir, 'Recovered.sbproj'); await writeRecordings(file); const P = serialise(); P.autosave = { at: Date.now(), name: S.name, path: S.path || null }; await NATIVE.write(file, JSON.stringify(P)); } catch (e) { console.warn('autosave', e.message); }
 }
 async function clearAutosave() { const dir = await autosaveDir(); if (!dir) return; try { await NATIVE.write(joinPath(dir, 'Recovered.sbproj'), ''); } catch (e) { } }
 async function offerRecovery() {

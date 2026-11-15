@@ -16,7 +16,7 @@ function markMapped() {
 function targetName(t) {
   const [owner, key] = t.split('|'); if (owner === 'T') return 'Transport: ' + key;
   const b = busById(owner); if (!b) return t; if (!key.startsWith('dev:')) return `${b.name}: ${key}`;
-  const [, id, k] = key.split(':'), d = findDevice(id, b.devices); const def = d && (DEVICES[d.type].params || []).find(q => q.k === k);
+  const [, id, k] = key.split(':'), d = findDevice(id, b.devices); const def = d && devParamDefs(d).find(q => q.k === k);
   return `${b.name}: ${d ? (d.type === 'rack' && k.startsWith('m') ? d.p.names[+k.slice(1) - 1] : (DEVICES[d.type].name + ' ' + (def ? def.label : k))) : key}`;
 }
 function showMapPanel() {
@@ -68,6 +68,6 @@ function runMapped(m, val) { // val 0..1 for knobs and faders; null for a key pr
 }
 function mapRange(b, key) {
   if (key === 'vol') return { min: 0, max: 1 }; if (key === 'pan') return { min: -1, max: 1 }; if (sendIndex(key) >= 0) return { min: 0, max: 1 };
-  if (key.startsWith('dev:')) { const [, id, k] = key.split(':'), d = findDevice(id, b.devices); const def = d && (DEVICES[d.type].params || []).find(q => q.k === k); return def && def.min != null ? def : null; }
+  if (key.startsWith('dev:')) { const [, id, k] = key.split(':'), d = findDevice(id, b.devices); const def = d && devParamDefs(d).find(q => q.k === k); return def && def.min != null ? def : null; }
   return null;
 }
