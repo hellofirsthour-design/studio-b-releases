@@ -187,7 +187,7 @@ function eqEditor(body, d, r, changed) {
       const del = document.createElement('button'); del.className = 'btn ghostb'; del.textContent = 'Remove band'; del.onclick = () => { d.p.bands.splice(selB, 1); selB = Math.max(0, selB - 1); changed(); bandBar(); }; ctl.appendChild(del);
       bar.appendChild(ctl);
     } else { const p = document.createElement('span'); p.className = 'muted'; p.textContent = 'Double-click the curve to add a band'; bar.appendChild(p); }
-    const rs = selectEl([[12, '±12 dB'], [18, '±18 dB'], [30, '±30 dB']], range, v => { range = v; bandBar(); }, 'Display range'); bar.appendChild(rs); bar.appendChild(outK);
+    const rs = selectEl([[12, '±12 dB'], [18, '±18 dB'], [30, '±30 dB']], range, v => { range = v; bandBar(); }, 'Display range'); bar.appendChild(rs); bar.appendChild(outK); bar.appendChild(toggleEl('Linear phase', !!d.p.linear, v => { pushUndo('Linear phase'); d.p.linear = v; changed(); }));
   };
   const hit = (x, y) => { let best = -1, bd = 14; d.p.bands.forEach((b, i) => { const [nx, ny] = nodeXY(b); const dd = Math.hypot(nx - x, ny - y); if (dd < bd) { bd = dd; best = i; } }); return best; };
   cv.addEventListener('pointerdown', e => {

@@ -50,7 +50,9 @@ async function neInit() {
 function neDefaultBackend() { const b = NE.avail.backends.filter(x => x.id !== 'null'); return (b.find(x => x.id === GP.driver) || b.find(x => x.id === 'coreaudio') || b.find(x => x.id === 'wasapi') || b.find(x => x.id === 'jack') || b[0] || NE.avail.backends[0]).id; }
 async function neStart() {
   const backend = GP.driver && NE.avail.backends.some(b => b.id === GP.driver) ? GP.driver : neDefaultBackend();
-  const r = await NATIVE.engine.open({ backend, output: GP.outName || '', input: GP.inId === 'none' ? 'none' : (GP.inName || ''), sampleRate: GP.sr || LIVE_CTX.sampleRate, buffer: GP.buffer || 256, rendererRate: LIVE_CTX.sampleRate });
+  // The input stays closed until something needs it (an armed audio track, a hardware input under Audio From, a choice in Settings),
+  // so opening Studio B to make beats never asks for the microphone.
+  const r = await NATIVE.engine.open({ backend, output: GP.outName || '', input: GP.inId === 'none' || !NE.wantIn ? 'none' : (GP.inName || ''), sampleRate: GP.sr || LIVE_CTX.sampleRate, buffer: GP.buffer || 256, rendererRate: LIVE_CTX.sampleRate });
   if (!r.ok) { NE.error = r.error; toast('Native audio: ' + r.error.replace(/\.?$/, '.') + ' Using the built-in engine for now.', 6000); return false; }
   NE.dev = { ...r, backend }; NE.error = null;
   if (!NE.sab) {
@@ -61,10 +63,9 @@ async function neStart() {
   }
   NE.I[4] = r.outputs; NE.I[5] = Math.max(1, r.inputs);
   const opt = { sab: NE.sab, ring: NE.L.ring, header: NE.L.header, maxCh: NE.L.maxCh };
-  if (NE.outNode) try { NE.outNode.disconnect(); } catch (e) { }
+  neRetire();   // the previous device's nodes must stop writing into the shared buffer, or the device hears them all at once
   NE.outNode = new AudioWorkletNode(LIVE_CTX, 'gw-out', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: r.outputs, channelCountMode: 'explicit', channelInterpretation: 'discrete', processorOptions: opt });
   NE.keep = NE.keep || LIVE_CTX.createGain(); NE.keep.gain.value = 0; NE.outNode.connect(NE.keep); NE.keep.connect(LIVE_CTX.destination);   // keeps the worklet running
-  if (NE.inNode) try { NE.inNode.disconnect(); } catch (e) { }
   NE.inNode = r.inputs ? new AudioWorkletNode(LIVE_CTX, 'gw-in', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [r.inputs], processorOptions: opt }) : null;
   if (NE.inNode) NE.inNode.connect(NE.keep);
   try { if (LIVE_CTX.setSinkId) await LIVE_CTX.setSinkId({ type: 'none' }); } catch (e) { }
@@ -72,11 +73,13 @@ async function neStart() {
   NE.on = true; S.tracks.forEach(routeOut); connectInputs(); neSyncProject(); neTransport();
   return true;
 }
+function neRetire() { [NE.outNode, NE.inNode].forEach(n => { if (!n) return; try { n.port.postMessage('stop'); } catch (e) { } try { n.disconnect(); } catch (e) { } }); NE.outNode = NE.inNode = null; }
 async function neStop() {
-  NE.on = false; IO.native = false; IO.outCh = 2; IO.inCh = 0; ioWire();
+  neRetire(); NE.on = false; IO.native = false; IO.outCh = 2; IO.inCh = 0; ioWire();
   try { if (LIVE_CTX.setSinkId) await LIVE_CTX.setSinkId(GP.outId || ''); } catch (e) { }
   await NATIVE.engine.close(); S.tracks.forEach(routeOut); connectInputs();
 }
+async function neWantInput() { if (NE.wantIn || GP.inId === 'none') return; NE.wantIn = true; if (NE.on) { showBusy('Opening the audio input…'); try { await neRestart(); } finally { showBusy(null); } } }
 async function neRestart() { if (NE.on) { await NATIVE.engine.close(); NE.on = false; } return neStart(); }
 function neStatus() { return NE.on ? NATIVE.engine.status() : Promise.resolve(null); }
 // song position for tempo-synced plug-ins
@@ -146,11 +149,14 @@ function devLatency(d) { // seconds this device delays its signal
   if (!d.on) return 0;
   if (d.type === 'plugin') { const s = NE.on && NE.slots.get(d.id); if (!s) return 0; return (NE.lag * 128 + (s.ready ? (NE.I[neSlotBase(s.slot) + 6] | 0) : 0)) / sr0(); }
   if (d.type === 'rack') return Math.max(0, ...d.p.chains.map(c => c.devices.reduce((a, x) => a + devLatency(x), 0)));
+  if (d.type === 'eq' && d.p.linear) return (EQ_FIR_N / 2) / sr0();
+  if (d.type === 'apex') return Math.round(sr0() * 0.0015) / sr0();
   return 0;
 }
 function busLatency(b) { let l = b.devices.reduce((a, d) => a + devLatency(d), 0); if (b.inst && b.inst.type === 'plugin' && NE.on) { const s = NE.slots.get('inst:' + b.id); if (s) l += (NE.lag * 128 + (s.ready ? NE.I[neSlotBase(s.slot) + 6] | 0 : 0)) / sr0(); } return l; }
 // Tracks are delayed so every path reaches the main output at the same moment; returns are lined up the same way.
 function applyPDC() {
+  if (isOffline() || T.busy) return schedulePDC();   // never touch the mix in the middle of a render; try again when it is done
   const on = GP.pdc !== false; const path = t => busLatency(t) + ancestors(t).reduce((a, g) => a + busLatency(g), 0);
   const leaves = S.tracks.filter(t => t.kind !== 'group'), maxT = on ? Math.max(0, ...leaves.map(path)) : 0, maxR = on ? Math.max(0, ...S.returns.map(busLatency)) : 0;
   S.tracks.forEach(t => (t._pdc = on && t.kind !== 'group' ? maxT - path(t) : 0));

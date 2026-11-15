@@ -220,8 +220,9 @@ registerProcessor('gw-crush', GWCrush);
 
 // ---- native engine bridge (Studio B 0.3+): rings in a SharedArrayBuffer, see native/src/shared.h ----
 class GWOut extends AudioWorkletProcessor {   // mix and routed tracks -> device outputs
-  constructor(o) { super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.ring = q.ring; this.base = q.header; }
+  constructor(o) { super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.ring = q.ring; this.base = q.header; this.port.onmessage = e => { if (e.data === 'stop') this.dead = true; }; }
   process(inputs) {
+    if (this.dead) return false;                                   // replaced by a newer node: never write again
     const I = this.I, F = this.F, ch = I[4] || 2, inp = inputs[0] || [], w = I[0] >>> 0, r = Atomics.load(I, 1) >>> 0, mask = this.ring - 1;
     if (((w - r) >>> 0) + 128 >= this.ring) return true;          // the device is not taking audio: drop
     for (let i = 0; i < 128; i++) { const o = this.base + ((w + i) & mask) * ch; for (let c = 0; c < ch; c++) F[o + c] = inp[c] ? inp[c][i] : 0; }
@@ -230,8 +231,9 @@ class GWOut extends AudioWorkletProcessor {   // mix and routed tracks -> device
 }
 registerProcessor('gw-out', GWOut);
 class GWIn extends AudioWorkletProcessor {    // device inputs -> Web Audio
-  constructor(o) { super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.ring = q.ring; this.base = q.header + q.ring * q.maxCh; }
+  constructor(o) { super(); const q = o.processorOptions; this.I = new Int32Array(q.sab); this.F = new Float32Array(q.sab); this.ring = q.ring; this.base = q.header + q.ring * q.maxCh; this.port.onmessage = e => { if (e.data === 'stop') this.dead = true; }; }
   process(_, outputs) {
+    if (this.dead) return false;
     const I = this.I, F = this.F, out = outputs[0], ch = I[5] || 1, mask = this.ring - 1; let r = Atomics.load(I, 3) >>> 0; const w = Atomics.load(I, 2) >>> 0; let avail = (w - r) >>> 0;
     if (avail > 4096) { r = (w - 512) >>> 0; avail = 512; }     // fell behind: jump to recent audio
     if (avail < 128) { for (const o of out) o.fill(0); return true; }

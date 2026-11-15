@@ -1,8 +1,8 @@
 {
- "version": "0.2.33",
+ "version": "0.2.34",
  "shell": 3,
- "date": "2026-11-15T19:27:34.344Z",
- "notes": "Orbit: a Pluto-style multi-effect for melodies",
+ "date": "2026-11-15T19:35:49.816Z",
+ "notes": "EQ and tone: linear-phase Prism, Console, Low End, Strip",
  "files": [
   {
    "path": "css/base.css",
@@ -31,8 +31,8 @@
   },
   {
    "path": "index.html",
-   "size": 20957,
-   "sha256": "39e5a245135ce4f2a0d5ea4ccd3d1ba75dd026a4983146e84c5654528a94d899"
+   "size": 20992,
+   "sha256": "16e0352b3803ed2a43feb16d3e68c5094029b1cd467172aaf26bbc1377ce01d6"
   },
   {
    "path": "js/arrange.js",
@@ -41,13 +41,13 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34197,
-   "sha256": "c1fd3b6211c01c3749b73e2bed734d2e814586a98fd91ff04822664b872c14e2"
+   "size": 34249,
+   "sha256": "9aa7005043e441f474aa8da31e6de39063a8b874932d7ca063548f1d2d583e06"
   },
   {
    "path": "js/cards.js",
-   "size": 39988,
-   "sha256": "effe1308b4cde5c05cf05e3cd1465fe62fd971eb0fd1929c653950d6b922ea18"
+   "size": 40108,
+   "sha256": "ef3f710d6b1beb086e0cee03d04047553391453a81aaf45c31e07bc4094f7be8"
   },
   {
    "path": "js/convert.js",
@@ -61,8 +61,8 @@
   },
   {
    "path": "js/devices.js",
-   "size": 29114,
-   "sha256": "334d0d5f0fbd24c31bd43fad9767c530d46eb63ad7a31d85dad070b5a0a94c39"
+   "size": 31363,
+   "sha256": "fce618852c52a1a99257557a667befa9878a2b68e369bd50b8afc0711701c2a3"
   },
   {
    "path": "js/dsp.js",
@@ -86,8 +86,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 54269,
-   "sha256": "64be9090e6cb5476adc26bae6a0d19be3dab1113e60d6b2e7b835e273dc60b4b"
+   "size": 54283,
+   "sha256": "ebec5288e3db9d6cf383d6dfb0115c68095e673768d9abf0d84ea9578077cd18"
   },
   {
    "path": "js/features.js",
@@ -151,8 +151,8 @@
   },
   {
    "path": "js/native.js",
-   "size": 16391,
-   "sha256": "d6000adaf0a39413675eb16d61eb5c32d6cc660d8e128041b20ba3caf6afb43f"
+   "size": 16656,
+   "sha256": "c0c66ceb11d25f403f0e5f3d9b8f0cfea4a147a818e982c380dea2470f043046"
   },
   {
    "path": "js/packs-data.js",
@@ -195,6 +195,11 @@
    "sha256": "e34e60a252210717d15b8e516d38de2ecd14ee7c7a43128810111311ad5eaa67"
   },
   {
+   "path": "js/tone.js",
+   "size": 12521,
+   "sha256": "088d1060a57815eef587cd19a5384e17dd0563f466b431f9b73f9aad3a9081af"
+  },
+  {
    "path": "js/ui.js",
    "size": 44841,
    "sha256": "3ea63907e17a8a38814d55593c8de7d5dcbe890d92ca1dba6b447853063250f9"
@@ -206,8 +211,8 @@
   },
   {
    "path": "js/worklets2.js",
-   "size": 19267,
-   "sha256": "6367466a8d6d6f04d8045b19dd23fe3a9e1d20beabc945f8c1884ecbd5e6cfb4"
+   "size": 20496,
+   "sha256": "632c607f6fb10b1b84ab46ec772c4c14cfceef55a4949c71612b5650f63568c5"
   },
   {
    "path": "vendor/lamejs/lame.min.js",
@@ -222,7 +227,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "f4137eddc19df18c714401f6f176af2656f97834c12868ea4210ea891e760a85"
+   "sha256": "66889ef6d20b2176084659acf9c554a8c5c00b667f57c3334639155763194f33"
   }
  ]
 }

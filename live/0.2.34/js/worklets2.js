@@ -201,4 +201,74 @@ class GWClip extends AudioWorkletProcessor {
   }
 }
 registerProcessor('gw-clip', GWClip);
+
+// Pitch shifter (two crossfaded taps on a short delay line): shimmer reverb's octave.
+class GWShift extends AudioWorkletProcessor {
+  constructor() { super(); this.semis = 12; this.N = 1 << 14; this.buf = [new Float32Array(this.N), new Float32Array(this.N)]; this.w = 0; this.ph = 0; this.W = Math.round(sampleRate * 0.05); this.port.onmessage = e => Object.assign(this, e.data); }
+  tap(b, d) { const p = this.w - d, i = Math.floor(p), f = p - i, m = this.N - 1; return b[i & m] * (1 - f) + b[(i + 1) & m] * f; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    const n = out[0].length, r = Math.pow(2, this.semis / 12), step = (r - 1) / this.W, m = this.N - 1;
+    for (let i = 0; i < n; i++) {
+      for (let c = 0; c < 2; c++) { const src = inp && (inp[c] || inp[0]); this.buf[c][this.w & m] = src ? src[i] : 0; }
+      this.ph -= step; this.ph -= Math.floor(this.ph); const p2 = (this.ph + 0.5) % 1, g1 = Math.sin(Math.PI * this.ph), g2 = Math.sin(Math.PI * p2);
+      for (let c = 0; c < out.length; c++) { const b = this.buf[c < 2 ? c : 0]; out[c][i] = this.tap(b, 2 + this.ph * this.W) * g1 + this.tap(b, 2 + p2 * this.W) * g2; }
+      this.w++;
+    }
+    return true;
+  }
+}
+registerProcessor('gw-shift', GWShift);
+
+// Granular delay: little pieces of the past ("grains") replayed at the delay time, scattered, sometimes an octave up or reversed.
+class GWGrain extends AudioWorkletProcessor {
+  constructor() {
+    super(); Object.assign(this, { time: 0.375, size: 0.09, density: 18, scatter: 0.06, fb: 0.35, octave: 0.2, reverse: 0.15 });
+    this.N = 1 << 18; this.buf = [new Float32Array(this.N), new Float32Array(this.N)]; this.w = 0; this.acc = 0; this.g = []; this.last = [0, 0];
+    this.port.onmessage = e => Object.assign(this, e.data);
+  }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    const n = out[0].length, m = this.N - 1, sr = sampleRate, norm = 1 / Math.sqrt(Math.max(1, this.density * this.size));
+    for (let i = 0; i < n; i++) {
+      for (let c = 0; c < 2; c++) { const src = inp && (inp[c] || inp[0]); this.buf[c][this.w & m] = (src ? src[i] : 0) + this.last[c] * this.fb; }
+      this.acc += this.density / sr;
+      while (this.acc >= 1 && this.g.length < 40) { this.acc -= 1;
+        const len = Math.max(64, Math.round(this.size * sr * (0.7 + Math.random() * 0.6))), rev = Math.random() < this.reverse, rate = (Math.random() < this.octave ? 2 : 1) * (rev ? -1 : 1);
+        const back = this.time * sr + Math.random() * this.scatter * sr + (rate > 1 ? len : 0) + (rev ? 0 : 0);
+        this.g.push({ pos: this.w - back + (rev ? len : 0), rate, len, age: 0, pan: Math.random() * 2 - 1 }); }
+      if (this.acc > 1) this.acc = 1;
+      let l = 0, r = 0;
+      for (let k = this.g.length - 1; k >= 0; k--) {
+        const g = this.g[k], env = Math.sin(Math.PI * g.age / g.len), p = g.pos, j = Math.floor(p), f = p - j;
+        const a = this.buf[0][j & m] * (1 - f) + this.buf[0][(j + 1) & m] * f, b = this.buf[1][j & m] * (1 - f) + this.buf[1][(j + 1) & m] * f;
+        const pl = Math.min(1, 1 - g.pan), pr = Math.min(1, 1 + g.pan); l += a * env * pl; r += b * env * pr;
+        g.pos += g.rate; g.age++; if (g.age >= g.len) this.g.splice(k, 1);
+      }
+      l *= norm; r *= norm; this.last[0] = l; this.last[1] = r;
+      out[0][i] = l; if (out[1]) out[1][i] = r; this.w++;
+    }
+    return true;
+  }
+}
+registerProcessor('gw-grain', GWGrain);
+
+// Sub-octave: flips the sign of the (low-passed) input on every other upward zero crossing, which halves its frequency; the input's own envelope keeps it musical.
+class GWSub extends AudioWorkletProcessor {
+  constructor() { super(); this.f = 120; this.st = [[0, 0], [0, 0]]; this.prev = 0; this.flip = 1; this.cnt = 0; this.env = 0; this.k = biq('lp', this.f); this.port.onmessage = e => { Object.assign(this, e.data); this.k = biq('lp', this.f); }; }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0]; if (!out || !out[0]) return true;
+    const n = out[0].length, eC = coef(8);
+    for (let i = 0; i < n; i++) {
+      const a = inp && inp[0] ? inp[0][i] : 0, b = inp && (inp[1] || inp[0]) ? (inp[1] || inp[0])[i] : a;
+      const x = run(this.k, this.st[1], run(this.k, this.st[0], (a + b) * 0.5)), ax = Math.abs(x);
+      this.env = ax > this.env ? ax + (this.env - ax) * coef(1) : ax + (this.env - ax) * eC;
+      if (this.prev <= 0 && x > 0) this.flip = -this.flip;   // one flip per cycle: a square at half the frequency
+      this.prev = x; const y = this.flip * this.env;
+      for (let c = 0; c < out.length; c++) out[c][i] = y;
+    }
+    return true;
+  }
+}
+registerProcessor('gw-sub', GWSub);
 `;

@@ -100,7 +100,7 @@ function wireSidechains() {
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
-function rewire(b) { if (NE.on && !isOffline()) { setTimeout(neSyncProject, 0); schedulePDC(); } if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
+function rewire(b) { if (!isOffline()) schedulePDC(); if (NE.on && !isOffline()) setTimeout(neSyncProject, 0); if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
 const anySolo = () => S.tracks.some(t => t.solo);
 // A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
 const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
@@ -355,6 +355,17 @@ function click(time, accent) {
 
 function unfreezeForTempo() { const fz = S.tracks.filter(t => t.frozen); if (!fz.length) return; fz.forEach(t => { delete t.frozen; rewire(t); applyMix(t); }); toast(`Unfroze ${fz.map(t => t.name).join(', ')} because the tempo changed. Freeze again to re-render.`, 5000); }
 /* ---------- transport ---------- */
+// Record: press it and the song starts recording (after the count-in, if one is set). Press it again to stop recording and keep playing.
+async function recordButton() {
+  if (T.rec) { T.rec = false; if (T.recording) finishRecording(); ui.transport(); return; }
+  if (!S.tracks.some(t => t.arm)) { const t = S.tracks.find(x => V.selTracks.has(x.id) && (x.kind === 'audio' || x.kind === 'midi')); if (t) await armTrack(t, true); }
+  T.rec = true; if (T.playing) startRecording(nowPos()); else play(V.insert);
+  ui.transport();
+}
+function countInMenu(at) {
+  const cur = (S.prefs && S.prefs.countIn) || 0;
+  popMenu(at, [[0, 'No count-in'], [1, '1 bar'], [2, '2 bars'], [4, '4 bars']].map(([v, l]) => ({ label: (v === cur ? '✓  ' : '    ') + l, run: () => { S.prefs = S.prefs || {}; S.prefs.countIn = v; markDirty(); ui.transport(); } })));
+}
 function play(from = V.insert) {
   if (isOffline() || T.busy) return;
   if (ctx.state !== 'running') ctx.resume();
@@ -368,6 +379,7 @@ function play(from = V.insert) {
 }
 function stop(silent) {
   if (isOffline()) return;
+  if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
   clearMidiFxQueues(); T.playing = false; stopSources(now);
@@ -417,7 +429,8 @@ function connectInputs() {
 }
 async function armTrack(t, on) {
   t.arm = on;
-  if (on && t.kind === 'audio' && !internalInput(t)) { try { await getInput(t.input); } catch (e) { t.arm = false; toast('Studio B could not open the audio input. Check the microphone permission and input device in Settings.'); } }
+  if (on && t.kind === 'audio' && IO.native && ((t.input || 'default') === 'default' || extParse(t.input))) { await neWantInput(); connectInputs(); }
+  else if (on && t.kind === 'audio' && !internalInput(t)) { try { await getInput(t.input); } catch (e) { t.arm = false; toast('Studio B could not open the audio input. Check the microphone permission and input device in Settings.'); } }
   applyMix(t); ui.headers();
 }
 function startRecording(from) {
