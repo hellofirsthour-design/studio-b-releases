@@ -14,6 +14,7 @@ const arr = {
   x(pos) { return (pos - V.scrollX) * V.pps; },
   pos(x) { return x / V.pps + V.scrollX; },
   gridStep() {
+    if (V.fixedGrid) { const f = V.fixedGrid, b = SPB(), v = f === 'bar' ? b : f === 'bar2' ? 2 * b : f === 'bar4' ? 4 * b : +f; return V.triplet && v < b ? v * 2 / 3 : v; }   // a fixed size from the toolbar
     const c = gridCandidates(); const min = 11 * Math.pow(2, V.grid);
     return c.find(s => s * V.pps >= min) || c[c.length - 1];
   },
@@ -101,22 +102,23 @@ const arr = {
   drawClip(g, t, c, x, y, cw, rh, css) {
     const sel = V.selClips.has(c.id), col = c.muted ? css.muted : (c.color || t.color), th = rh >= 34 ? 14 : 0;
     g.save(); g.beginPath(); g.rect(Math.max(x, -2), y + 1, Math.min(cw, 1e5), rh - 2); g.clip();
-    g.fillStyle = mix(col, css.lane, 0.55); g.fillRect(x, y + 1, cw, rh - 2);
-    if (th) { g.fillStyle = col; g.fillRect(x, y + 1, cw, th); g.fillStyle = '#17151c'; g.font = '600 10px ' + css.ui; g.fillText((c.muted ? '◌ ' : '') + c.name, Math.max(x, 0) + 4, y + 11); }
+    const ink = c.muted ? css.dim : mix(col, '#ffffff', 0.45);   // notes and waveforms: a light tint of the clip colour on a dark tinted body
+    g.fillStyle = mix(col, css.lane, 0.8); g.fillRect(x, y + 1, cw, rh - 2); g.fillStyle = mix(col, css.lane, 0.55); g.fillRect(x, y + 1, 1, rh - 2);
+    if (th) { g.fillStyle = mix(col, css.lane, 0.28); g.fillRect(x, y + 1, cw, th); g.fillStyle = 'rgba(10,10,12,.85)'; g.font = '600 10px ' + css.ui; g.fillText((c.muted ? '◌ ' : '') + c.name, Math.max(x, 0) + 4, y + 11); }
     const by = y + 1 + th, bh = rh - 2 - th;
     if (c.type === 'midi' && bh > 6) {
       const ns = c.notes; if (ns.length) {
         let lo = 127, hi = 0; ns.forEach(n => { if (n.p < lo) lo = n.p; if (n.p > hi) hi = n.p; }); const span = Math.max(8, hi - lo + 1), nh = Math.max(1.5, Math.min(5, bh / span));
         const L = c.bars * 16, base = c.start - c.offset;
-        g.fillStyle = c.muted ? css.dim : '#17151c';
+        g.fillStyle = ink;
         for (let k = Math.floor(c.offset / L); base + k * L < c.start + c.len; k++) {
           const lx = this.x(base + k * L); if (k > Math.floor(c.offset / L) && lx > x) { g.globalAlpha = 0.35; g.fillRect(lx, by, 1, bh); g.globalAlpha = 1; }
-          for (const n of ns) { if (n.s >= L) continue; const s = base + k * L + n.s; g.fillStyle = T.playing && nowPos() >= s && nowPos() < s + n.l ? '#ffffff' : (c.muted ? css.dim : '#17151c'); if (s + n.l <= c.start || s >= c.start + c.len) continue; const nx = this.x(s); g.fillRect(nx, by + (hi - n.p) / span * (bh - nh) , Math.max(1.5, Math.min(n.l * V.pps, (c.start + c.len - s) * V.pps) - 1), nh); }
+          for (const n of ns) { if (n.s >= L) continue; const s = base + k * L + n.s; g.fillStyle = T.playing && nowPos() >= s && nowPos() < s + n.l ? '#ffffff' : ink; if (s + n.l <= c.start || s >= c.start + c.len) continue; const nx = this.x(s); g.fillRect(nx, by + (hi - n.p) / span * (bh - nh) , Math.max(1.5, Math.min(n.l * V.pps, (c.start + c.len - s) * V.pps) - 1), nh); }
         }
       }
     } else if (c.type === 'audio' && bh > 4) {
       const s = SAMPLES.get(c.sampleId); if (s && s.wave) {
-        const wv = s.wave, mid = by + bh / 2, amp = bh / 2 - 1, gain = dbToGain(c.gain); g.fillStyle = c.muted ? css.dim : '#17151c';
+        const wv = s.wave, mid = by + bh / 2, amp = bh / 2 - 1, gain = dbToGain(c.gain); g.fillStyle = ink;
         const x0 = Math.max(0, Math.floor(x)), x1 = Math.min(this.lanes.clientWidth, Math.ceil(x + cw));
         for (let px = x0; px < x1; px++) {
           const lp = c.loop && c.loopLen > 0.25, la = this.pos(px) - c.start, a = (lp ? la % c.loopLen : la) + c.offset, b = a + 1 / V.pps;
@@ -129,7 +131,7 @@ const arr = {
         g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1;
         if (c.fadeIn > 0) { g.beginPath(); g.moveTo(x, by + bh); g.lineTo(x + c.fadeIn * V.pps, by); g.stroke(); }
         if (c.fadeOut > 0) { g.beginPath(); g.moveTo(x + cw - c.fadeOut * V.pps, by); g.lineTo(x + cw, by + bh); g.stroke(); }
-        if (c.warp && th && cw > 60) { g.fillStyle = 'rgba(23,21,28,.6)'; g.font = '9px ' + css.mono; g.fillText(c.semis ? (c.semis > 0 ? '+' : '') + c.semis + 'st' : '', x + cw - 26, y + 11); }
+        if (c.warp && th && cw > 60) { g.fillStyle = 'rgba(10,10,12,.7)'; g.font = '9px ' + css.mono; g.fillText(c.semis ? (c.semis > 0 ? '+' : '') + c.semis + 'st' : '', x + cw - 26, y + 11); }
       } else if (th) { g.fillStyle = css.dim; g.font = '10px ' + css.ui; g.fillText('Media offline', x + 4, by + 12); }
     }
     g.restore();
@@ -415,7 +417,7 @@ const px = v => Math.round(v * (devicePixelRatio || 1)) / (devicePixelRatio || 1
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // A collapsed track is a thin strip: its clips still show, with their names.
 const rowH = b => (b.collapsed ? 22 : b.h || 40);
-const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, sp = GP.zoomSpeed || 1; return clamp(Math.exp(-d * 0.0021 * sp), 0.8, 1.25); };
+const zoomFactor = e => { const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, sp = GP.zoomSpeed || 1, pinch = e.deltaMode === 0 && Math.abs(d) < 40; return clamp(Math.exp(-d * (pinch ? 0.011 : 0.0021) * sp), 0.7, 1.4); };
 /* Smooth zoom: the view eases toward the target zoom over a few frames, keeping the point under the pointer fixed. */
 const ZOOM = { t: null, raf: 0 };
 function zoomSmooth(target, pos, x) {
@@ -448,6 +450,7 @@ async function dropOnTimeline(e, r, at) {
   if (typeof browser !== 'undefined' && browser.stopPreview) browser.stopPreview();
   const dt = e.dataTransfer, track = r && r.kind === 'track' ? r.b : null;
   const sbs = dt.getData('sb/sample'), sbd = dt.getData('sb/device'), sbi = dt.getData('sb/inst'), sbp = dt.getData('sb/plugin');
+  const sbm = dt.getData('sb/midifx'); if (sbm) return addMidiFx(sbm, track && track.kind === 'midi' ? track : null);
   if (sbp) { const o = JSON.parse(sbp); if (!NE.on) return toast('Turn on the native engine in Settings → Audio to use plug-ins'); return addPlugin(o.ref, o.instrument, track || (r ? r.b : null)); }
   if (sbd) { const b = r ? r.b : null; if (b) { pushUndo('Add device'); b.devices.push(newDevice(sbd)); rewire(b); V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.all(); } return; }
   if (sbi) { addInstrumentTrack(sbi, track && track.kind === 'midi' ? track : null); return; }

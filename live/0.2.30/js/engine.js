@@ -75,7 +75,7 @@ const depthOf = b => ancestors(b).length;
 const hiddenByFold = b => ancestors(b).some(g => g.fold);
 function routeOut(b) {
   const r = RT.get(b.id); if (!r || b === S.master) return; const g = groupOf(b), ext = extParse(b.out), isRet = S.returns.includes(b);
-  const dest = ext ? (IO.native && !isOffline() ? extOutNode(b.out) : null) : g && RT.get(g.id) ? RT.get(g.id).in : isRet ? M.in : (M.direct || M.in);
+  const dest = b.out === 'none' ? null : ext ? (IO.native && !isOffline() ? extOutNode(b.out) : null) : g && RT.get(g.id) ? RT.get(g.id).in : isRet ? M.in : (M.direct || M.in);
   if (r.outDest === dest) return; if (r.outDest) try { r.mute.disconnect(r.outDest); } catch (e) { } if (dest) r.mute.connect(dest); r.outDest = dest;
 }
 function buildBus(b, kind) {
@@ -96,7 +96,7 @@ function buildBus(b, kind) {
 }
 // Feed each sidechained compressor from its source bus (post-fader).
 function wireSidechains() {
-  allBuses().forEach(b => b.devices.forEach(d => { if (d.type !== 'comp') return; const r = DEV_RT.get(d.id); if (!r || !r.sc) return;
+  allBuses().forEach(b => b.devices.forEach(d => { if (d.type !== 'comp' && d.type !== 'iron') return; const r = DEV_RT.get(d.id); if (!r || !r.sc) return;
     if (r.scSrc) { try { r.scSrc.disconnect(r.sc); } catch (e) { } r.scSrc = null; }
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
@@ -261,7 +261,8 @@ function startAudio(t, c, pos, when) {
   g.gain.setValueAtTime(startsClip ? 0 : clipGainAt(c, pos, sp), w0);
   if (startsClip) g.gain.linearRampToValueAtTime(clipGainAt(c, Math.min(segEnd, pos + 0.01), sp), at(Math.min(segEnd, pos + 0.01)));
   const end = c.start + c.len;
-  const bps = [c.start - hin, sp.fin ? c.start - hin + sp.fin : c.start + c.fadeIn, sp.fout ? end + hout - sp.fout : end - c.fadeOut, end + hout];
+  const e4 = 0.004 * bpmAt(c.start) / 15; // hold full level until just before the end, then the short edge fade (or the clip's own fade)
+  const bps = [c.start - hin, sp.fin ? c.start - hin + sp.fin : c.start + c.fadeIn, sp.fout ? end + hout - sp.fout : end - c.fadeOut, end + hout, c.start - hin + e4, end + hout - e4];
   const regs = [[c.start - hin, bps[1]], [bps[2], end + hout]]; if ((c.xfShape && c.xfShape !== 'linear') || (c.fadeShape && c.fadeShape !== 'linear') || (sp.outShape && sp.outShape !== 'linear')) regs.forEach(([a0, b0]) => { for (let k = 1; k < 8; k++) bps.push(a0 + (b0 - a0) * k / 8); });
   bps.filter(p => p > pos + 0.01 && p < segEnd - 1e-6).sort((x, y) => x - y)
     .forEach(p => g.gain.linearRampToValueAtTime(clipGainAt(c, p, sp), at(p)));
@@ -291,6 +292,7 @@ function scheduleWindow(from, to) {
   for (const t of S.tracks) {
     if (t.kind === 'midi' && !t.frozen) {
       const inst = RT.get(t.id) && RT.get(t.id).inst; if (!inst) continue;
+      const fx = (t.midifx || []).some(f => f.on), win = fx ? [] : null;   // with MIDI effects, notes collect here and go through the chain
       for (const c of t.clips) {
         if (c.muted || c.start + c.len <= from || c.start >= to) continue;
         const L = c.bars * 16, base = c.start - c.offset, end = c.start + c.len;
@@ -303,10 +305,12 @@ function scheduleWindow(from, to) {
             const dur = Math.min(n.l, end - p, L - n.s);
             const gv = c.groove ? grooveAt(grooveById(c.groove), p) : null; // groove: shift and accent from the groove pool
             const vel = clamp((n.vr ? n.v + (Math.random() * 2 - 1) * n.vr : n.v) * (gv ? gv.vel : 1), 0.01, 1); // velocity range: a random spread around the note's velocity
+            if (win) { win.push({ p: n.p, pos: p + (gv ? gv.shift : 0), dur, vel, rv: n.rv, mpe: n.mpe }); continue; }
             inst.noteOn(n.p, Math.max(ctx.currentTime, timeAt(p + (gv ? gv.shift : 0))), vel, durSec(p, dur) * 0.98, n.rv, n.mpe);
           }
         }
       }
+      if (win || (RT.get(t.id).mq && RT.get(t.id).mq.length)) midiFxQueue(t, inst, win || [], from, to);
     } else if (!(T.recording && t.arm && t.kind === 'audio' && T.recording.audio.some(r => r.t === t))) {
       for (const c of audioClipsOf(t)) { const sp = c.frozen ? { a: c.start } : clipEffSpan(t, c); if (sp.a >= from - 1e-9 && sp.a < to - 1e-9) startAudio(t, c, sp.a, timeAt(sp.a)); }
       // at a tempo change, clips that are already playing restart with the new stretch
@@ -351,6 +355,17 @@ function click(time, accent) {
 
 function unfreezeForTempo() { const fz = S.tracks.filter(t => t.frozen); if (!fz.length) return; fz.forEach(t => { delete t.frozen; rewire(t); applyMix(t); }); toast(`Unfroze ${fz.map(t => t.name).join(', ')} because the tempo changed. Freeze again to re-render.`, 5000); }
 /* ---------- transport ---------- */
+// Record: press it and the song starts recording (after the count-in, if one is set). Press it again to stop recording and keep playing.
+async function recordButton() {
+  if (T.rec) { T.rec = false; if (T.recording) finishRecording(); ui.transport(); return; }
+  if (!S.tracks.some(t => t.arm)) { const t = S.tracks.find(x => V.selTracks.has(x.id) && (x.kind === 'audio' || x.kind === 'midi')); if (t) await armTrack(t, true); }
+  T.rec = true; if (T.playing) startRecording(nowPos()); else play(V.insert);
+  ui.transport();
+}
+function countInMenu(at) {
+  const cur = (S.prefs && S.prefs.countIn) || 0;
+  popMenu(at, [[0, 'No count-in'], [1, '1 bar'], [2, '2 bars'], [4, '4 bars']].map(([v, l]) => ({ label: (v === cur ? '✓  ' : '    ') + l, run: () => { S.prefs = S.prefs || {}; S.prefs.countIn = v; markDirty(); ui.transport(); } })));
+}
 function play(from = V.insert) {
   if (isOffline() || T.busy) return;
   if (ctx.state !== 'running') ctx.resume();
@@ -364,9 +379,10 @@ function play(from = V.insert) {
 }
 function stop(silent) {
   if (isOffline()) return;
+  if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
-  T.playing = false; stopSources(now);
+  clearMidiFxQueues(); T.playing = false; stopSources(now);
   S.tracks.forEach(t => { const r = RT.get(t.id); if (r && r.inst) r.inst.allOff(now); });
   releaseAutomation();
   if (!silent) { ui.transport(); arr.draw(); }
@@ -397,7 +413,7 @@ async function getInput(deviceId = 'default') {
   const inp = { stream, src }; INPUTS.set(deviceId, inp); connectInputs(); return inp;
 }
 const monitorOn = t => t.kind === 'audio' && (t.monitor === 'in' || (t.monitor === 'auto' && t.arm));
-const internalInput = t => t.input === 'resample' || String(t.input || '').startsWith('track:') || !!extParse(t.input) || (IO.native && (t.input || 'default') === 'default');
+const internalInput = t => t.input === 'resample' || t.input === 'none' || String(t.input || '').startsWith('track:') || !!extParse(t.input) || (IO.native && (t.input || 'default') === 'default');
 function inputNode(t) {
   if (t.input === 'resample') return M.out;
   if (String(t.input || '').startsWith('track:')) { const r = RT.get(t.input.slice(6)); return r ? r.mute : null; }
@@ -515,16 +531,26 @@ function punchIn(t, c) { clearRange(t, c.start, c.start + c.len); }
 
 /* ---------- live notes (computer keyboard / MIDI) ---------- */
 const held = new Map();
+// MIDI tracks that hear a source: their MIDI From and channel match, and they are armed, monitoring In, or selected on Auto.
+function midiTargets(src, ch) {
+  const takes = t => t.kind === 'midi' && !t.frozen && (t.midiIn || 'all') !== 'none' && ((t.midiIn || 'all') === 'all' || t.midiIn === src) && (!t.midiCh || src === 'kb' || +t.midiCh === ch + 1);
+  const hears = t => t.arm || t.monitor === 'in' || ((t.monitor || 'auto') === 'auto' && V.selTracks.has(t.id));
+  const list = S.tracks.filter(t => takes(t) && hears(t));
+  return list;
+}
+const padNote = (t, n) => (t.inst.type === 'drums' ? GM_PAD(n) : t.inst.type === 'sampler' && t.inst.mode !== 'keys' ? clamp(n - 36, 0, 15) : n);
 function liveTarget() { const t = S.tracks.find(x => x.arm && x.kind === 'midi') || S.tracks.find(x => V.selTracks.has(x.id) && x.kind === 'midi'); return t; }
 function liveNoteOn(key, note, vel = 0.85, t = liveTarget(), ch = 0) {
   if (!t || t.kind !== 'midi') return; if (ctx.state !== 'running') ctx.resume();
-  const v = RT.get(t.id).inst.noteOn(note, ctx.currentTime, vel, null);
-  const h = { v, t, note, vel, ch, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
+  const fx = (t.midifx || []).some(f => f.on), vs = fx ? liveFxOn(t, note, vel) : null;
+  const v = fx ? null : RT.get(t.id).inst.noteOn(note, ctx.currentTime, vel, null);
+  const h = { v, vs, t, note, vel, ch, pos: T.playing ? posAt(ctx.currentTime) : null, at: ctx.currentTime }; held.set(key, h);
   if (T.recording) T.recording.held.set(key, h);
 }
 function liveNoteOff(key, rv) {
   const h = held.get(key); if (!h) return; held.delete(key);
-  RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime, rv);
+  if (h.vs) { h.vs.forEach(v => RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(v, ctx.currentTime, rv)); liveFxOff(h.t, h.note); }
+  else RT.get(h.t.id) && RT.get(h.t.id).inst.noteOff(h.v, ctx.currentTime, rv);
   const R = T.recording; if (R && h.pos != null) { R.held.delete(key); const m = R.midi.find(x => x.t === h.t); const dur = Math.max(0.01, ctx.currentTime - h.at); if (m) m.notes.push({ p: h.note, abs: h.pos, l: Math.max(0.25, posAt(ctx.currentTime) - h.pos), vel: h.vel, rv, at: h.at, mpe: h.pb && h.pb.length ? { pb: [{ t: 0, v: h.pb0 || 0 }, ...h.pb.map(q => ({ t: clamp((q.at - h.at) / dur, 0, 1), v: q.v }))] } : undefined }); }
   if (!R) { CAPTURE.push({ t: h.t.id, p: h.note, t0: h.at, t1: ctx.currentTime, vel: h.vel, rv, pos: h.pos, end: T.playing && h.pos != null ? posAt(ctx.currentTime) : null }); if (CAPTURE.length > 4000) CAPTURE.splice(0, 1000); }
 }

@@ -84,7 +84,7 @@ async function renderRange(from, to, { sr = 48000, tail = 2, onProgress, only = 
     startAudioAt(from, 0.02);
     const hop = 0.1;
     for (let t = 0; t < secs; t += hop) {
-      off.suspend(Math.round(t * sr / 128) * 128 / sr).then(() => { if (T.nextPos < to) { const end = Math.min(to, posAt(off.currentTime + 0.25)); while (T.nextPos < end) { const a = T.nextPos, b = Math.min(end, Math.floor(a + 1e-9) + 1); scheduleWindow(a, b); T.nextPos = b; } } if (onProgress) onProgress(off.currentTime / secs); off.resume(); }).catch(() => { });
+      off.suspend(Math.round(t * sr / 128) * 128 / sr).then(() => { try { if (T.nextPos < to) { const end = Math.min(to, posAt(off.currentTime + 0.25)); while (T.nextPos < end) { const a = T.nextPos, b = Math.min(end, Math.floor(a + 1e-9) + 1); scheduleWindow(a, b); T.nextPos = b; } } if (onProgress) onProgress(off.currentTime / secs); } catch (e) { console.error('render step', e); T.nextPos = Math.max(T.nextPos, posAt(off.currentTime + 0.25)); } off.resume(); }).catch(() => { });
     }
     return await off.startRendering();
   } finally {

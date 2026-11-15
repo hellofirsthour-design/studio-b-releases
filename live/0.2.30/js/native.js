@@ -51,7 +51,7 @@ function neDefaultBackend() { const b = NE.avail.backends.filter(x => x.id !== '
 async function neStart() {
   const backend = GP.driver && NE.avail.backends.some(b => b.id === GP.driver) ? GP.driver : neDefaultBackend();
   const r = await NATIVE.engine.open({ backend, output: GP.outName || '', input: GP.inId === 'none' ? 'none' : (GP.inName || ''), sampleRate: GP.sr || LIVE_CTX.sampleRate, buffer: GP.buffer || 256, rendererRate: LIVE_CTX.sampleRate });
-  if (!r.ok) { NE.error = r.error; toast('Native audio: ' + r.error + ' Using the built-in engine for now.', 6000); return false; }
+  if (!r.ok) { NE.error = r.error; toast('Native audio: ' + r.error.replace(/\.?$/, '.') + ' Using the built-in engine for now.', 6000); return false; }
   NE.dev = { ...r, backend }; NE.error = null;
   if (!NE.sab) {
     NE.sab = new SharedArrayBuffer(NE.L.bytes); NE.I = new Int32Array(NE.sab);
@@ -61,10 +61,9 @@ async function neStart() {
   }
   NE.I[4] = r.outputs; NE.I[5] = Math.max(1, r.inputs);
   const opt = { sab: NE.sab, ring: NE.L.ring, header: NE.L.header, maxCh: NE.L.maxCh };
-  if (NE.outNode) try { NE.outNode.disconnect(); } catch (e) { }
+  neRetire();   // the previous device's nodes must stop writing into the shared buffer, or the device hears them all at once
   NE.outNode = new AudioWorkletNode(LIVE_CTX, 'gw-out', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: r.outputs, channelCountMode: 'explicit', channelInterpretation: 'discrete', processorOptions: opt });
   NE.keep = NE.keep || LIVE_CTX.createGain(); NE.keep.gain.value = 0; NE.outNode.connect(NE.keep); NE.keep.connect(LIVE_CTX.destination);   // keeps the worklet running
-  if (NE.inNode) try { NE.inNode.disconnect(); } catch (e) { }
   NE.inNode = r.inputs ? new AudioWorkletNode(LIVE_CTX, 'gw-in', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [r.inputs], processorOptions: opt }) : null;
   if (NE.inNode) NE.inNode.connect(NE.keep);
   try { if (LIVE_CTX.setSinkId) await LIVE_CTX.setSinkId({ type: 'none' }); } catch (e) { }
@@ -72,8 +71,9 @@ async function neStart() {
   NE.on = true; S.tracks.forEach(routeOut); connectInputs(); neSyncProject(); neTransport();
   return true;
 }
+function neRetire() { [NE.outNode, NE.inNode].forEach(n => { if (!n) return; try { n.port.postMessage('stop'); } catch (e) { } try { n.disconnect(); } catch (e) { } }); NE.outNode = NE.inNode = null; }
 async function neStop() {
-  NE.on = false; IO.native = false; IO.outCh = 2; IO.inCh = 0; ioWire();
+  neRetire(); NE.on = false; IO.native = false; IO.outCh = 2; IO.inCh = 0; ioWire();
   try { if (LIVE_CTX.setSinkId) await LIVE_CTX.setSinkId(GP.outId || ''); } catch (e) { }
   await NATIVE.engine.close(); S.tracks.forEach(routeOut); connectInputs();
 }
@@ -160,8 +160,8 @@ function applyPDC() {
 }
 
 /* ---------- Audio From / Audio To ---------- */
-const outLabel = b => (extParse(b.out) ? extLabel(b.out, 'out') : groupOf(b) ? groupOf(b).name : 'Main');
-const inLabel = t => (t.input === 'resample' ? 'Main' : String(t.input || '').startsWith('track:') ? ((busById(t.input.slice(6)) || {}).name || 'track') : extParse(t.input) ? extLabel(t.input, 'in') : IO.native ? 'In 1/2' : 'Mic');
+const outLabel = b => (b.out === 'none' ? 'No Output' : extParse(b.out) ? extLabel(b.out, 'out') : groupOf(b) ? groupOf(b).name : 'Main');
+const inLabel = t => (t.input === 'none' ? 'No Input' : t.input === 'resample' ? 'Main' : String(t.input || '').startsWith('track:') ? ((busById(t.input.slice(6)) || {}).name || 'track') : extParse(t.input) ? extLabel(t.input, 'in') : IO.native ? 'In 1/2' : 'Mic');
 function chooseOutput(b, e) {
   const set = v => { pushUndo('Output'); if (v) b.out = v; else delete b.out; routeOut(b); ui.all(); if (V.view === 'mix') mixer.render(); };
   const items = [{ label: (!b.out ? '✓ ' : '') + (groupOf(b) ? 'Group: ' + groupOf(b).name : 'Main'), run: () => set(null) }];

@@ -61,7 +61,7 @@ function runModulators(time, pos) {
     const r = DEV_RT.get(d.id); if (!r) return; const v = modValue(d, r, time, pos); r.v = v; if (d.p.target) applyMod(b, d.p.target, v); }); walk(b.devices); });
 }
 // keep modulating while the transport is stopped (playback drives it from the scheduler)
-setInterval(() => { if (!S || T.playing || T.busy || isOffline()) return; runModulators(LIVE_CTX.currentTime, null); }, 40);
+setInterval(() => { if (typeof S === 'undefined' || !S || T.playing || T.busy || isOffline()) return; runModulators(LIVE_CTX.currentTime, null); }, 40);
 
 /* ---------- card ---------- */
 function modView(body, o, d, r, changed) {

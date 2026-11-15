@@ -1,13 +1,13 @@
 {
- "version": "0.2.29",
+ "version": "0.2.30",
  "shell": 3,
- "date": "2026-11-15T18:08:11.312Z",
- "notes": "Dynamics suite and a fix for audio clips fading out over their length",
+ "date": "2026-11-15T19:06:43.940Z",
+ "notes": "Fix smeared sound after changing the audio output; record button; new look",
  "files": [
   {
    "path": "css/base.css",
-   "size": 29378,
-   "sha256": "226d1044485ab734d3693f8fdea91b4270b6d7ee8d9136d6308dc64fb3da9a85"
+   "size": 29411,
+   "sha256": "53fc7abf135a44eb1d438a46432e193d9fbd9b9eedec47972ecf7b807e0f9c0a"
   },
   {
    "path": "css/studio.css",
@@ -15,14 +15,19 @@
    "sha256": "9f3c736a27588273dc89c24092c2eed987073f1e0a6eb667128354e60cad4fe6"
   },
   {
+   "path": "css/theme.css",
+   "size": 5179,
+   "sha256": "4da4c877743ea2037956374d979b708f997cef9ea04176a56a058e5c514bdf68"
+  },
+  {
    "path": "index.html",
-   "size": 20543,
-   "sha256": "1b43ef53b4b6dbdf91d8524cd099ca83b877657ee7eb754d49f3773d720320be"
+   "size": 20588,
+   "sha256": "61b0b37f375a42d4fa1947426afdea49431ea710dc5cbcf36c0accc38c88fdd9"
   },
   {
    "path": "js/arrange.js",
-   "size": 49918,
-   "sha256": "eb7a8f5658b617e847e5a52434fbed2eba85b6e7f0464505ef2a2a502af4b155"
+   "size": 50085,
+   "sha256": "226698a26f14c3f9a634a6bd857fce2fcbbe57d351e513fd724214e144224e2f"
   },
   {
    "path": "js/browser.js",
@@ -41,8 +46,8 @@
   },
   {
    "path": "js/core.js",
-   "size": 20216,
-   "sha256": "e41a4a5ed8b2f8d9cdc74be41523346f678394c0c5a2286ec298df263fb3489c"
+   "size": 20509,
+   "sha256": "0e316bebdeb29b8ac7f28605c14a600bdb5aa88a41241e9a15e4b93d446ab604"
   },
   {
    "path": "js/devices.js",
@@ -71,8 +76,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 53168,
-   "sha256": "eb3440437500666b60c0dbe848a7dba46604e034e5f993c7313b4ca80291e6d7"
+   "size": 54114,
+   "sha256": "0f3d88ddd879d0f6f4914e6629e23ba18c0a170abbc62b0275a9344746ad6ff7"
   },
   {
    "path": "js/features.js",
@@ -111,8 +116,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 36137,
-   "sha256": "535ecd773cb847de29dfffb1d3dddc16c95767369d3dbecdc1c0a2f0e291bafb"
+   "size": 35733,
+   "sha256": "38e23da7a9fc9e39f220c53337886c157a924df5b98a075a23096aa44c43a2a1"
   },
   {
    "path": "js/mapping.js",
@@ -136,8 +141,8 @@
   },
   {
    "path": "js/native.js",
-   "size": 15755,
-   "sha256": "ae8b23c8562c330b0f1a2ecb1884e2364888ab8ba90eb88f72b75b86b4c57758"
+   "size": 15967,
+   "sha256": "bdb4a1590ce926630d9f48c56b3114a8349505e4e4e89a0f23e5be584ffc5dbd"
   },
   {
    "path": "js/packs-data.js",
@@ -181,8 +186,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 43882,
-   "sha256": "b1084412525a1b85213f3ac1b86aafa29a79302bbce994c34204fdd210387076"
+   "size": 44594,
+   "sha256": "8bf1079ca18e64e433a06660dc85f039858ce2b7ef8f5355c74247ad3512bb0f"
   },
   {
    "path": "js/warp.js",
@@ -207,7 +212,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "7be8d99abf9f42737a15343c15913c1b9b156ca4b754d5b2240625ee26ab21cb"
+   "sha256": "48ea27df113a71cf57a3f52d1f9903011ddfb0e981431098b9b472d35dec70ca"
   }
  ]
 }

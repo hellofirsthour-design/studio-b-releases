@@ -6,7 +6,7 @@ const ui = {
     if (document.activeElement !== $('#bpm')) $('#bpm').value = S.bpm;
     $('#play').classList.toggle('on', T.playing); $('#rec').classList.toggle('on', T.rec); $('#midiOd').classList.toggle('on', !!V.midiOd); $('#capture').classList.toggle('hot', CAPTURE.length > 0);
     $('#metro').classList.toggle('on', !!S.metro); $('#loopBtn').classList.toggle('on', S.loop.on);
-    $('#follow').classList.toggle('on', V.follow); $('#autoBtn').classList.toggle('on', V.autoMode); $('#autoArm').classList.toggle('on', !!V.autoArm); $('#reAuto').classList.toggle('hot', OVERRIDES.size > 0); $('#reAuto').disabled = !OVERRIDES.size;
+    $('#follow').classList.toggle('on', V.follow); $('#autoBtn').classList.toggle('on', V.autoMode); $$('[data-col]').forEach(x => x.classList.toggle('on', !!V[{ io: 'showIO', r: 'showR', m: 'showM', d: 'showD' }[x.dataset.col]])); $('#autoArm').classList.toggle('on', !!V.autoArm); $('#reAuto').classList.toggle('hot', OVERRIDES.size > 0); $('#reAuto').disabled = !OVERRIDES.size;
     $('#root').value = S.root; $('#scale').value = S.scale; $('#snapBtn').classList.toggle('on', V.snap);
     $('#sig').value = SIG().join('/'); { const ci = (S.prefs && S.prefs.countIn) || 0; $('#countIn').classList.toggle('on', !!ci); $('#countIn .badge').textContent = ci ? String(ci) : ''; $('#countIn').title = ci ? `Count-in: ${ci} bar${ci > 1 ? 's' : ''} before recording. Click to change.` : 'Count-in before recording: off. Click to turn on.'; } S.punch = S.punch || {}; $('#punchIn').classList.toggle('on', !!S.punch.in); $('#punchOut').classList.toggle('on', !!S.punch.out);
     const nb = SIG()[0], beats = $('#beats'); if (beats.children.length !== Math.min(nb, 12)) beats.innerHTML = '<i></i>'.repeat(Math.min(nb, 12));
@@ -14,13 +14,14 @@ const ui = {
     $('#app').classList.toggle('nobrowser', !V.browser);
   },
   headers() {
+    document.documentElement.style.setProperty('--hdrW', headerWidth() + 'px');
     arr.layout(); const box = $('#hdrInner'); let h = '';
     arr.rows.forEach(r => {
       if (r.kind === 'auto') { const ps = autoParams(r.b); h += `<div class="hdr autolane" data-id="${r.b.id}" data-li="${r.li}" style="top:${r.y}px;height:${r.h}px;--tc:${r.b.color || '#a7a3b8'};--depth:${S.tracks.includes(r.b) ? depthOf(r.b) : 0}"><i class="hcol dim"></i><div class="hmain"><div class="hrow"><select class="dd hauto" data-h="laneKey" aria-label="Automation lane parameter">${ps.map(p => `<option value="${p.key}" ${p.key === r.key ? 'selected' : ''}>${r.b.auto[p.key] && r.b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select><button class="hb" data-h="delLane" title="Hide this lane (its automation stays)">✕</button></div></div></div>`; return; }
       if (r.kind === 'auto') { const ps = autoParams(r.b); h += `<div class="hdr autolane" data-id="${r.b.id}" data-li="${r.li}" style="top:${r.y}px;height:${r.h}px;--tc:${r.b.color || '#a7a3b8'};--depth:${S.tracks.includes(r.b) ? depthOf(r.b) : 0}"><i class="hcol dim"></i><div class="hmain"><div class="hrow"><select class="dd hauto" data-h="laneKey" aria-label="Automation lane parameter">${ps.map(p => `<option value="${p.key}" ${p.key === r.key ? 'selected' : ''}>${r.b.auto[p.key] && r.b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select><button class="hb" data-h="delLane" title="Hide this lane (its automation stays)">✕</button></div></div></div>`; return; }
       if (r.kind === 'take') { h += `<div class="hdr take" data-id="${r.b.id}" data-lane="${r.lane.id}" style="top:${r.y}px;height:${r.h}px;--tc:${r.b.color}"><i class="hcol dim"></i><div class="hmain"><div class="hrow"><span class="hname tname" title="Drag across a take (or click it) to comp it onto the track">${esc(r.lane.name)}</span><button class="hb" data-h="compAll" title="Use this whole take">Use</button><button class="hb" data-h="delTake" title="Delete this take lane">✕</button></div></div></div>`; return; }
       const b = r.b, isT = r.kind === 'track', sel = V.selTracks.has(b.id), num = isT ? S.tracks.indexOf(b) + 1 : r.kind === 'return' ? RET_LETTERS[S.returns.indexOf(b)] || 'R' : 'M', grp = b.kind === 'group';
-      const big = r.h >= 50 && !b.collapsed, params = V.autoMode ? autoParams(b) : null;
+      const big = r.h >= 50 && !b.collapsed && V.showM, params = V.autoMode ? autoParams(b) : null;
       h += `<div class="hdr ${sel ? 'sel' : ''} ${r.kind} ${grp ? 'group' : ''}" data-id="${b.id}" style="top:${r.y}px;height:${r.h}px;--tc:${b.color || '#a7a3b8'};--depth:${isT ? depthOf(b) : 0}">
         <i class="hcol"></i>
         <div class="hmain">
@@ -31,8 +32,9 @@ const ui = {
           ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
           : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${INST_NAMES[b.inst.type]}</span>` : ''}
               <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" data-map="${b.id}|vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
-          ${r.h >= 86 && !V.autoMode ? `<div class="hrow hsm"><span class="lab">Pan</span><input type="range" class="hpan" min="-1" max="1" step="0.01" value="${b.pan || 0}" data-h="pan" aria-label="Pan">${isT ? `<span class="lab">A</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendA}" data-h="sendA" aria-label="Send A"><span class="lab">B</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendB}" data-h="sendB" aria-label="Send B">` : ''}</div>` : ''}
+          ${r.h >= 86 && !V.autoMode && V.showM ? `<div class="hrow hsm"><span class="lab">Pan</span><input type="range" class="hpan" min="-1" max="1" step="0.01" value="${b.pan || 0}" data-h="pan" aria-label="Pan">${isT && !V.showR ? `<span class="lab">A</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendA}" data-h="sendA" aria-label="Send A"><span class="lab">B</span><input type="range" class="hsend" min="0" max="1" step="0.01" value="${b.sendB}" data-h="sendB" aria-label="Send B">` : ''}</div>` : ''}
         </div>
+        ${V.showIO && !b.collapsed ? ioColumn(r) : ''}${V.showR && !b.collapsed ? sendsColumn(r) : ''}${V.showD && !b.collapsed ? delayColumn(r) : ''}
         <div class="hmeter" data-meter="${b.id}"><i class="lvl"></i><i class="pk"></i></div>
         <div class="hresize" data-h="resize"></div>
       </div>`;
@@ -53,7 +55,7 @@ const ui = {
     const pane = $('#pane-dev'); const o = busById([...V.selTracks][0]) || (V.editClip && trackOf(clipById(V.editClip)));
     pane.innerHTML = ''; if (!o) { pane.innerHTML = '<div class="empty-state"><h3>No track selected</h3><p>Select a track to see its instrument and effects. Drag effects in from the browser.</p></div>'; return; }
     const rack = document.createElement('div'); rack.className = 'rack'; pane.appendChild(rack);
-    if (o.kind === 'midi') rack.appendChild(instrumentCard(o));
+    if (o.kind === 'midi') { (o.midifx || []).forEach((f, i) => rack.appendChild(midiFxCard(o, f, i))); rack.appendChild(instrumentCard(o)); }
     o.devices.forEach((d, i) => rack.appendChild(deviceCard(o, d, i)));
     const add = document.createElement('div'); add.className = 'card addcard';
     add.innerHTML = `<div class="ch"><span class="cname">Add effect</span></div><div class="addlist">${Object.entries(DEVICES).filter(([, v]) => !v.hidden).map(([k, v]) => `<button data-dev="${k}"><b>${v.name}</b><span>${v.blurb}</span></button>`).join('')}</div>`;
@@ -118,14 +120,18 @@ function bindHeaders() {
   box.addEventListener('pointerdown', e => { if (e.target.matches && e.target.matches('input[type=range]')) pushUndo('Mixer'); }, true);
   box.addEventListener('input', e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id), k = h.dataset.h;
+    if (k === 'send') { const i = +h.dataset.si; setSend(b, i, +h.value); applyMix(b); autoTouch(b, sendKey(i), +h.value); markDirty(); return; }
     if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { if (k === 'sendA' || k === 'sendB') setSend(b, sendIndex(k), +h.value); else b[k] = +h.value; autoTouch(b, k, +h.value); autoTouch(b, k, +h.value); applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
   });
+  box.addEventListener('change', e => { const h0 = e.target.closest('[data-h]'), hd0 = e.target.closest('.hdr'); if (h0 && hd0 && ioChange(busById(hd0.dataset.id), h0)) return; });
   box.addEventListener('change', e => { hideTip(); const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (h && h.dataset.h === 'autoShow') { busById(hd.dataset.id).autoShow = h.value; ui.headers(); } if (h && h.dataset.h === 'laneKey') { busById(hd.dataset.id).lanes[+hd.dataset.li] = h.value; ui.headers(); } });
   box.addEventListener('dblclick', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id);
     if (hd.dataset.lane && e.target.closest('.hname')) { const lane = b.takes.find(l => l.id === hd.dataset.lane); return askText('Take name', lane.name, v => { pushUndo('Rename take'); lane.name = v; ui.headers(); }); }
-    if (e.target.closest('.hname')) askText('Track name', b.name, v => { pushUndo('Rename'); b.name = v; ui.headers(); ui.detail(); });
-    if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); }
+    if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); return; }
+    if (e.target.closest('input, select, button, .hio')) return;
+    // double-click a track: show or hide the clip and devices panel for it (rename is Ctrl+R or the right-click menu)
+    const shown = !$('#app').classList.contains('nodetail'); if (!shown || V.selTracks.has(b.id)) setDetailShown(!shown); V.selTracks = new Set([b.id]); if (!shown) V.detail = V.detail || 'devices'; ui.all();
   });
   box.addEventListener('contextmenu', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; e.preventDefault(); const b = busById(hd.dataset.id); const isT = S.tracks.includes(b);
@@ -151,7 +157,8 @@ function bindHeaders() {
 function duplicateTrack(t) { if (t.kind === 'group') return toast('Duplicate the tracks inside the group instead'); pushUndo('Duplicate track'); const c = deep(t); c.id = uid(); c.name = t.name + ' copy'; c.arm = false; const idMap = {}; c.devices.forEach(d => { const n = uid(); idMap[d.id] = n; d.id = n; }); const remap = k => k.replace(/^(dev|eqf|eqg):([^:]+)/, (m, kind, id) => `${kind}:${idMap[id] || id}`); c.auto = Object.fromEntries(Object.entries(c.auto).map(([k, v]) => [remap(k), v])); if (c.autoShow) c.autoShow = remap(c.autoShow); delete c.frozen; c.clips.forEach(k => (k.id = uid())); S.tracks.splice(S.tracks.indexOf(t) + 1, 0, c); buildBus(c, 'track'); V.selTracks = new Set([c.id]); ui.all(); }
 function deleteTrack(t) { pushUndo('Delete track'); if (t.kind === 'group') S.tracks.forEach(x => { if (x.group === t.id) x.group = t.group || null; }); removeBus(t); S.tracks = S.tracks.filter(x => x !== t); if (V.editClip && !clipById(V.editClip)) V.editClip = null; if (t.kind === 'group') rebuildAll(); applyAllMix(); ui.all(); }
 function addTrack(kind, instType) { pushUndo('Insert track'); const t = newTrack(kind, instType); const after = S.tracks.findIndex(x => V.selTracks.has(x.id)); S.tracks.splice(after >= 0 ? after + 1 : S.tracks.length, 0, t); buildBus(t, 'track'); V.selTracks = new Set([t.id]); ui.all(); return t; }
-function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler" or "synth:Preset"
+function addInstrumentTrack(spec, onto) { // spec: "synth", "drums", "sampler", "synth:Preset" or "sound:Name"
+  if (spec.startsWith('sound:')) return addSound(spec.slice(6), onto);
   const [type, preset] = spec.split(':');
   if (onto) { pushUndo('Replace instrument'); removeBus(onto); onto.inst = newInst(type); if (preset) Object.assign(onto.inst, SYNTH_PRESETS[preset], { preset }); buildBus(onto, 'track'); V.selTracks = new Set([onto.id]); V.detail = 'devices'; ui.all(); return; }
   const t = addTrack('midi', type); if (preset) { Object.assign(t.inst, SYNTH_DEFAULT, SYNTH_PRESETS[preset], { preset }); t.name = preset; RT.get(t.id).inst.update(); }
@@ -272,3 +279,51 @@ function askText(title, value, done) {
 }
 function showTip(e, text) { if (GP.tips === false && !(e && e.buttons)) return; const t = $('#tip'); t.hidden = false; t.textContent = text; t.style.left = (e.clientX + 14) + 'px'; t.style.top = (e.clientY - 26) + 'px'; }
 function hideTip() { $('#tip').hidden = true; }
+
+/* ---------- track header columns: I/O, sends (R), mixer (M), track delay (D) ---------- */
+V.showIO = lsGet('sb-io') === '1'; V.showR = lsGet('sb-r') === '1'; V.showM = lsGet('sb-m') !== '0'; V.showD = lsGet('sb-d') === '1';
+const opt = (v, l, cur) => `<option value="${esc(String(v))}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(l)}</option>`;
+function ioColumn(r) {
+  const b = r.b, isT = r.kind === 'track', mon = (b.monitor || 'auto');
+  const monSeg = `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${mon === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>`;
+  const outs = [opt('', b.kind === 'group' || !groupOf(b) ? 'Main' : 'Group: ' + groupOf(b).name, b.out || ''), ...(IO.native ? outChoices().map(([v, l]) => opt(v, 'Ext. ' + l, b.out)) : []), opt('none', 'No Output', b.out)].join('');
+  const outSel = r.kind === 'master' ? (IO.native ? `<select class="dd hio1" data-h="mainOut" aria-label="Main output">${outChoices().filter(x => !/mono/.test(x[1])).map(([v, l]) => opt(v, l.replace('Out ', ''), GP.mainOut || 'ext:1')).join('')}</select>` : '<span class="iolab">System output</span>')
+    : `<select class="dd hio1" data-h="outT" aria-label="Audio to">${outs}</select>`;
+  if (isT && b.kind === 'midi') {
+    const src = b.midiIn || 'all', ins = [opt('all', 'All Ins', src), opt('kb', 'Computer Keyboard', src), ...(window.MIDI_INS || []).map(m => opt(m.id, m.name, src)), opt('none', 'No Input', src)].join('');
+    const chs = [opt(0, 'All Channels', b.midiCh || 0), ...[...Array(16)].map((_, i) => opt(i + 1, 'Ch. ' + (i + 1), b.midiCh || 0))].join('');
+    return `<div class="hio"><select class="dd" data-h="midiIn" aria-label="MIDI from">${ins}</select><select class="dd" data-h="midiCh" aria-label="MIDI channel" ${src === 'none' ? 'disabled' : ''}>${chs}</select>${monSeg}${outSel}</div>`;
+  }
+  if (isT && b.kind === 'audio') {
+    const inp = b.input || 'default', type = inp === 'none' ? 'none' : inp === 'resample' ? 'resample' : inp.startsWith('track:') ? inp : 'ext';
+    const types = [opt('ext', 'Ext. In', type), opt('resample', 'Resampling', type), ...S.tracks.filter(x => x !== b && x.kind !== 'group').map(x => opt('track:' + x.id, x.name, type)), opt('none', 'No Input', type)].join('');
+    const chOpts = type !== 'ext' ? opt('', type === 'none' ? '' : 'Post FX', '') : IO.native ? inChoices().map(([v, l]) => opt(v, l.replace('In ', ''), inp === 'default' ? 'ext:1' : inp)).join('') : opt('default', '1/2', 'default');
+    return `<div class="hio"><select class="dd" data-h="inT" aria-label="Audio from">${types}</select><select class="dd" data-h="inC" aria-label="Input channel" ${type !== 'ext' ? 'disabled' : ''}>${chOpts}</select>${monSeg}${outSel}</div>`;
+  }
+  return `<div class="hio"><span class="iolab">${r.kind === 'master' ? 'Main out' : 'Audio To'}</span>${outSel}</div>`;
+}
+function sendsColumn(r) {
+  const b = r.b; if (!S.tracks.includes(b) || !S.returns.length) return '<div class="hsends"></div>';
+  return `<div class="hsends">${S.returns.map((ret, i) => `<label title="Send ${RET_LETTERS[i]} to ${esc(ret.name)}"><span>${RET_LETTERS[i]}</span><input type="range" min="0" max="1" step="0.01" value="${sendOf(b, i)}" data-h="send" data-si="${i}" aria-label="Send ${RET_LETTERS[i]}"></label>`).join('')}</div>`;
+}
+function delayColumn(r) { const b = r.b; return S.tracks.includes(b) ? `<div class="hdly"><input type="number" step="1" min="-500" max="500" value="${b.delayMs || 0}" data-h="delay" aria-label="Track delay in milliseconds" title="Track delay (ms)"><span>ms</span></div>` : '<div class="hdly"></div>'; }
+function headerWidth() { let w = 228; if (V.showIO) w += 196; if (V.showR) w += 16 + 26 * Math.max(1, S.returns.length); if (V.showD) w += 70; return w; }
+function colToggle(k) { const map = { io: 'showIO', r: 'showR', m: 'showM', d: 'showD' }, key = map[k]; V[key] = !V[key]; lsSet('sb-' + k, V[key] ? '1' : '0'); ui.headers(); ui.transport(); }
+
+function ioChange(b, h) {
+  if (!b) return false; const k = h.dataset.h, v = h.value;
+  if (k === 'midiIn') { pushUndo('MIDI from'); b.midiIn = v; }
+  else if (k === 'midiCh') { pushUndo('MIDI channel'); b.midiCh = +v; }
+  else if (k === 'inT') { pushUndo('Audio from'); b.input = v === 'ext' ? (IO.native ? 'ext:1' : 'default') : v; connectInputs(); }
+  else if (k === 'inC') { pushUndo('Input channel'); b.input = v; connectInputs(); }
+  else if (k === 'outT') { pushUndo('Audio to'); if (v) b.out = v; else delete b.out; routeOut(b); }
+  else if (k === 'mainOut') { GP.mainOut = v; saveGP(); ioWire(); }
+  else if (k === 'delay') { pushUndo('Track delay'); b.delayMs = clamp(+v || 0, -500, 500); applyAllMix(); }
+  else return false;
+  markDirty(); ui.headers(); if (V.view === 'mix') mixer.render(); return true;
+}
+
+/* sliders draw their filled run from --pct (see theme.css) */
+function syncRange(el) { const lo = +el.min || 0, hi = el.max === '' ? 100 : +el.max, v = +el.value; el.style.setProperty('--pct', ((v - lo) / ((hi - lo) || 1) * 100).toFixed(1) + '%'); }
+document.addEventListener('input', e => { if (e.target.type === 'range') syncRange(e.target); }, true);
+setInterval(() => document.querySelectorAll('input[type=range]').forEach(syncRange), 150);
