@@ -39,6 +39,14 @@ function toggleEl(label, on, onChange) {
   b.onclick = () => { on = !on; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); onChange(on); }; return b;
 }
 function paramGrid(defs, obj, onChange, mapPre) {
+  // grouped parameters become sections side by side (Oscillators | Filter | Amp ...), each filling its columns top to bottom
+  if (defs.some(d => d.group) && defs.length > 1) {
+    const box = document.createElement('div'); box.className = 'pgrid psecs'; let cur = null, sec = null;
+    const open = name => { sec = document.createElement('div'); sec.className = 'psec'; if (name) { const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = name; sec.appendChild(h); } cur = []; sec._defs = cur; box.appendChild(sec); };
+    defs.forEach(d => { if (d.group) open(d.group); else { if (!sec) open(null); cur.push(d); } });
+    [...box.children].forEach(s => s.appendChild(paramGrid(s._defs, obj, onChange, mapPre)));
+    return box;
+  }
   const g = document.createElement('div'); g.className = 'pgrid';
   for (const d of defs) {
     if (d.group) { const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = d.group; g.appendChild(h); continue; }
@@ -115,6 +123,7 @@ function deviceCard(o, d, i) {
   c.addEventListener('drop', e => { const f = e.dataTransfer.getData('gw/dev'); if (f === '') return; e.preventDefault(); const [x] = o.devices.splice(+f, 1); o.devices.splice(i, 0, x); rewire(o); ui.detail(); markDirty(); });
   c.querySelector('.ch').addEventListener('contextmenu', e => { e.preventDefault(); popMenu(e, [...(o._rack ? [] : d.type === 'rack' ? [{ label: 'Ungroup rack (keeps the selected chain)', run: () => ungroupRack(o, i) }] : [{ label: 'Group into a rack', key: 'Ctrl+G', run: () => groupIntoRack(o, i) }]), { label: 'Show automation for this device', run: () => { const p = autoParams(o).find(x => x.key.includes(d.id)); if (p) { o.autoShow = p.key; V.autoMode = true; ui.all(); } } }, { label: d.on ? 'Turn off' : 'Turn on', run: () => $('.pwr', c).click() }, { label: 'Delete', danger: true, run: () => $('[data-rm]', c).click() }]); });
   if (d.type === 'plugin') { plugBody(body, o, d.id, d.p, (k, v) => { changed(); autoTouch(o, `dev:${d.id}:${k}`, v); }, `${o.id}|dev:${d.id}:`); return c; }
+  devScreen(body, d, r);   // live screen for dynamics, reverbs and modulators
   if (d.type === 'rack') { rackView(body, o, d, r); return c; }
   if (DEVICES[d.type].mod) { modView(body, o, d, r, changed); return c; }
   if (def.cols) { // one column per section, side by side (Patina)
@@ -252,7 +261,7 @@ function eqEditor(body, d, r, changed) {
 }
 
 /* ============ instrument cards ============ */
-function instrumentCard(t) { const c = instrumentCard_(t); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
+function instrumentCard(t) { const c = instrumentCard_(t); if (c) soundBar(t, c); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
 function applyInstPreset(t, p) {
   const keep = Object.fromEntries([...PRESET_SKIP].filter(k => k !== 'preset' && t.inst[k] !== undefined).map(k => [k, t.inst[k]]));
   const base = deep(newInst(t.inst.type)); Object.keys(t.inst).forEach(k => delete t.inst[k]); Object.assign(t.inst, base, p || {}, keep, { preset: p ? 'User' : t.inst.preset });
@@ -266,7 +275,6 @@ function instrumentCard_(t) {
     const c = cardShell('Contour', 'Synth', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
     const top = document.createElement('div'); top.className = 'row';
     top.appendChild(selectEl(['Init', ...Object.keys(SYNTH_PRESETS)], t.inst.preset, v => { Object.assign(t.inst, SYNTH_DEFAULT, SYNTH_PRESETS[v] || {}, { preset: v }); inst.update(); ui.detail(); markDirty(); }, 'Preset'));
-    const tip = document.createElement('span'); tip.className = 'muted'; tip.textContent = 'Play it from your computer keyboard: A W S E D F T G Y H U J K. Z and X change octave.'; top.appendChild(tip);
     body.appendChild(top);
     const W = ['sine', 'triangle', 'sawtooth', 'square'];
     const defs = [{ group: 'Oscillators' }, SEL('wave1', 'Osc 1', W), SEL('wave2', 'Osc 2', W), K('oct2', 'Osc 2 oct', -2, 2, { step: 1, fmt: v => (v > 0 ? '+' : '') + v }), K('detune', 'Detune', 0, 50, { fmt: v => v.toFixed(0) + 'c' }), K('mix2', 'Osc 2 level', 0, 1, { fmt: fPct }), K('sub', 'Sub', 0, 1, { fmt: fPct }), K('noise', 'Noise', 0, 0.5, { fmt: fPct }),
@@ -278,19 +286,22 @@ function instrumentCard_(t) {
   }
   if (t.inst.type === 'drums') {
     const c = cardShell('Kit', 'Drum rack', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
-    const grid = document.createElement('div'); grid.className = 'kit';
+    // like a drum rack: a small grid of pads (click to pick and hear one, drop a sample on any of them), and the picked pad's controls beside it
+    const sel = clamp(t._pad || 0, 0, t.inst.pads.length - 1), grid = document.createElement('div'); grid.className = 'kit';
     t.inst.pads.forEach((pad, pi) => {
-      const cell = document.createElement('div'); cell.className = 'kpad'; cell.style.setProperty('--tc', t.color);
-      cell.innerHTML = `<button class="padhit" data-pad="${t.id}:${pi}" aria-label="Play ${esc(pad.kind)}"><b>${pi + 1}</b><span>${esc(pad.sampleId ? (SAMPLES.get(pad.sampleId) || {}).name || 'Sample' : pad.kind)}</span></button><div class="kctl"></div>`;
-      $('.padhit', cell).onpointerdown = () => { if (ctx.state !== 'running') ctx.resume(); inst.noteOn(pi, ctx.currentTime, 0.9); };
-      const ctl = $('.kctl', cell);
-      ctl.appendChild(selectEl(DRUM_KINDS, pad.kind, v => { pad.kind = v; pad.sampleId = null; ui.detail(); markDirty(); }, 'Sound'));
-      [['tune', 'Tune', -24, 24, v => (v > 0 ? '+' : '') + v.toFixed(1)], ['decay', 'Decay', 0.2, 3, v => v.toFixed(2) + 'x'], ['level', 'Level', 0, 1.2, fPct], ['pan', 'Pan', -1, 1, v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R')]].forEach(([k, l, a, b, f]) => ctl.appendChild(knob({ label: l, value: pad[k], min: a, max: b, fmt: f, small: true, onInput: v => (pad[k] = v) })));
-      const ld = document.createElement('button'); ld.className = 'btn ghostb tiny'; ld.textContent = 'Load sample'; ld.onclick = () => pickSample(async id => { pad.sampleId = id; ui.detail(); markDirty(); }); ctl.appendChild(ld);
-      cell.addEventListener('dragover', e => e.preventDefault()); cell.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadSampleFile(f).then(id => { if (id) { pad.sampleId = id; ui.detail(); } }); });
-      grid.appendChild(cell);
+      const b = document.createElement('button'); b.className = 'padhit' + (pi === sel ? ' sel' : ''); b.dataset.pad = t.id + ':' + pi; b.style.setProperty('--tc', t.color); b.title = 'Click to pick and hear it. Drop a sample here to load it.';
+      b.innerHTML = `<b>${pi + 1}</b><span>${esc(pad.sampleId ? (SAMPLES.get(pad.sampleId) || {}).name || 'Sample' : pad.kind)}</span>`;
+      b.onpointerdown = () => { if (ctx.state !== 'running') ctx.resume(); inst.noteOn(pi, ctx.currentTime, 0.9); if (t._pad !== pi) { t._pad = pi; ui.detail(); } };
+      b.addEventListener('dragover', e => e.preventDefault()); b.addEventListener('drop', e => { e.preventDefault(); const sid = e.dataTransfer.getData('sb/sample'), f = e.dataTransfer.files[0]; const set = id => { if (id) { pushUndo('Load sample'); pad.sampleId = id; t._pad = pi; ui.detail(); markDirty(); } }; if (sid) set(sid); else if (f) loadSampleFile(f).then(set); });
+      grid.appendChild(b);
     });
-    body.appendChild(grid); return c;
+    const pad = t.inst.pads[sel], ctl = document.createElement('div'); ctl.className = 'kctl';
+    const hd = document.createElement('div'); hd.className = 'khead'; hd.innerHTML = `<span class="lab">Pad ${sel + 1}</span>`; hd.appendChild(selectEl(DRUM_KINDS, pad.kind, v => { pad.kind = v; pad.sampleId = null; ui.detail(); markDirty(); }, 'Sound')); ctl.appendChild(hd);
+    const kn = document.createElement('div'); kn.className = 'kknobs';
+    [['tune', 'Tune', -24, 24, v => (v > 0 ? '+' : '') + v.toFixed(1)], ['decay', 'Decay', 0.2, 3, v => v.toFixed(2) + 'x'], ['level', 'Level', 0, 1.2, fPct], ['pan', 'Pan', -1, 1, v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R')]].forEach(([k, l, a, b, f]) => kn.appendChild(knob({ label: l, value: pad[k], min: a, max: b, fmt: f, onInput: v => { pad[k] = v; markDirty(); } })));
+    ctl.appendChild(kn);
+    const ld = document.createElement('button'); ld.className = 'btn ghostb tiny'; ld.textContent = pad.sampleId ? 'Replace sample…' : 'Load sample…'; ld.onclick = () => pickSample(async id => { pad.sampleId = id; ui.detail(); markDirty(); }); ctl.appendChild(ld);
+    body.appendChild(grid); body.appendChild(ctl); return c;
   }
   return samplerCard(t, inst);
 }

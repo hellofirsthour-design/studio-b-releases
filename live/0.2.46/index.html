@@ -80,9 +80,10 @@
   <div id="split" role="separator" aria-label="Drag to resize the detail view"></div>
 
   <section id="detail">
-    <nav id="dtabs"><button data-d="clip">Clip</button><button data-d="devices">Devices</button><button data-d="both">Both</button><span id="dTitle"></span><button id="dHide" class="dhide" title="Hide clip and devices (Ctrl+Alt+L)" aria-label="Hide the clip and devices panel">▾</button></nav>
+    <nav id="dtabs"><button data-d="clip">Clip</button><button data-d="devices">Devices</button><span id="dTitle"></span><button id="dHide" class="dhide" title="Hide clip and devices (Ctrl+Alt+L)" aria-label="Hide the clip and devices panel">▾</button></nav>
     <div class="dpanes"><div id="pane-clip" class="pane"></div><div id="pane-dev" class="pane" hidden></div></div>
   </section>
+  <footer id="status"><span id="stHelp"></span><span id="stInfo"></span></footer>
 </div>
 
 <div id="export" class="modal" hidden><div class="sheet">
@@ -168,6 +169,7 @@
 <script src="js/mapping.js"></script>
 <script src="js/browser.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/look.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 {
- "version": "0.2.45",
+ "version": "0.2.46",
  "shell": 4,
- "date": "2026-11-15T23:07:25.252Z",
- "notes": "Devices without inner scrolling, compact drum pads, separate clip/device views",
+ "date": "2026-11-16T17:50:27.558Z",
+ "notes": "Sound bar in every instrument, hot-swap, wider EQ and rack cards",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 11017,
-   "sha256": "0cd10368c95c62094f457e75ed12261271a2fe481cdbdd27722777fea6390772"
+   "size": 13097,
+   "sha256": "e072a26d5b7e3961075bc97128f76ee4b03330f6ad110494a35b547ed5d7db63"
   },
   {
    "path": "img/b-mark.svg",
@@ -46,13 +46,13 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34249,
-   "sha256": "ceb17fcfb81e4914381bf7b97ac5147bc37685337cc3574e19f6b05001c13351"
+   "size": 34346,
+   "sha256": "5abe2136de3f431d60ff737eb16a3445c53e24b832683a408e515e8ccf32c382"
   },
   {
    "path": "js/cards.js",
-   "size": 41893,
-   "sha256": "3f6b4dbc542f5a24ef3cf3ae2ea138a6f8a42d02239b0ada69be94fced46c866"
+   "size": 41916,
+   "sha256": "3f942c3d3a050faf119974601597e50278500e48b35f101f4619cc1d36ce79ca"
   },
   {
    "path": "js/convert.js",
@@ -201,8 +201,8 @@
   },
   {
    "path": "js/sounds.js",
-   "size": 37783,
-   "sha256": "8a2c9fee020a9a8d5219d1f9ba3ca75cfacc9c7cc2d02f030d15214536b863b8"
+   "size": 43716,
+   "sha256": "4ef975456aaea34892a9a2fd6394a7f4e6ac7c3361915573e5f002986a31c0d3"
   },
   {
    "path": "js/space.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "3afbae03614a3bbc9c2d0e60c576d29b07ec4a741f793225d096eb4ec1913ef3"
+   "sha256": "ecde4c2cf4aa8660928f1551d71f5551af7ebf878da4c1fa4abe1b0745e96199"
   }
  ]
 }
