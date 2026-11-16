@@ -1,8 +1,8 @@
 {
- "version": "0.2.57",
+ "version": "0.2.58",
  "shell": 4,
- "date": "2026-11-16T22:05:13.032Z",
- "notes": "Mixer: fader caps centred on the groove",
+ "date": "2026-11-16T22:58:44.258Z",
+ "notes": "Real meters, mixer fits the window, clip editor keys, browser double-click, fixes",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 21963,
-   "sha256": "1a4645d9600feeb9750cd204af4307571f1d46c06877429565c74030bf409f33"
+   "size": 24759,
+   "sha256": "c6f3843368b340ad58e9ddabb0006f4a1eca10ab12c6d716ca93886325af8386"
   },
   {
    "path": "img/b-mark.svg",
@@ -46,13 +46,13 @@
   },
   {
    "path": "js/browser.js",
-   "size": 34346,
-   "sha256": "5abe2136de3f431d60ff737eb16a3445c53e24b832683a408e515e8ccf32c382"
+   "size": 36262,
+   "sha256": "0f1c791c4cc45ca3106d86347eeaa7f2f6cb6c49c89ece2e7e60299a483c5a0e"
   },
   {
    "path": "js/cards.js",
-   "size": 41916,
-   "sha256": "3f942c3d3a050faf119974601597e50278500e48b35f101f4619cc1d36ce79ca"
+   "size": 41594,
+   "sha256": "5cb79daee11e2a1aebaba2887fd0b048a831a733af38fb3bf4b447ed8b01b799"
   },
   {
    "path": "js/convert.js",
@@ -81,8 +81,8 @@
   },
   {
    "path": "js/effects2.js",
-   "size": 20079,
-   "sha256": "46b9f6da2c06079421d287c3fac323c424c714c48bbc8a5114fbc98f32544a9f"
+   "size": 20988,
+   "sha256": "eb529c205d4ad88d13d3eb2fde13be229b223daa37fc2fe0ea33a76a96a70b37"
   },
   {
    "path": "js/engine-worker.js",
@@ -91,8 +91,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 61975,
-   "sha256": "bbe2881b26b0502b576011880c97a53258346d542b80abeec04d5146107b79c2"
+   "size": 62051,
+   "sha256": "17be6276ac03aebb13c308829d06076decde97c7b6f392cc500977035e95a2e4"
   },
   {
    "path": "js/features.js",
@@ -141,8 +141,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 35884,
-   "sha256": "36989e7155abe5487963f077e111da8c027bfb567782f782d34aeb7f17366f7a"
+   "size": 37192,
+   "sha256": "bc4754f960a23b7471ca9c2751f91c3d6156eb5f4bd80676e574c8cd106c5b74"
   },
   {
    "path": "js/mapping.js",
@@ -156,8 +156,8 @@
   },
   {
    "path": "js/mixer.js",
-   "size": 24287,
-   "sha256": "a12ec96cc642d5f6a4c9a7431bd82e9ae03ad65d11aef250c6890baf069f4272"
+   "size": 25216,
+   "sha256": "0fae08c61b680d1c683ee726d5fd2a5752848870a8bd20bffcb66ab6fa1acf3d"
   },
   {
    "path": "js/mods.js",
@@ -176,8 +176,8 @@
   },
   {
    "path": "js/packs.js",
-   "size": 10416,
-   "sha256": "f99a6fa501023064a5d7afa412bbc7447174dc556ef52a5e2987adfe1bc336de"
+   "size": 10410,
+   "sha256": "41c82018388be83af2523a5d104bb44bca1ca8331fb24bfeea224f1a29164848"
   },
   {
    "path": "js/plugins.js",
@@ -196,13 +196,13 @@
   },
   {
    "path": "js/roll.js",
-   "size": 36625,
-   "sha256": "a996fd38d1847122cfdf4df23a1d8731247a4118324ea30d65b30f03a10e2924"
+   "size": 40102,
+   "sha256": "e3a403ed4d0b4249b0a28afaeeea98fff83e03ce056938bff4a8be1d127e3e27"
   },
   {
    "path": "js/sounds.js",
-   "size": 43721,
-   "sha256": "991cc48daaaa44f585b512d451e5e1be82f495b068478cb867d7eb220ed01aea"
+   "size": 43710,
+   "sha256": "0a0ce23261f83e9a0caaa1cb8f9d2c2decc0445760c42a6bd21ecb98bc88ee2b"
   },
   {
    "path": "js/space.js",
@@ -231,8 +231,8 @@
   },
   {
    "path": "js/worklets2.js",
-   "size": 26186,
-   "sha256": "78613d52dc632243647b852b2babfeeb155b0d2f470aca2fd852f5fefd429030"
+   "size": 26187,
+   "sha256": "f3a51a010198326dfa76a7439e50453818770160d58e55986fb0d146c9864086"
   },
   {
    "path": "js/writer.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "a17abd0af00caf0533d2c3c8adab5ff9f8adb8d8af291d5ecc8461448612dce5"
+   "sha256": "371434f3014b0d0507375dc29f44fb56b2b6af907d052d88a8e1ccb7044c06c3"
   }
  ]
 }

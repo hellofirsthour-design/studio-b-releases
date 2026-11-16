@@ -5,22 +5,33 @@ let CLIPBOARD = null;
 
 /* ---------- meters & lights ---------- */
 const tbuf = new Float32Array(2048);
-function readPeak(an) { const n = an.fftSize, b = n === 2048 ? tbuf : new Float32Array(n); an.getFloatTimeDomainData(b); let m = 0; for (let i = 0; i < n; i++) { const v = Math.abs(b[i]); if (v > m) m = v; } return m; }
-function meter(id, el, an, now, horiz) {
-  let st = METER.get(id); if (!st) METER.set(id, (st = { lvl: 0, pk: 0, pkT: 0, clip: false }));
-  const p = readPeak(an), n = clamp((gainToDb(p) + 60) / 66, 0, 1); st.lastDb = gainToDb(p);
-  st.lvl = n > st.lvl ? n : Math.max(n, st.lvl - 0.025);
-  if (n >= st.pk) { st.pk = n; st.pkT = now; } else if (now - st.pkT > 1200) st.pk = Math.max(st.lvl, st.pk - 0.01);
-  if (p >= 0.999) st.clip = true;
+const PEAK_BUFS = new Map();
+function readPeak(an) { const n = an.fftSize; let b = PEAK_BUFS.get(n); if (!b) PEAK_BUFS.set(n, (b = new Float32Array(n))); an.getFloatTimeDomainData(b); let m = 0; for (let i = 0; i < n; i++) { const v = b[i] < 0 ? -b[i] : b[i]; if (v > m) m = v; } return m; }
+// Meters. The level comes from the channel's analysers, 4096 samples wide, so consecutive screen frames overlap and no sample is
+// missed; `src` is an AnalyserNode, a peak number, or null for no new data this frame. Position follows the fader's dB scale (0 dB sits where the
+// fader's 0 mark is), the colour is fixed to the level (green, yellow from -12 dB, orange from -3, red over 0 dBFS), and the
+// clip light stays on after the level comes back down, until you click it.
+const meterPos = db => clamp(gainToFader(dbToGain(clamp(db, -90, 4))), 0, 1);
+function meter(id, el, src, now, horiz) {
+  let st = METER.get(id); if (!st) METER.set(id, (st = { lvl: 0, pk: 0, pkT: 0, clip: false, lastDb: -120 }));
+  const p = src == null ? null : typeof src === 'number' ? src : readPeak(src);
+  const n = p == null ? 0 : p > 1e-5 ? meterPos(gainToDb(p)) : 0; if (p != null) st.lastDb = gainToDb(p);
+  if (p != null) st.lvl = n > st.lvl ? n : Math.max(n, st.lvl - 0.025);   // no new reading this frame: hold
+  if (n >= st.pk) { st.pk = n; st.pkT = now; } else if (now - st.pkT > 1500) st.pk = Math.max(st.lvl, st.pk - 0.008);
+  if (p != null && p > 1) st.clip = true;
   if (!el) return st; const l = el.querySelector('.lvl'), k = el.querySelector('.pk');
-  if (horiz) { l.style.transform = `scaleX(${st.lvl})`; k.style.left = st.pk * 100 + '%'; } else { l.style.transform = `scaleY(${st.lvl})`; k.style.bottom = st.pk * 100 + '%'; }
-  k.style.opacity = st.pk > 0.02 ? 1 : 0; el.classList.toggle('clipped', st.clip);
+  const cut = ((1 - st.lvl) * 100).toFixed(2) + '%';
+  if (horiz) { l.style.clipPath = `inset(0 ${cut} 0 0)`; k.style.left = st.pk * 100 + '%'; } else { l.style.clipPath = `inset(${cut} 0 0 0)`; k.style.bottom = st.pk * 100 + '%'; }
+  k.style.opacity = st.pk > 0.02 ? 1 : 0; k.classList.toggle('over', st.pk > meterPos(0) + 1e-3); el.classList.toggle('clipped', st.clip);
   return st;
 }
+function clearClips() { METER.forEach(m => (m.clip = false)); if (typeof mixer !== 'undefined') mixer.peaks.clear(); document.querySelectorAll('.clipped').forEach(x => x.classList.remove('clipped')); }
+document.addEventListener('click', e => { if (e.target.closest('.hmeter, .mxmeter, #mmeter, .mxclip')) clearClips(); });
 let lastFrame = 0;
 function frame(now) {
   if (S) {
-    allBuses().forEach(b => { const r = b === S.master ? { an: M.an } : RT.get(b.id); const an = b.arm && b.kind === 'audio' ? inputAnalyser(b) || (r && r.an) : r && r.an; if (an) meter(b.id, document.querySelector(`.hdr[data-id="${b.id}"]:not([data-lane]) .hmeter`), an, now); });
+    allBuses().forEach(b => { const r = b === S.master ? M : RT.get(b.id); if (!r) return; const inp = b.arm && b.kind === 'audio' ? inputAnalyser(b) : null;
+      const src = inp || (b === S.master ? M.an : r.an); meter(b.id, document.querySelector(`.hdr[data-id="${b.id}"]:not([data-lane]) .hmeter`), src, now); });
     const ms = meter('mainTop', $('#mmeter'), M.an, now, true);
     $('#mclip').classList.toggle('on', ms.clip);
     S.tracks.forEach(t => { const el = document.querySelector(`.hdr[data-id="${t.id}"] .hcol`); if (el) el.classList.toggle('on', now - (ACT.get(t.id) || 0) < 90); });
@@ -263,7 +274,7 @@ function bindBar() {
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) m.hidden = true; }));
   // splitter between arrangement and detail
   const spl = $('#split'), app = $('#app'); const setH = h => { h = clamp(h, 160, innerHeight - 260); lsSet('sb-detailH', h); sizeDetail(); arr.draw(); roll.draw_(); };   // only the Clip view resizes
-  sizeDetail(); addEventListener('resize', () => sizeDetail());
+  sizeDetail(); addEventListener('resize', () => { sizeDetail(); if (V.view === 'mix') mixer.fit(); });
   setDetailShown(lsGet('sb-detailHidden') !== '1'); $('#dHide').onclick = () => setDetailShown(false);
   spl.onpointerdown = e => { if (app.classList.contains('nodetail')) { setDetailShown(true); return; } if (V.detail !== 'clip') return; spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
   document.addEventListener('dragover', e => e.preventDefault());

@@ -112,8 +112,8 @@ function bindHeaders() {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id);
     switch (h.dataset.h) {
       case 'chip': V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = 'devices'; ui.all(); return;
-      case 'mute': b.mute = !b.mute; break;
-      case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; break;
+      case 'mute': b.mute = !b.mute; linkFlag(b, 'mute'); break;
+      case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) { S.tracks.forEach(t => (t.solo = false)); (S.vcas || []).forEach(v => (v.solo = false)); } b.solo = !b.solo; linkFlag(b, 'solo'); break;
       case 'arm': { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); break; }
       case 'mon': b.monitor = h.dataset.m; break;
       case 'fold': b.fold = !b.fold; break;
@@ -134,7 +134,7 @@ function bindHeaders() {
   box.addEventListener('input', e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id), k = h.dataset.h;
     if (k === 'send') { const i = +h.dataset.si; setSend(b, i, +h.value); applyMix(b); autoTouch(b, sendKey(i), +h.value); markDirty(); return; }
-    if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { if (k === 'sendA' || k === 'sendB') setSend(b, sendIndex(k), +h.value); else b[k] = +h.value; autoTouch(b, k, +h.value); autoTouch(b, k, +h.value); applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
+    if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { const oldVol = b.vol; if (k === 'sendA' || k === 'sendB') setSend(b, sendIndex(k), +h.value); else b[k] = +h.value; if (k === 'vol') linkVol(b, oldVol); autoTouch(b, k, +h.value); autoTouch(b, k, +h.value); applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
   });
   box.addEventListener('change', e => { const h0 = e.target.closest('[data-h]'), hd0 = e.target.closest('.hdr'); if (h0 && hd0 && ioChange(busById(hd0.dataset.id), h0)) return; });
   box.addEventListener('change', e => { hideTip(); const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (h && h.dataset.h === 'autoShow') { busById(hd.dataset.id).autoShow = h.value; ui.headers(); } if (h && h.dataset.h === 'laneKey') { busById(hd.dataset.id).lanes[+hd.dataset.li] = h.value; ui.headers(); } });

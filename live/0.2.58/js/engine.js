@@ -46,10 +46,10 @@ const songEnd = () => Math.max(64, ...S.tracks.flatMap(t => t.clips.map(c => c.s
 /* ---------- audio graph ---------- */
 function buildMaster() {
   [M.out, M.click, M.cue, M.loud].forEach(n => { if (n) try { n.disconnect(); } catch (e) { } });
-  M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = 2048; M.direct = ctx.createDelay(2); M.direct.connect(M.in);
+  M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = isOffline() ? 32 : 4096; M.direct = ctx.createDelay(2); M.direct.connect(M.in);
   M.rec = !isOffline() && ctx.createMediaStreamDestination ? ctx.createMediaStreamDestination() : null;
   M.out.connect(liveOut('main')); M.out.connect(M.an); if (M.rec) M.out.connect(M.rec);
-  M.split = ctx.createChannelSplitter(2); M.anL = ctx.createAnalyser(); M.anR = ctx.createAnalyser(); M.anL.fftSize = M.anR.fftSize = 1024; M.out.connect(M.split); M.split.connect(M.anL, 0); M.split.connect(M.anR, 1);
+  M.split = ctx.createChannelSplitter(2); M.anL = ctx.createAnalyser(); M.anR = ctx.createAnalyser(); M.anL.fftSize = M.anR.fftSize = isOffline() ? 32 : 4096; M.out.connect(M.split); M.split.connect(M.anL, 0); M.split.connect(M.anR, 1);
   if (!isOffline() && PITCH_OK) { try { M.loud = new AudioWorkletNode(ctx, 'gw-loud', { numberOfInputs: 1, numberOfOutputs: 0 }); M.out.connect(M.loud); M.loud.port.onmessage = e => (M.loudData = e.data); } catch (e) { M.loud = null; } }
   M.click = ctx.createGain(); M.click.gain.value = 0.35; if (!isOffline()) M.click.connect(GP.clickCue ? liveOut('cue') : liveOut('main'));
   M.cue = ctx.createGain(); M.cue.gain.value = 0.8; if (!isOffline()) M.cue.connect(liveOut('cue'));
@@ -82,9 +82,9 @@ function routeOut(b) {
 }
 function buildBus(b, kind) {
   const r = { fader: ctx.createGain(), pan: ctx.createStereoPanner(), dly: ctx.createDelay(2), mute: ctx.createGain(), an: ctx.createAnalyser(), pre: ctx.createGain(), preMute: ctx.createGain(), kind };
-  r.an.fftSize = 1024; r.pre.connect(r.fader); r.fader.connect(r.pan); r.pan.connect(r.dly); r.dly.connect(r.mute); r.mute.connect(r.an); r.pre.connect(r.preMute);
+  r.an.fftSize = isOffline() ? 32 : 4096; r.pre.connect(r.fader); r.fader.connect(r.pan); r.pan.connect(r.dly); r.dly.connect(r.mute); r.mute.connect(r.an); r.pre.connect(r.preMute);
   RT.set(b.id, r); routeOut(b);
-  r.split = ctx.createChannelSplitter(2); r.anL = ctx.createAnalyser(); r.anR = ctx.createAnalyser(); r.anL.fftSize = r.anR.fftSize = 1024; r.mute.connect(r.split); r.split.connect(r.anL, 0); r.split.connect(r.anR, 1);
+  r.split = ctx.createChannelSplitter(2); r.anL = ctx.createAnalyser(); r.anR = ctx.createAnalyser(); r.anL.fftSize = r.anR.fftSize = isOffline() ? 32 : 4096; r.mute.connect(r.split); r.split.connect(r.anL, 0); r.split.connect(r.anR, 1);
   if (kind === 'return' || b.kind === 'group') r.in = ctx.createGain();
   else if (b.kind === 'midi') { r.inst = makeInstrument(b); r.in = r.inst.out; }
   else { r.in = ctx.createGain(); r.mon = ctx.createGain(); r.mon.gain.value = 0; r.mon.connect(r.in); }
@@ -103,16 +103,37 @@ function wireSidechains() {
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
 function rewire(b) { if (!isOffline()) schedulePDC(); if (NE.on && !isOffline()) setTimeout(neSyncProject, 0); if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
-const anySolo = () => S.tracks.some(t => t.solo);
+const anySolo = () => S.tracks.some(t => t.solo) || (S.vcas || []).some(v => v.solo && vcaMembers(v).length);
+/* VCAs, as in Pro Tools: a fader with no audio of its own. Its level scales every member's fader, and its mute and solo
+   mute and solo the members. Mix groups link their members' faders (relative, in dB), mutes and solos. */
+const vcaOf = b => (b && b.vca ? (S.vcas || []).find(v => v.id === b.vca) || null : null);
+const vcaMembers = v => allBuses().filter(b => b.vca === v.id);
+const vcaGain = b => { const v = vcaOf(b); return v ? faderGain(v.vol) / faderGain(0.79) : 1; };
+const mixGroupOf = b => (b && b.mg ? (S.mixGroups || []).find(g => g.id === b.mg) || null : null);
+let LINK_SUSPEND = false;   // hold Ctrl/Cmd while moving a control to move just that channel
+document.addEventListener('pointerdown', e => { LINK_SUSPEND = !!(e.ctrlKey || e.metaKey); }, true);
+const groupMates = b => { const g = mixGroupOf(b); return g && g.on !== false && !LINK_SUSPEND ? allBuses().filter(x => x !== b && x.mg === g.id) : []; };
+// The other members follow a fader move by the same number of dB (a member at -inf stays there).
+function linkVol(b, oldVol) {
+  if (oldVol <= 0) return []; const d = gainToDb(faderGain(b.vol)) - gainToDb(faderGain(oldVol)); if (!isFinite(d) || Math.abs(d) < 1e-9) return [];
+  const mates = groupMates(b); mates.forEach(m => { if (m.vol <= 0) return; m.vol = clamp(gainToFader(dbToGain(gainToDb(faderGain(m.vol)) + d)), 0, 1); applyMix(m); autoTouch(m, 'vol', m.vol); refreshVolUI(m); }); return mates;
+}
+function linkFlag(b, key) { groupMates(b).forEach(m => { m[key] = b[key]; }); }
+function refreshVolUI(b) {
+  const hv = document.querySelector(`.hdr[data-id="${b.id}"] .hvol`); if (hv) { hv.value = b.vol; if (typeof syncRange === 'function') syncRange(hv); }
+  const hd = document.querySelector(`[data-db="${b.id}"]`); if (hd) hd.textContent = faderDb(b.vol);
+  const mv = document.querySelector(`#mixer .mxs[data-id="${b.id}"] .mxvol`); if (mv) mv.value = b.vol;
+  const md = document.querySelector(`#mixer .mxs[data-id="${b.id}"] .mxdb`); if (md) md.value = faderDb(b.vol);
+}
 // A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
-const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
+const soloPath = b => b.solo || ancestors(b).some(g => g.solo || (vcaOf(g) || {}).solo) || (vcaOf(b) || {}).solo || (b.kind === 'group' && descendants(b).some(t => t.solo || (vcaOf(t) || {}).solo));
 function applyMix(b) {
   if (b === S.master) { if (M.out) sm(M.out.gain, faderGain(b.vol)); return; }
   const r = RT.get(b.id); if (!r) return;
-  if (!autoActive(b, 'vol')) sm(r.fader.gain, faderGain(b.vol));
+  if (!autoActive(b, 'vol')) sm(r.fader.gain, faderGain(b.vol) * vcaGain(b));
   if (!autoActive(b, 'pan')) sm(r.pan.pan, b.pan);
   if (r.sends) r.sends.forEach((g, i) => { const k = sendKey(i); if (!autoActive(b, k)) sm(g.gain, sendOf(b, i)); });
-  const isTrack = S.tracks.includes(b), audible = !b.mute && !ancestors(b).some(g => g.mute) && (!isTrack || !anySolo() || soloPath(b));
+  const isTrack = S.tracks.includes(b), audible = !b.mute && !(vcaOf(b) || {}).mute && !ancestors(b).some(g => g.mute || (vcaOf(g) || {}).mute) && (!isTrack || !anySolo() || soloPath(b));
   sm(r.mute.gain, audible ? 1 : 0, 0.008); sm(r.preMute.gain, audible ? 1 : 0, 0.008);
   const off = Math.max(0, ...S.tracks.map(t => -(t.delayMs || 0))) / 1000; sm(r.dly.delayTime, clamp(((isTrack ? b.delayMs || 0 : 0) / 1000) + off + (b._pdc || 0), 0, 1.99), 0.02);
   if (r.mon) sm(r.mon.gain, monitorOn(b) ? 1 : 0, 0.01);
@@ -234,7 +255,7 @@ function applyAutomation(b, from, to, first) {
     const r = b === S.master ? { fader: M.out } : RT.get(b.id); if (!r) continue;
     const vEnd = autoValue(pts, to), tEnd = timeAt(to);
     const ramp = (param, val) => { if (first) { param.cancelScheduledValues(0); param.setValueAtTime(val(autoValue(pts, from)), Math.max(0, timeAt(from))); } param.linearRampToValueAtTime(val(vEnd), Math.max(ctx.currentTime, tEnd)); };
-    if (key === 'vol') ramp(r.fader.gain, faderGain);
+    if (key === 'vol') { const vg = vcaGain(b); ramp(r.fader.gain, v => faderGain(v) * vg); }
     else if (key === 'pan' && r.pan) ramp(r.pan.pan, v => v);
     else if (sendIndex(key) >= 0) { const g = r.sends && r.sends[sendIndex(key)]; if (g) ramp(g.gain, v => v); }
     else {

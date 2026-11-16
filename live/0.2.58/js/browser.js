@@ -40,6 +40,19 @@ const browser = {
     }
     const el = $('#browser');
     el.addEventListener('click', e => this.click(e));
+    // keyboard, like other DAWs: Up/Down move through the list (and preview), Right/Left open and close folders, Enter loads
+    const list = $('#blist'); list.tabIndex = 0;
+    list.addEventListener('pointerdown', () => list.focus());
+    list.addEventListener('keydown', e => {
+      const rows = [...list.querySelectorAll('.brow')]; if (!rows.length) return; const cur = list.querySelector('.brow.sel'), i = rows.indexOf(cur);
+      const pick = r => { if (!r) return; rows.forEach(x => x.classList.remove('sel')); r.classList.add('sel'); r.scrollIntoView({ block: 'nearest' });
+        const act = r.dataset.act; if (act === 'sound' || act === 'prev') this.click({ target: r, detail: 1 }); };
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); pick(rows[clamp(i + (e.key === 'ArrowDown' ? 1 : -1), 0, rows.length - 1)] || rows[0]); return; }
+      if (!cur) return;
+      if ((e.key === 'ArrowRight' && cur.dataset.act === 'dir' && !this.expanded.has(cur.dataset.id)) || (e.key === 'ArrowLeft' && cur.dataset.act === 'dir' && this.expanded.has(cur.dataset.id))) {
+        e.preventDefault(); e.stopPropagation(); const id = cur.dataset.id; this.click({ target: cur, detail: 1 }).then(() => { const again = [...list.querySelectorAll('.brow')].find(x => x.dataset.id === id); if (again) { again.classList.add('sel'); again.scrollIntoView({ block: 'nearest' }); } }); return; }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (cur.dataset.act !== 'dir') this.click({ target: cur, detail: 2 }); }
+    });
     el.addEventListener('dblclick', e => { const c = e.target.closest('[data-side^="col:"]'); if (c) { const col = this.cols.list.find(x => 'col:' + x.id === c.dataset.side); askText('Collection name', col.name, v => { col.name = v; this.saveCols(); this.render(); }); } });
     el.addEventListener('contextmenu', e => this.context(e));
     el.addEventListener('dragstart', e => { this.stopPreview(); const it = e.target.closest('[data-drag]'); if (!it) return; e.dataTransfer.setData(it.dataset.drag, it.dataset.val); e.dataTransfer.effectAllowed = 'copy'; });
@@ -71,9 +84,9 @@ const browser = {
     return `<div class="brow ${o.cls || ''}" style="padding-left:${pad + 14}px" draggable="${o.drag ? 'true' : 'false'}" ${o.drag ? `data-drag="${o.drag}" data-val='${esc(o.val)}'` : ''} data-act="${o.act || ''}" data-key="${esc(o.key || '')}" ${o.path ? `data-path="${esc(o.path)}"` : ''} ${o.sid ? `data-sid="${o.sid}"` : ''} ${o.file ? `data-file="${o.file}"` : ''} title="${esc(o.title || '')}">${ico(o.icon || 'file')}<b>${esc(o.name)}</b>${tagDots}${o.meta ? `<span class="bmeta">${esc(o.meta)}</span>` : ''}</div>`;
   },
   // building blocks for each category
-  fxItem(k) { const v = DEVICES[k]; return { name: v.name, drag: 'sb/device', val: k, act: 'fx', key: 'fx:' + k, icon: 'fx', title: v.blurb + '. Click to add to the selected track, or drag onto a track' }; },
+  fxItem(k) { const v = DEVICES[k]; return { name: v.name, drag: 'sb/device', val: k, act: 'fx', key: 'fx:' + k, icon: 'fx', title: v.blurb + '. Double-click to add to the selected track, or drag onto a track' }; },
   soundItem(s) { const inst = INST_NAMES[s.inst.type] || 'Kit'; return { name: s.name, drag: 'sb/inst', val: 'sound:' + s.name, act: 'sound', key: 'inst:sound:' + s.name, icon: s.cat === 'Drum Kits' ? 'drums' : 'sounds', title: 'Click to hear it, double-click or drag onto the arrangement to load it' }; },
-  instItem(v, name, meta) { return { name, drag: 'sb/inst', val: v, act: 'inst', key: 'inst:' + v, icon: v.startsWith('drums') ? 'drums' : 'instruments', title: (meta ? meta + '. ' : '') + 'Click to add a track, or drag onto a MIDI track' }; },
+  instItem(v, name, meta) { return { name, drag: 'sb/inst', val: v, act: 'inst', key: 'inst:' + v, icon: v.startsWith('drums') ? 'drums' : 'instruments', title: (meta ? meta + '. ' : '') + 'Double-click to add a track, or drag onto a MIDI track' }; },
   fileItem(f) { const isSet = /\.(als|sbproj)$/i.test(f.name); return isSet ? { name: f.name, path: f.path, act: 'openSet', key: 'file:' + f.path, icon: 'set', meta: /\.als$/i.test(f.name) ? 'Live Set' : 'Project', title: 'Double-click to open' } : { name: f.name, path: f.path, file: f.fileId, drag: 'sb/sample', val: JSON.stringify(f.fileId ? { fileId: f.fileId } : { path: f.path }), act: 'prev', key: 'file:' + (f.path || f.fileId), icon: 'file' }; },
   folderRows(id, name, path, depth, filter) {
     const out = [this.row({ dir: true, id, name, path }, depth)];
@@ -120,10 +133,10 @@ const browser = {
       h = q ? Object.keys(DEVICES).filter(k => !DEVICES[k].hidden && m(DEVICES[k].name + ' ' + DEVICES[k].blurb)).map(k => this.row(this.fxItem(k))).join('')
         : FX_FOLDERS.map(([f, ks]) => this.staticFolder('fx:' + f, f, ks.map(k => this.fxItem(k)))).join('');
     } else if (sel === 'midifx') {
-      title = 'MIDI Effects'; h = Object.entries(MIDIFX).filter(([, v]) => m(v.name)).map(([k, v]) => this.row({ name: v.name, title: v.blurb, drag: 'sb/midifx', val: k, act: 'midifx', key: 'midifx:' + k, icon: 'midifx', title: 'Click to add to the selected MIDI track, or drag onto one' })).join('');
+      title = 'MIDI Effects'; h = Object.entries(MIDIFX).filter(([, v]) => m(v.name)).map(([k, v]) => this.row({ name: v.name, title: v.blurb, drag: 'sb/midifx', val: k, act: 'midifx', key: 'midifx:' + k, icon: 'midifx', title: 'Double-click to add to the selected MIDI track, or drag onto one' })).join('');
     } else if (sel === 'plugins') {
       title = 'Plug-Ins';
-      const pi = x => ({ name: x.name, meta: `${x.vendor ? x.vendor + ' · ' : ''}${x.format}`, drag: 'sb/plugin', val: JSON.stringify({ ref: refOf(x), instrument: !!x.instrument }), act: 'plugin', key: 'plug:' + x.format + x.uid, icon: x.instrument ? 'instruments' : 'plugins', title: x.instrument ? 'Click for a new MIDI track with this instrument, or drag onto a MIDI track' : 'Click to add to the selected track, or drag onto a track' });
+      const pi = x => ({ name: x.name, meta: `${x.vendor ? x.vendor + ' · ' : ''}${x.format}`, drag: 'sb/plugin', val: JSON.stringify({ ref: refOf(x), instrument: !!x.instrument }), act: 'plugin', key: 'plug:' + x.format + x.uid, icon: x.instrument ? 'instruments' : 'plugins', title: x.instrument ? 'Click for a new MIDI track with this instrument, or drag onto a MIDI track' : 'Double-click to add to the selected track, or drag onto a track' });
       if (!NE.avail || !NE.avail.ok) h = this.empty('Plug-ins need the native engine', !IS_DESKTOP ? 'VST3 and Audio Unit plug-ins run in the desktop app.' : !NE.avail ? 'This copy of Studio B is older than the native engine. Download the newest installer once; after that, updates arrive on their own.' : 'The native engine did not load on this computer: ' + esc(NE.avail.error || '') + '.');
       else {
         const all = nePlugins().filter(x => m(x.name) || m(x.vendor || '')), ins = all.filter(x => x.instrument), fx = all.filter(x => !x.instrument);
@@ -141,7 +154,7 @@ const browser = {
       h = this.staticFolderOpen('In this project', ps);
       if (q && IS_DESKTOP) h += this.roots().map(r => { const id = 'sqroot:' + r.path, t = this.searchTree(r.path, audio, r.name); if (/No matches/.test(t)) return ''; if (!this.expanded.has('closed:' + id)) this.expanded.add(id); return this.row({ dir: true, id, name: r.name }, 0) + (this.expanded.has(id) ? t.replace(/padding-left:(\d+)px/g, (m, v) => `padding-left:${+v + 14}px`) : ''); }).join('') || '<div class="brow dim">No matches in your folders</div>';
       else h += this.roots().map(r => this.folderRows(r.path, r.name, r.path, 0, audio)).join('') + (!IS_DESKTOP ? this.webPlaces(audio) : '');
-    } else if (sel === 'grooves') { title = 'Grooves'; const gi = g => ({ name: g.name, meta: g.cycle >= 16 ? '1 bar' : g.cycle + ' steps', act: 'groove', val: g.id, key: 'groove:' + g.id, icon: 'grooves', title: 'Click to apply to the selected clips' });
+    } else if (sel === 'grooves') { title = 'Grooves'; const gi = g => ({ name: g.name, meta: g.cycle >= 16 ? '1 bar' : g.cycle + ' steps', act: 'groove', val: g.id, key: 'groove:' + g.id, icon: 'grooves', title: 'Double-click to apply to the selected clips' });
       h = `<div class="grvamt"><span>Global amount</span><input type="range" min="0" max="1.3" step="0.01" value="${S.grooveAmt != null ? S.grooveAmt : 1}" id="grvAmt" aria-label="Global groove amount"><b>${Math.round((S.grooveAmt != null ? S.grooveAmt : 1) * 100)}%</b></div>` + this.staticFolderOpen('Groove pool (this project)', (S.grooves || []).filter(g => m(g.name)).map(gi)) + this.staticFolderOpen('Swing and feel', GROOVE_LIB.filter(g => m(g.name)).map(gi)); }
     else if (sel === 'templates') { title = 'Templates'; h = `<div class="row tight bscan"><button class="btn ghostb tiny" data-act="tplSave">Save as template…</button><button class="btn ghostb tiny" data-act="tplDefault">Save as default set</button></div>` + (this.tpls || []).filter(t => m(t.name)).map(t => `<div class="brow" data-act="tpl" data-name="${esc(t.name)}" title="Click to start a new project from this template">${ico('set')}<b>${esc(t.name)}</b></div>`).join('') || this.empty('No templates yet', 'Set up a project the way you like, then use the ☰ menu in the toolbar: <b>Save as template</b> or <b>Save as default set</b>.'); listTemplates().then(ts => { const n = ts.map(t => t.name).join(); if (n !== (this.tpls || []).map(t => t.name).join()) { this.tpls = ts; this.renderList(); } }); }
     else if (sel === 'project') {
@@ -205,6 +218,8 @@ const browser = {
     const s = e.target.closest('[data-side]'); if (s) { this.stopPreview(); this.swapFor = null; this.sel = s.dataset.side; lsSet('sb-bsel', this.sel); this.render(); return; }
     const a = e.target.closest('[data-act]'); if (!a) return; const act = a.dataset.act;
     if (act === 'sort') { this.sortDesc = !this.sortDesc; this.renderList(); return; }
+    // one click picks a row; adding it takes a double-click (or a drag onto a track), like other DAWs
+    if (['inst', 'fx', 'midifx', 'plugin', 'groove', 'tpl'].includes(act) && e.detail < 2) { $$('.brow.sel', $('#blist')).forEach(x => x.classList.remove('sel')); a.classList.add('sel'); return; }
     if (act === 'inst') return addInstrumentTrack(a.dataset.val, null);
     if (act === 'pack') { const id = (a.dataset.key || '').slice(5); if (!PACK_STATE.installed.has(id)) downloadPack(id); else toast(`${packInfo(id).name} is installed. Its instruments are in the folders below.`); return; }
     if (act === 'sound') { const n = (a.dataset.key || '').slice(11); if (e.detail >= 2) { stopSoundPreview(); const sw = this.swapFor && S.tracks.find(t => t.id === this.swapFor); return addSound(n, sw || null); } document.querySelectorAll('#blist .brow.sel').forEach(x => x.classList.remove('sel')); a.classList.add('sel'); if (this.previewOn) previewSound(n); return; }
