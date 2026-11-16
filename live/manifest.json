@@ -1,8 +1,8 @@
 {
- "version": "0.2.58",
+ "version": "0.2.59",
  "shell": 4,
- "date": "2026-11-16T22:58:44.258Z",
- "notes": "Real meters, mixer fits the window, clip editor keys, browser double-click, fixes",
+ "date": "2026-11-16T23:28:17.570Z",
+ "notes": "Driftline: echoes die away below 100% feedback; tail test for everything",
  "files": [
   {
    "path": "css/base.css",
@@ -66,8 +66,8 @@
   },
   {
    "path": "js/devices.js",
-   "size": 32322,
-   "sha256": "ec5178990bb297bd8cb2ed0c6e097b26f93e7de9684f5285c7a95bca2e2d1dbc"
+   "size": 32835,
+   "sha256": "741f3f507987d8df6f2bb8221fa778b0fb14eaba8c23bbcbda96eddc7c9c2916"
   },
   {
    "path": "js/dsp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "371434f3014b0d0507375dc29f44fb56b2b6af907d052d88a8e1ccb7044c06c3"
+   "sha256": "224c9b316a279c31d5af00f20ce81729bdafb0434ada0df6707af3df5d4a6dd0"
   }
  ]
 }

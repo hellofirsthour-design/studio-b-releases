@@ -42,10 +42,17 @@ class PatinaDev extends Base {
     this.hum = c.createOscillator(); this.hum.type = 'sawtooth'; this.humLp = c.createBiquadFilter(); this.humLp.type = 'lowpass'; this.humLp.frequency.value = 400;
     this.gV = c.createGain(); this.gH = c.createGain(); this.gHum = c.createGain(); this.nTone = c.createBiquadFilter(); this.nTone.type = 'lowpass';
     this.nV.connect(this.gV); this.nH.connect(this.gH); this.hum.connect(this.humLp); this.humLp.connect(this.gHum); [this.gV, this.gH, this.gHum].forEach(g => g.connect(this.nTone)); this.nV.start(0, Math.random() * 3); this.nH.start(0, Math.random() * 3); this.hum.start();
+    // the noise follows the music: a level follower on the input opens it, so it fades out shortly after the sound stops
+    this.nGate = c.createGain(); this.nGate.gain.value = 0;
+    this.eAbs = c.createWaveShaper(); { const cv = new Float32Array(1025); for (let i = 0; i < 1025; i++) cv[i] = Math.abs(i / 512 - 1); this.eAbs.curve = cv; }
+    this.eLp = c.createBiquadFilter(); this.eLp.type = 'lowpass'; this.eLp.frequency.value = 4; this.eLp.Q.value = 0.5;
+    this.eAmp = c.createGain(); this.eAmp.gain.value = 60;
+    this.eSat = c.createWaveShaper(); { const cv = new Float32Array(1025); for (let i = 0; i < 1025; i++) { const x = i / 512 - 1; cv[i] = x <= 0 ? 0 : Math.tanh(x * 3); } this.eSat.curve = cv; }
+    this.input.connect(this.eAbs); this.eAbs.connect(this.eLp); this.eLp.connect(this.eAmp); this.eAmp.connect(this.eSat); this.eSat.connect(this.nGate.gain);
     this.out2 = c.createGain();
     this.input.connect(this.wob); this.wob.connect(this.dPre); this.dPre.connect(this.dSh); this.dSh.connect(this.dPost); this.dPost.connect(this.crush); this.crush.connect(this.mSh);
     this.mSh.connect(this.mPost); this.mPost.connect(this.mLp); this.mLp.connect(this.mDrop); this.mDrop.connect(this.tLo); this.tLo.connect(this.tHi);
-    this.tHi.connect(this.dryG); this.tHi.connect(this.room); this.room.connect(this.roomG); this.dryG.connect(this.sum); this.roomG.connect(this.sum); this.nTone.connect(this.sum);
+    this.tHi.connect(this.dryG); this.tHi.connect(this.room); this.room.connect(this.roomG); this.dryG.connect(this.sum); this.roomG.connect(this.sum); this.nTone.connect(this.nGate); this.nGate.connect(this.sum);
     this.sum.connect(this.out2); this.out2.connect(this.wet);
     [this.gV, this.gH, this.gHum, this.roomG, this.wowG, this.fltG, this.dropAmt].forEach(g => (g.gain.value = 0)); // start silent, then ease to the settings
     this.set();
