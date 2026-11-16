@@ -306,12 +306,12 @@ const arr = {
     }
     let hit = this.hitClip(r, x, y); const pos = this.pos(x);
     if (hit && r.b.frozen && hit.zone !== 'range') { toast(`${r.b.name} is frozen. Unfreeze it (right-click the track) to edit its clips.`); hit = { c: hit.c, zone: 'range' }; }
-    if (hit && hit.zone === 'range') { V.editClip = hit.c.id; ui.detail(); hit = null; }
+    let bodyClip = null; if (hit && hit.zone === 'range') { V.editClip = hit.c.id; ui.detail(); bodyClip = hit.c; hit = null; }
     if (hit) {
       const c = hit.c;
       if (e.shiftKey || e.ctrlKey || e.metaKey) { V.selClips.has(c.id) ? V.selClips.delete(c.id) : V.selClips.add(c.id); }
       else if (!V.selClips.has(c.id)) V.selClips = new Set([c.id]);
-      V.time = null; V.insert = this.snap(pos); V.editClip = c.id; ui.detail();
+      V.time = null; V.insert = c.start; V.editClip = c.id; ui.detail();   // play starts at the start of the clip you clicked
       const sel = S.tracks.flatMap(t => t.clips.filter(k => V.selClips.has(k.id)).map(k => ({ t, c: k, o: deep(k) })));
       const x0 = e.clientX, row0 = this.rows.indexOf(r); let moved = false, undo = false, copied = false;
       this.drag = true;
@@ -365,7 +365,9 @@ const arr = {
       if (V.time.b - V.time.a < 1e-6) V.time = null; else { V.selTracks = new Set(V.time.tracks); V.insert = V.time.a; }
       this.draw(); if (V.time) showTip(ev, `${barsBeats(V.time.a)} → ${barsBeats(V.time.b)}  ·  ${barsBeatsLen(V.time.b - V.time.a)}`);
     };
-    cv.onpointerup = () => { cv.onpointermove = null; this.drag = false; hideTip(); ui.headers(); ui.detail(); this.draw(); };
+    cv.onpointerup = () => { cv.onpointermove = null; this.drag = false; hideTip();
+      if (bodyClip && !V.time) { V.selClips = new Set([bodyClip.id]); V.insert = bodyClip.start; if (!T.playing) T.stopPos = bodyClip.start; }   // a plain click on a clip: select it, play from its start
+      ui.headers(); ui.detail(); this.draw(); };
     ui.headers(); this.draw();
   },
   context(e) {

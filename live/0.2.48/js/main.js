@@ -262,10 +262,10 @@ function bindBar() {
   $('#addAudio').onclick = () => cmd('newAudio'); $('#addMidi').onclick = () => cmd('newMidi');
   $$('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) m.hidden = true; }));
   // splitter between arrangement and detail
-  const spl = $('#split'), app = $('#app'); const setH = h => { h = clamp(h, 160, innerHeight - 260); app.style.setProperty('--detailH', h + 'px'); lsSet('sb-detailH', h); arr.draw(); roll.draw_(); };
-  const sv = +lsGet('sb-detailH'); if (sv) setH(sv);
+  const spl = $('#split'), app = $('#app'); const setH = h => { h = clamp(h, 160, innerHeight - 260); lsSet('sb-detailH', h); sizeDetail(); arr.draw(); roll.draw_(); };   // only the Clip view resizes
+  sizeDetail(); addEventListener('resize', () => sizeDetail());
   setDetailShown(lsGet('sb-detailHidden') !== '1'); $('#dHide').onclick = () => setDetailShown(false);
-  spl.onpointerdown = e => { if (app.classList.contains('nodetail')) { setDetailShown(true); return; } spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
+  spl.onpointerdown = e => { if (app.classList.contains('nodetail')) { setDetailShown(true); return; } if (V.detail !== 'clip') return; spl.setPointerCapture(e.pointerId); const y0 = e.clientY, h0 = $('#detail').offsetHeight; spl.onpointermove = ev => setH(h0 - (ev.clientY - y0)); spl.onpointerup = () => (spl.onpointermove = null); };
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { if (e.defaultPrevented) return; e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && /\.(als|sbproj|json)$/i.test(f.name)) f.arrayBuffer().then(data => confirmLeave(() => openProjectFile({ name: f.name, path: IS_DESKTOP && f.path ? f.path : null, data }))); });
 }

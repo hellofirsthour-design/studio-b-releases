@@ -1,8 +1,8 @@
 {
- "version": "0.2.47",
+ "version": "0.2.48",
  "shell": 4,
- "date": "2026-11-16T17:57:42.778Z",
- "notes": "Separate Clip and Devices views: Devices fixed height, Clip resizable",
+ "date": "2026-11-16T18:09:31.502Z",
+ "notes": "New free pack: Keys, Clav & World (13 recorded instruments, CC0)",
  "files": [
   {
    "path": "css/base.css",
@@ -171,8 +171,8 @@
   },
   {
    "path": "js/packs-data.js",
-   "size": 60945,
-   "sha256": "e61c7240b06675c86dbac0d4655451b58cb482cfa2a881665696e94bd215f9ca"
+   "size": 112949,
+   "sha256": "6e5fd1d0a09b644644d4869bea1696dc2551fa44698e54cd6240ad31771b89fc"
   },
   {
    "path": "js/packs.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "afe0ce6896938d9ec4c07cdbdf87511ca0764625bf8f376464e2076152621857"
+   "sha256": "1cfb453fd8cab03bd7d0fa97b6b0333669b596c6492e4a3cb8952c6bc9e4db36"
   }
  ]
 }

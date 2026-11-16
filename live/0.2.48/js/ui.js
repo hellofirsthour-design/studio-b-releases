@@ -45,8 +45,11 @@ const ui = {
   },
   detail() {
     $$('#dtabs [data-d]').forEach(b => b.classList.toggle('on', b.dataset.d === V.detail));
-    const showClip = V.detail === 'clip' || V.detail === 'both', showDev = V.detail === 'devices' || V.detail === 'both';
+    if (V.detail === 'both') V.detail = 'devices';   // clip and devices are separate views now
+    const showClip = V.detail === 'clip', showDev = !showClip;
     $('#pane-clip').hidden = !showClip; $('#pane-dev').hidden = !showDev; $('#detail').classList.toggle('both', V.detail === 'both');
+    // as in Ableton: the Clip view only appears when a clip is opened, and only it can be resized; Devices keeps one fixed height
+    const ct = $('#dtabs [data-d="clip"]'); if (ct) ct.hidden = !showClip; sizeDetail();
     const c = V.editClip && clipById(V.editClip), selB = busById([...V.selTracks][0]), t = V.detail === 'devices' ? selB : (c ? trackOf(c) : selB);
     $('#dTitle').innerHTML = t ? `<i style="background:${t.color || '#a7a3b8'}"></i>${esc(t.name)}${c && V.detail !== 'devices' && trackOf(c) === t ? ' / ' + esc(c.name) : ''}` : '';
     if (showClip) { if (c && c.type === 'audio') audioEditor(c); else roll.mount(); }
@@ -64,7 +67,7 @@ const ui = {
     const addFx = k => { pushUndo('Add device'); o.devices.push(newDevice(k)); rewire(o); ui.devices(); const r2 = $('#pane-dev .rack'); if (r2) r2.scrollLeft = r2.scrollWidth; };
     add.querySelector('.dzadd').onclick = e => popMenu(e, FX_FOLDERS.map(([f, ks]) => ({ label: f + '  ›', run: () => popMenu(e, ks.filter(k => DEVICES[k]).map(k => ({ label: DEVICES[k].name, run: () => addFx(k) }))) })));
     rack.appendChild(add);
-    rack.querySelectorAll(':scope > .card').forEach(rackify);
+    rack.querySelectorAll(':scope > .card').forEach(rackify); requestAnimationFrame(() => rack.querySelectorAll('.cside').forEach(wrapSide));
     fitRack(); if (!pane._ro) { pane._ro = new ResizeObserver(() => fitRack()); pane._ro.observe(pane); }
     rack.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('sb/device')) { e.preventDefault(); add.classList.add('over'); } });
     rack.addEventListener('dragleave', e => { if (!rack.contains(e.relatedTarget)) add.classList.remove('over'); });
@@ -78,6 +81,8 @@ function bindHeaders() {
   box.addEventListener('pointerdown', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id); const h = e.target.closest('[data-h]');
     if (hd.dataset.lane) return;
+    // double-click a track (two presses on the same track, wherever the first press redrew the header) shows or hides its clip and devices
+    if (!e.target.closest('input, select, button, .chip, .hresize, .hvol, .hio')) { const now = performance.now(); if (HDR_TAP.id === b.id && now - HDR_TAP.t < 420) { HDR_TAP.t = 0; toggleTrackDetail(b, HDR_TAP.was); return; } HDR_TAP.id = b.id; HDR_TAP.t = now; HDR_TAP.was = V.selTracks.has(b.id) && !$('#app').classList.contains('nodetail') && V.detail !== 'clip'; }
     if (h && h.dataset.h === 'resize') {
       e.preventDefault(); const y0 = e.clientY, h0 = b.h || 40; h.setPointerCapture(e.pointerId);
       h.onpointermove = ev => { b.h = clamp(h0 + ev.clientY - y0, 22, 320); arr.layout(); $$('.hdr', box).forEach(el => { const r = arr.rows.find(q => q.b.id === el.dataset.id && (el.dataset.lane ? q.lane && q.lane.id === el.dataset.lane : q.kind !== 'take')); if (r) { el.style.top = r.y + 'px'; el.style.height = r.h + 'px'; } }); arr.draw(); };
@@ -106,7 +111,7 @@ function bindHeaders() {
   box.addEventListener('click', async e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id);
     switch (h.dataset.h) {
-      case 'chip': V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = V.detail === 'clip' ? 'both' : (V.detail || 'devices'); ui.all(); return;
+      case 'chip': V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = 'devices'; ui.all(); return;
       case 'mute': b.mute = !b.mute; break;
       case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; break;
       case 'arm': { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); break; }
@@ -136,9 +141,7 @@ function bindHeaders() {
     const hd = e.target.closest('.hdr'); if (!hd) return; const b = busById(hd.dataset.id);
     if (hd.dataset.lane && e.target.closest('.hname')) { const lane = b.takes.find(l => l.id === hd.dataset.lane); return askText('Take name', lane.name, v => { pushUndo('Rename take'); lane.name = v; ui.headers(); }); }
     if (e.target.closest('.hvol')) { b.vol = 0.79; applyMix(b); ui.headers(); return; }
-    if (e.target.closest('input, select, button, .hio')) return;
-    // double-click a track: show or hide the clip and devices panel for it (rename is Ctrl+R or the right-click menu)
-    const shown = !$('#app').classList.contains('nodetail'); if (!shown || V.selTracks.has(b.id)) setDetailShown(!shown); V.selTracks = new Set([b.id]); if (!shown) V.detail = V.detail || 'devices'; ui.all();
+    /* showing and hiding the panel is handled on pointerdown (see HDR_TAP), so a redraw between the clicks cannot swallow it */
   });
   box.addEventListener('contextmenu', e => {
     const hd = e.target.closest('.hdr'); if (!hd) return; e.preventDefault(); const b = busById(hd.dataset.id); const isT = S.tracks.includes(b);
@@ -359,4 +362,18 @@ function rackify(card) {
   if (side.children.length) cb.insertBefore(side, cb.firstChild);
 }
 // How many rows of knobs fit in the device panel: the device body's height, less its padding and section labels, over one knob's height.
-function fitRack() { const rack = $('#pane-dev .rack'); if (!rack) return; const cb = rack.querySelector('.card .cb'), h = cb ? cb.clientHeight : rack.clientHeight - 47; rack.style.setProperty('--prow', clamp(Math.floor((h - 36) / 69), 1, 8)); }
+function fitRack() { const rack = $('#pane-dev .rack'); if (!rack) return; const cb = rack.querySelector('.card .cb'), h = cb ? cb.clientHeight : rack.clientHeight - 47; rack.style.setProperty('--prow', clamp(Math.floor((h - 36) / 69), 1, 8)); rack.style.setProperty('--cbh', h + 'px'); }
+
+const HDR_TAP = { id: null, t: 0, was: false };
+const DEV_H = 290;
+function clipH() { return clamp(+lsGet('sb-detailH') || 320, 160, Math.max(160, innerHeight - 260)); }
+function sizeDetail() { const app = $('#app'), dev = V.detail !== 'clip', h = dev ? Math.min(DEV_H, Math.max(160, innerHeight - 260)) : clipH(), was = app.style.getPropertyValue('--detailH');
+  app.classList.toggle('devview', dev); if (was !== h + 'px') { app.style.setProperty('--detailH', h + 'px'); if (typeof arr !== 'undefined' && arr.draw) requestAnimationFrame(() => { arr.draw(); if (typeof fitRack === 'function') fitRack(); }); } }
+function toggleTrackDetail(b, wasShowing) { const shown = !$('#app').classList.contains('nodetail'); if (shown && wasShowing) setDetailShown(false); else { setDetailShown(true); V.detail = 'devices'; } V.selTracks = new Set([b.id]); ui.all(); }
+// No scrolling inside a device: if its left column is taller than the panel, it flows into more columns and the device gets wider.
+function wrapSide(side) {
+  const H = side.parentElement.clientHeight - 16; if (side.scrollHeight <= H + 2 || side._wrapped) return; side._wrapped = true;
+  const items = [...side.children], cols = []; let col = null, h = 0;
+  items.forEach(el => { const eh = el.getBoundingClientRect().height + 6; if (!col || h + eh > H) { col = document.createElement('div'); col.className = 'ccol'; cols.push(col); h = 0; } col.appendChild(el); h += eh; });
+  side.classList.add('wrapped'); cols.forEach(c => side.appendChild(c));
+}
