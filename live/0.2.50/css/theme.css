@@ -111,7 +111,7 @@ input[type=range]:hover::-webkit-slider-thumb{background:#fff}
 .dropzone .dzadd:hover{color:var(--accent);border-color:var(--accent)}
 .dropzone.over{border-color:var(--accent);color:var(--accent)}
 #pane-dev .cside{width:auto;max-width:260px} #pane-dev .cside .dscreen,#pane-dev .cside .gr,#pane-dev .cside .bmeters,#pane-dev .cside .scsel{width:220px}
-#pane-dev .cside:has(.eqw){width:400px;max-width:none}
+#pane-dev .cside:has(.eqw){width:max-content;max-width:none}
 
 /* no scrolling inside devices */
 #pane-dev .cside{max-height:none;overflow:visible}
@@ -129,3 +129,27 @@ input[type=range]:hover::-webkit-slider-thumb{background:#fff}
 #pane-dev .eqw{min-width:min(620px,80vw);width:max-content}
 #pane-dev .eqbar{flex-wrap:nowrap}
 #pane-dev .eqc{height:clamp(64px,calc(var(--cbh,260px) - 84px),180px)}
+
+/* ---------- sound bar (top of every instrument) and the library panel ---------- */
+.card.hasbar > .ch .csub{display:none}
+.sbar{display:flex;align-items:stretch;gap:0;margin-left:8px;min-width:0;height:20px;background:#0f1013;border:1px solid #08090b;border-radius:5px;box-shadow:inset 0 1px 2px rgba(0,0,0,.5)}
+.sbar button{background:none;border:0;color:#b4b7bf;font:inherit;font-size:11px;padding:0 6px;cursor:pointer;white-space:nowrap}
+.sbar button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.sbar .sbcat{border-right:1px solid #08090b;color:#9a9da6;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.sbar .sbname{color:var(--accent);font-weight:600;min-width:120px;max-width:220px;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.sbar .sbstep{font-size:14px;line-height:1;padding:0 5px}
+.sbar .sbswap{border-left:1px solid #08090b}
+#sndpanel{position:fixed;z-index:61;width:440px;max-width:calc(100vw - 16px);background:#1b1c21;border:1px solid #08090b;border-radius:var(--r2,8px);box-shadow:0 14px 36px -8px rgba(0,0,0,.8);padding:8px;display:grid;gap:8px}
+#sndpanel[hidden]{display:none}
+#sndpanel .spq{background:#0f1013;border:1px solid #08090b;border-radius:5px;color:var(--text);padding:5px 8px;font:inherit;font-size:12px}
+#sndpanel .spcols{display:grid;grid-template-columns:150px 1fr;gap:6px;height:300px}
+#sndpanel .spcats,#sndpanel .spsnds{overflow:auto;display:grid;align-content:start;gap:1px}
+#sndpanel button{background:none;border:0;color:#c3c6ce;text-align:left;font:inherit;font-size:12px;padding:4px 8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;gap:6px}
+#sndpanel button span{color:var(--faint,#6b6e77);font-size:10px}
+#sndpanel button:hover{background:rgba(255,255,255,.05);color:var(--text)}
+#sndpanel button.on{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--text)}
+#sndpanel .spcats{border-right:1px solid #08090b;padding-right:6px}
+#pane-dev .cside:has(.rchain){width:max-content;max-width:none}
+#pane-dev .ccol:has(.rchain){width:max-content}
+/* Devices keep one fixed height; only the Clip view can be dragged taller or shorter */
+#app.devview:not(.nodetail) #split{cursor:default} #app.devview:not(.nodetail) #split:hover{background:#0a0b0d}

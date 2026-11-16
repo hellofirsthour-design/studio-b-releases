@@ -261,7 +261,7 @@ function eqEditor(body, d, r, changed) {
 }
 
 /* ============ instrument cards ============ */
-function instrumentCard(t) { const c = instrumentCard_(t); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
+function instrumentCard(t) { const c = instrumentCard_(t); if (c) soundBar(t, c); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
 function applyInstPreset(t, p) {
   const keep = Object.fromEntries([...PRESET_SKIP].filter(k => k !== 'preset' && t.inst[k] !== undefined).map(k => [k, t.inst[k]]));
   const base = deep(newInst(t.inst.type)); Object.keys(t.inst).forEach(k => delete t.inst[k]); Object.assign(t.inst, base, p || {}, keep, { preset: p ? 'User' : t.inst.preset });

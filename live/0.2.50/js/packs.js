@@ -1,11 +1,11 @@
 /* ============ Free sample packs ============
-   Recorded instruments (pianos, organ, mallets, strings, brass, woodwinds, sax) from two public-domain (CC0) libraries
-   by Versilian Studios, listed in packs-data.js. A pack downloads on request: only the first few seconds of each
+   Recorded instruments (pianos, organ, mallets, strings, brass, woodwinds, sax, guitars, bass) from public-domain (CC0)
+   libraries by Versilian Studios, FreePats, Karoryfer and Jeff Learman, listed in packs-data.js. A pack downloads on request: only the first few seconds of each
    recording are fetched, trimmed, given a seamless loop if the instrument sustains, and saved as 16-bit WAV in
    Music/Studio B/Packs. Installed instruments show up in Sounds like any other sound and play through Zones. */
 const PACK_STATE = { installed: new Map(), busy: new Map() }; // packId -> { insts: { instId: [zone] } }, packId -> progress 0..1
 const packInfo = id => PACK_MANIFEST.packs.find(p => p.id === id);
-const packUrl = (repo, file) => `https://raw.githubusercontent.com/sgossner/${repo}/${PACK_MANIFEST.sha[repo]}/` + file.split('/').map(encodeURIComponent).join('/');
+const packUrl = (repo, file) => { const r = (PACK_MANIFEST.repos || {})[repo]; return `https://raw.githubusercontent.com/${r ? r.path : 'sgossner/' + repo}/${r ? r.sha : PACK_MANIFEST.sha[repo]}/` + file.split('/').map(encodeURIComponent).join('/'); };
 async function packRoot() { const p = await NATIVE.paths(); return joinPath(joinPath(p.music, 'Studio B'), 'Packs'); }
 
 // WAV reader that copes with a file cut short (we only fetch its beginning)
@@ -62,7 +62,9 @@ function registerPack(id, data, dir) {
   const p = packInfo(id); PACK_STATE.installed.set(id, { ...data, dir });
   for (const i of p.insts) {
     if (!data.insts[i.id] || SOUNDS.some(s => s.pack === id && s.packInst === i.id)) continue;
-    const before = SOUNDS.length; snd(i.cat, i.name, { type: 'multi', A: i.A, R: i.R, gain: i.gain, glide: 0 }, i.fx, i.tags + ' sampled recorded acoustic pack', i.chars);
+    // a synth sound may already use this name (Vibraphone, Marimba…): the recorded one gets its own, or it could never be loaded
+    const name = SOUNDS.some(s => !s.pack && s.name === i.name) ? i.name + ' (Recorded)' : i.name;
+    const before = SOUNDS.length; snd(i.cat, name, { type: 'multi', A: i.A, R: i.R, gain: i.gain, glide: 0 }, i.fx, i.tags + ' sampled recorded acoustic pack', i.chars);
     SOUNDS.slice(before).forEach(s => { s.pack = id; s.packInst = i.id; });
   }
 }
@@ -94,9 +96,11 @@ async function downloadPack(id) {
   PACK_STATE.busy.set(id, done / total); browser.render(); toast(`Downloading ${p.name}, about ${p.mb} MB…`);
   const save = () => NATIVE.write(meta, JSON.stringify(data));
   const one = async ({ i, z, file }) => {
-    let ab = null; const bytes = Math.ceil(i.secs * 48000 * 2 * 3) + 65536;
-    for (let a = 0; a < 3 && !ab; a++) { try { const r = await fetch(packUrl(z.repo, z.file), { headers: { Range: `bytes=0-${bytes}` } }); if (!r.ok) throw new Error('HTTP ' + r.status); ab = await r.arrayBuffer(); } catch (e) { if (a === 2) throw e; await new Promise(r => setTimeout(r, 800 * (a + 1))); } }
-    const sh = shapeRecording(parseWavPartial(ab), i.secs, i.loop);
+    // WAV: fetch only the first few seconds. FLAC is compressed, so it comes whole and the browser decodes it.
+    let ab = null; const flac = /\.flac$/i.test(z.file), bytes = Math.ceil(i.secs * 48000 * 2 * 3) + 65536;
+    for (let a = 0; a < 3 && !ab; a++) { try { const r = await fetch(packUrl(z.repo, z.file), flac ? {} : { headers: { Range: `bytes=0-${bytes}` } }); if (!r.ok) throw new Error('HTTP ' + r.status); ab = await r.arrayBuffer(); } catch (e) { if (a === 2) throw e; await new Promise(r => setTimeout(r, 800 * (a + 1))); } }
+    let w; if (flac) { const b = await LIVE_CTX.decodeAudioData(ab); w = { sr: b.sampleRate, chans: Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c)), cut: false }; } else w = parseWavPartial(ab);
+    const sh = shapeRecording(w, i.secs, i.loop);
     await NATIVE.write(joinPath(dir, file), encodeWav(sh.buf, 16));
     (data.insts[i.id] = data.insts[i.id] || []).push({ file, root: z.root, vlo: z.vlo, vhi: z.vhi, ...(i.loop && sh.le ? { ls: +sh.ls.toFixed(5), le: +sh.le.toFixed(5) } : {}) });
     done++; PACK_STATE.busy.set(id, done / total); if (Date.now() - lastSave > 1500) { lastSave = Date.now(); await save(); browser.render(); }
@@ -109,5 +113,5 @@ async function downloadPack(id) {
 function packItem(p) {
   const st = PACK_STATE.installed.get(p.id), busy = PACK_STATE.busy.get(p.id);
   const meta = busy != null ? `Downloading ${Math.round(busy * 100)}%` : st ? `Installed · ${p.insts.length} instruments` : `Download · ${p.mb} MB`;
-  return { name: p.name, meta, act: 'pack', key: 'pack:' + p.id, icon: 'sounds', title: `${p.blurb}. ${st ? 'Installed: its instruments are in the folders below.' : 'Click to download. Free and public domain (CC0), from Versilian Studios.'}` };
+  return { name: p.name, meta, act: 'pack', key: 'pack:' + p.id, icon: 'sounds', title: `${p.blurb}. ${st ? 'Installed: its instruments are in the folders below.' : 'Click to download.'} ${p.credit || 'Free and public domain (CC0).'}` };
 }

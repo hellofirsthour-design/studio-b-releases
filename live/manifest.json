@@ -1,8 +1,8 @@
 {
- "version": "0.2.49",
+ "version": "0.2.50",
  "shell": 4,
- "date": "2026-11-16T18:52:14.670Z",
- "notes": "Guitars & Bass pack; recorded sounds no longer hidden behind synth names",
+ "date": "2026-11-16T20:02:31.341Z",
+ "notes": "Wurlitzer pack; pre-roll, post-roll and auto-stop after punch-out; Devices by default",
  "files": [
   {
    "path": "css/base.css",
@@ -91,8 +91,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 54338,
-   "sha256": "17dced8de7ed1f4528c157485614619326a44eb01aac12547366638ca145df8d"
+   "size": 55617,
+   "sha256": "ba22df99f6d3220503fec811a3c4a649cd2f4f8bcbbacfbcbe70c84b6564f6c3"
   },
   {
    "path": "js/features.js",
@@ -136,8 +136,8 @@
   },
   {
    "path": "js/look.js",
-   "size": 8005,
-   "sha256": "b9d4dd8506b613868d1e74323d61bac5a06724f98a3f86e4efcf3ce7a9745c85"
+   "size": 8133,
+   "sha256": "0865a0de37bc674bd865394389d4aefd50a47778601d17ad46b802a2991dd123"
   },
   {
    "path": "js/main.js",
@@ -171,13 +171,13 @@
   },
   {
    "path": "js/packs-data.js",
-   "size": 121583,
-   "sha256": "ca954002e7063664d7cc79f0b2cdfefb773c5ab1608b9237decc9b9baacec2a5"
+   "size": 126344,
+   "sha256": "82c5f1c601f8a257e71a93c360f9c6bde2a636b79fac6d6a781918b4a537f2bd"
   },
   {
    "path": "js/packs.js",
-   "size": 10423,
-   "sha256": "da02f7b8013ad211399103fba10be4664c0c1b7a1fcef5f05df09c98dbd47b08"
+   "size": 10416,
+   "sha256": "f99a6fa501023064a5d7afa412bbc7447174dc556ef52a5e2987adfe1bc336de"
   },
   {
    "path": "js/plugins.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 50076,
-   "sha256": "ed9f5b56c94aaae300250743eb93399a9ccd86011b356dbb8cf384ef8121909b"
+   "size": 50197,
+   "sha256": "a5885ae3ec70e47da0359403fe5b5b2bb82fb214f02fe4a06510be94d3a5cc96"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "278024b89a718c9ddefd0b2cd3ea18ab3e0aac11693f94da5c5587fe30b53dda"
+   "sha256": "f99865d1dcac1c8aaf92958481283f6a2a0f8a3e55d410dccfe73dbec8ca6f23"
   }
  ]
 }

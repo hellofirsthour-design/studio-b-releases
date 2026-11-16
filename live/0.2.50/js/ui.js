@@ -8,7 +8,7 @@ const ui = {
     $('#metro').classList.toggle('on', !!S.metro); $('#loopBtn').classList.toggle('on', S.loop.on);
     $('#follow').classList.toggle('on', V.follow); $('#autoBtn').classList.toggle('on', V.autoMode); $$('[data-col]').forEach(x => x.classList.toggle('on', !!V[{ io: 'showIO', r: 'showR', m: 'showM', d: 'showD' }[x.dataset.col]])); $('#autoArm').classList.toggle('on', !!V.autoArm); $('#reAuto').classList.toggle('hot', OVERRIDES.size > 0); $('#reAuto').disabled = !OVERRIDES.size;
     $('#root').value = S.root; $('#scale').value = S.scale; $('#snapBtn').classList.toggle('on', V.snap);
-    $('#sig').value = SIG().join('/'); { const ci = (S.prefs && S.prefs.countIn) || 0; $('#countIn').classList.toggle('on', !!ci); $('#countIn .badge').textContent = ci ? String(ci) : ''; $('#countIn').title = ci ? `Count-in: ${ci} bar${ci > 1 ? 's' : ''} before recording. Click to change.` : 'Count-in before recording: off. Click to turn on.'; } S.punch = S.punch || {}; $('#punchIn').classList.toggle('on', !!S.punch.in); $('#punchOut').classList.toggle('on', !!S.punch.out);
+    $('#sig').value = SIG().join('/'); { const P = S.prefs || {}, ci = P.countIn || 0, pr = P.preRoll || 0, po = P.postRoll || 0, bars = n => n + ' bar' + (n > 1 ? 's' : ''); $('#countIn').classList.toggle('on', !!(ci || pr || po)); $('#countIn .badge').textContent = ci ? String(ci) : pr ? 'P' : ''; $('#countIn').title = `Record options. Count-in: ${ci ? bars(ci) : 'off'}. Pre-roll: ${pr ? bars(pr) : 'off'}. Post-roll: ${po ? bars(po) : 'off'}. Click to change.`; } S.punch = S.punch || {}; $('#punchIn').classList.toggle('on', !!S.punch.in); $('#punchOut').classList.toggle('on', !!S.punch.out);
     const nb = SIG()[0], beats = $('#beats'); if (beats.children.length !== Math.min(nb, 12)) beats.innerHTML = '<i></i>'.repeat(Math.min(nb, 12));
     $('#loopStart').textContent = barsBeats(S.loop.start); $('#loopLen').textContent = barsBeatsLen(S.loop.end - S.loop.start);
     $('#app').classList.toggle('nobrowser', !V.browser);
@@ -48,6 +48,8 @@ const ui = {
     if (V.detail === 'both') V.detail = 'devices';   // clip and devices are separate views now
     const showClip = V.detail === 'clip', showDev = !showClip;
     $('#pane-clip').hidden = !showClip; $('#pane-dev').hidden = !showDev; $('#detail').classList.toggle('both', V.detail === 'both');
+    // as in Ableton: the Clip view only appears when a clip is opened, and only it can be resized; Devices keeps one fixed height
+    const ct = $('#dtabs [data-d="clip"]'); if (ct) ct.hidden = !showClip; sizeDetail();
     const c = V.editClip && clipById(V.editClip), selB = busById([...V.selTracks][0]), t = V.detail === 'devices' ? selB : (c ? trackOf(c) : selB);
     $('#dTitle').innerHTML = t ? `<i style="background:${t.color || '#a7a3b8'}"></i>${esc(t.name)}${c && V.detail !== 'devices' && trackOf(c) === t ? ' / ' + esc(c.name) : ''}` : '';
     if (showClip) { if (c && c.type === 'audio') audioEditor(c); else roll.mount(); }
@@ -363,6 +365,10 @@ function rackify(card) {
 function fitRack() { const rack = $('#pane-dev .rack'); if (!rack) return; const cb = rack.querySelector('.card .cb'), h = cb ? cb.clientHeight : rack.clientHeight - 47; rack.style.setProperty('--prow', clamp(Math.floor((h - 36) / 69), 1, 8)); rack.style.setProperty('--cbh', h + 'px'); }
 
 const HDR_TAP = { id: null, t: 0, was: false };
+const DEV_H = 290;
+function clipH() { return clamp(+lsGet('sb-detailH') || 320, 160, Math.max(160, innerHeight - 260)); }
+function sizeDetail() { const app = $('#app'), dev = V.detail !== 'clip', h = dev ? Math.min(DEV_H, Math.max(160, innerHeight - 260)) : clipH(), was = app.style.getPropertyValue('--detailH');
+  app.classList.toggle('devview', dev); if (was !== h + 'px') { app.style.setProperty('--detailH', h + 'px'); if (typeof arr !== 'undefined' && arr.draw) requestAnimationFrame(() => { arr.draw(); if (typeof fitRack === 'function') fitRack(); }); } }
 function toggleTrackDetail(b, wasShowing) { const shown = !$('#app').classList.contains('nodetail'); if (shown && wasShowing) setDetailShown(false); else { setDetailShown(true); V.detail = 'devices'; } V.selTracks = new Set([b.id]); ui.all(); }
 // No scrolling inside a device: if its left column is taller than the panel, it flows into more columns and the device gets wider.
 function wrapSide(side) {
