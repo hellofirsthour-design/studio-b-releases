@@ -47,7 +47,7 @@ function modValue(d, r, time, pos) {
 // Apply one modulation value to its target without changing the stored knob value.
 function applyMod(b, key, v) {
   const rt = RT.get(b.id);
-  if (key === 'vol' && rt) { sm(rt.fader.gain, faderGain(clamp(b.vol + v * 0.5, 0, 1))); return; }
+  if (key === 'vol' && rt) { sm(rt.fader.gain, faderGain(clamp(b.vol + v * 0.5, 0, 1)) * vcaGain(b)); return; }
   if (key === 'pan' && rt) { sm(rt.pan.pan, clamp((b.pan || 0) + v, -1, 1)); return; }
   if (key.startsWith('inst:') && rt && rt.inst) { const k = key.slice(5), base = b.inst[k], rng = { cutoff: [40, 16000, 'log'], res: [0.3, 20], detune: [0, 50], mix2: [0, 1], noise: [0, 1] }[k]; if (!rng || base == null) return;
     const val = rng[2] === 'log' ? clamp(base * Math.pow(rng[1] / rng[0], v * 0.5), rng[0], rng[1]) : clamp(base + v * (rng[1] - rng[0]) / 2, rng[0], rng[1]); (rt.inst.modulate || (() => { }))(k, val); return; }

@@ -1,8 +1,8 @@
 {
- "version": "0.2.56",
+ "version": "0.2.57",
  "shell": 4,
- "date": "2026-11-16T22:00:40.536Z",
- "notes": "Mixer: slimmer fader caps with space before the meter",
+ "date": "2026-11-16T22:05:13.032Z",
+ "notes": "Mixer: fader caps centred on the groove",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 21701,
-   "sha256": "6ab6372b05a22f85ed95556c2b998b8338ab44c2460b44b35ef9ceb81f3cc5ac"
+   "size": 21963,
+   "sha256": "1a4645d9600feeb9750cd204af4307571f1d46c06877429565c74030bf409f33"
   },
   {
    "path": "img/b-mark.svg",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "e75d3479fabd763d44bb828f27f1df2fdd39f73497ef48976911cc2c001bc903"
+   "sha256": "a17abd0af00caf0533d2c3c8adab5ff9f8adb8d8af291d5ecc8461448612dce5"
   }
  ]
 }
