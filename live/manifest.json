@@ -1,8 +1,8 @@
 {
- "version": "0.2.59",
+ "version": "0.2.60",
  "shell": 4,
- "date": "2026-11-16T23:28:17.570Z",
- "notes": "Driftline: echoes die away below 100% feedback; tail test for everything",
+ "date": "2026-11-16T23:46:11.781Z",
+ "notes": "Tail test: one process per batch, results saved before closing",
  "files": [
   {
    "path": "css/base.css",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "224c9b316a279c31d5af00f20ce81729bdafb0434ada0df6707af3df5d4a6dd0"
+   "sha256": "704244887085e1fe68daa162b4fe0ad32e8f86faa7f0978af0ee9e637d224d45"
   }
  ]
 }

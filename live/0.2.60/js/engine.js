@@ -46,10 +46,10 @@ const songEnd = () => Math.max(64, ...S.tracks.flatMap(t => t.clips.map(c => c.s
 /* ---------- audio graph ---------- */
 function buildMaster() {
   [M.out, M.click, M.cue, M.loud].forEach(n => { if (n) try { n.disconnect(); } catch (e) { } });
-  M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = 2048; M.direct = ctx.createDelay(2); M.direct.connect(M.in);
+  M.in = ctx.createGain(); M.out = ctx.createGain(); M.an = ctx.createAnalyser(); M.an.fftSize = isOffline() ? 32 : 4096; M.direct = ctx.createDelay(2); M.direct.connect(M.in);
   M.rec = !isOffline() && ctx.createMediaStreamDestination ? ctx.createMediaStreamDestination() : null;
   M.out.connect(liveOut('main')); M.out.connect(M.an); if (M.rec) M.out.connect(M.rec);
-  M.split = ctx.createChannelSplitter(2); M.anL = ctx.createAnalyser(); M.anR = ctx.createAnalyser(); M.anL.fftSize = M.anR.fftSize = 1024; M.out.connect(M.split); M.split.connect(M.anL, 0); M.split.connect(M.anR, 1);
+  M.split = ctx.createChannelSplitter(2); M.anL = ctx.createAnalyser(); M.anR = ctx.createAnalyser(); M.anL.fftSize = M.anR.fftSize = isOffline() ? 32 : 4096; M.out.connect(M.split); M.split.connect(M.anL, 0); M.split.connect(M.anR, 1);
   if (!isOffline() && PITCH_OK) { try { M.loud = new AudioWorkletNode(ctx, 'gw-loud', { numberOfInputs: 1, numberOfOutputs: 0 }); M.out.connect(M.loud); M.loud.port.onmessage = e => (M.loudData = e.data); } catch (e) { M.loud = null; } }
   M.click = ctx.createGain(); M.click.gain.value = 0.35; if (!isOffline()) M.click.connect(GP.clickCue ? liveOut('cue') : liveOut('main'));
   M.cue = ctx.createGain(); M.cue.gain.value = 0.8; if (!isOffline()) M.cue.connect(liveOut('cue'));
@@ -82,9 +82,9 @@ function routeOut(b) {
 }
 function buildBus(b, kind) {
   const r = { fader: ctx.createGain(), pan: ctx.createStereoPanner(), dly: ctx.createDelay(2), mute: ctx.createGain(), an: ctx.createAnalyser(), pre: ctx.createGain(), preMute: ctx.createGain(), kind };
-  r.an.fftSize = 1024; r.pre.connect(r.fader); r.fader.connect(r.pan); r.pan.connect(r.dly); r.dly.connect(r.mute); r.mute.connect(r.an); r.pre.connect(r.preMute);
+  r.an.fftSize = isOffline() ? 32 : 4096; r.pre.connect(r.fader); r.fader.connect(r.pan); r.pan.connect(r.dly); r.dly.connect(r.mute); r.mute.connect(r.an); r.pre.connect(r.preMute);
   RT.set(b.id, r); routeOut(b);
-  r.split = ctx.createChannelSplitter(2); r.anL = ctx.createAnalyser(); r.anR = ctx.createAnalyser(); r.anL.fftSize = r.anR.fftSize = 1024; r.mute.connect(r.split); r.split.connect(r.anL, 0); r.split.connect(r.anR, 1);
+  r.split = ctx.createChannelSplitter(2); r.anL = ctx.createAnalyser(); r.anR = ctx.createAnalyser(); r.anL.fftSize = r.anR.fftSize = isOffline() ? 32 : 4096; r.mute.connect(r.split); r.split.connect(r.anL, 0); r.split.connect(r.anR, 1);
   if (kind === 'return' || b.kind === 'group') r.in = ctx.createGain();
   else if (b.kind === 'midi') { r.inst = makeInstrument(b); r.in = r.inst.out; }
   else { r.in = ctx.createGain(); r.mon = ctx.createGain(); r.mon.gain.value = 0; r.mon.connect(r.in); }

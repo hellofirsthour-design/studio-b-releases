@@ -202,6 +202,7 @@ class GWClip extends AudioWorkletProcessor {
 }
 registerProcessor('gw-clip', GWClip);
 
+
 // Pitch shifter (two crossfaded taps on a short delay line): shimmer reverb's octave.
 class GWShift extends AudioWorkletProcessor {
   constructor() { super(); this.semis = 12; this.N = 1 << 14; this.buf = [new Float32Array(this.N), new Float32Array(this.N)]; this.w = 0; this.ph = 0; this.W = Math.round(sampleRate * 0.05); this.port.onmessage = e => Object.assign(this, e.data); }

@@ -273,9 +273,6 @@ function instrumentCard_(t) {
   const inst = RT.get(t.id).inst;
   if (t.inst.type === 'synth') {
     const c = cardShell('Contour', 'Synth', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
-    const top = document.createElement('div'); top.className = 'row';
-    top.appendChild(selectEl(['Init', ...Object.keys(SYNTH_PRESETS)], t.inst.preset, v => { Object.assign(t.inst, SYNTH_DEFAULT, SYNTH_PRESETS[v] || {}, { preset: v }); inst.update(); ui.detail(); markDirty(); }, 'Preset'));
-    body.appendChild(top);
     const W = ['sine', 'triangle', 'sawtooth', 'square'];
     const defs = [{ group: 'Oscillators' }, SEL('wave1', 'Osc 1', W), SEL('wave2', 'Osc 2', W), K('oct2', 'Osc 2 oct', -2, 2, { step: 1, fmt: v => (v > 0 ? '+' : '') + v }), K('detune', 'Detune', 0, 50, { fmt: v => v.toFixed(0) + 'c' }), K('mix2', 'Osc 2 level', 0, 1, { fmt: fPct }), K('sub', 'Sub', 0, 1, { fmt: fPct }), K('noise', 'Noise', 0, 0.5, { fmt: fPct }),
       { group: 'Filter' }, SEL('ftype', 'Type', ['lowpass', 'highpass', 'bandpass']), K('cutoff', 'Cutoff', 40, 16000, { scale: 'log', fmt: fHz }), K('res', 'Reso', 0.3, 20, { fmt: v => v.toFixed(1) }), K('fenv', 'Env amt', 0, 8000, { fmt: fHz }), K('fA', 'F attack', 0.001, 3, { scale: 'log', fmt: fS }), K('fD', 'F decay', 0.01, 4, { scale: 'log', fmt: fS }),
