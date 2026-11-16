@@ -103,16 +103,37 @@ function wireSidechains() {
     const src = d.p.sc && RT.get(d.p.sc); if (src) { src.mute.connect(r.sc, 0, 1); r.scSrc = src.mute; } }));
 }
 function rewire(b) { if (!isOffline()) schedulePDC(); if (NE.on && !isOffline()) setTimeout(neSyncProject, 0); if (b && b._rack) return rackRebuild(b._rack); if (b === S.master) return rewireMaster(); const r = RT.get(b.id); if (!r) return; if (b.frozen) { try { r.in.disconnect(); } catch (e) { } b.devices.forEach(d => { const x = DEV_RT.get(d.id); if (x) try { x.output.disconnect(); } catch (e) { } }); if (r.inst) r.inst.allOff(ctx.currentTime); return; } chain(r.in, b.devices, r.pre); }
-const anySolo = () => S.tracks.some(t => t.solo);
+const anySolo = () => S.tracks.some(t => t.solo) || (S.vcas || []).some(v => v.solo && vcaMembers(v).length);
+/* VCAs, as in Pro Tools: a fader with no audio of its own. Its level scales every member's fader, and its mute and solo
+   mute and solo the members. Mix groups link their members' faders (relative, in dB), mutes and solos. */
+const vcaOf = b => (b && b.vca ? (S.vcas || []).find(v => v.id === b.vca) || null : null);
+const vcaMembers = v => allBuses().filter(b => b.vca === v.id);
+const vcaGain = b => { const v = vcaOf(b); return v ? faderGain(v.vol) / faderGain(0.79) : 1; };
+const mixGroupOf = b => (b && b.mg ? (S.mixGroups || []).find(g => g.id === b.mg) || null : null);
+let LINK_SUSPEND = false;   // hold Ctrl/Cmd while moving a control to move just that channel
+document.addEventListener('pointerdown', e => { LINK_SUSPEND = !!(e.ctrlKey || e.metaKey); }, true);
+const groupMates = b => { const g = mixGroupOf(b); return g && g.on !== false && !LINK_SUSPEND ? allBuses().filter(x => x !== b && x.mg === g.id) : []; };
+// The other members follow a fader move by the same number of dB (a member at -inf stays there).
+function linkVol(b, oldVol) {
+  if (oldVol <= 0) return []; const d = gainToDb(faderGain(b.vol)) - gainToDb(faderGain(oldVol)); if (!isFinite(d) || Math.abs(d) < 1e-9) return [];
+  const mates = groupMates(b); mates.forEach(m => { if (m.vol <= 0) return; m.vol = clamp(gainToFader(dbToGain(gainToDb(faderGain(m.vol)) + d)), 0, 1); applyMix(m); autoTouch(m, 'vol', m.vol); refreshVolUI(m); }); return mates;
+}
+function linkFlag(b, key) { groupMates(b).forEach(m => { m[key] = b[key]; }); }
+function refreshVolUI(b) {
+  const hv = document.querySelector(`.hdr[data-id="${b.id}"] .hvol`); if (hv) { hv.value = b.vol; if (typeof syncRange === 'function') syncRange(hv); }
+  const hd = document.querySelector(`[data-db="${b.id}"]`); if (hd) hd.textContent = faderDb(b.vol);
+  const mv = document.querySelector(`#mixer .mxs[data-id="${b.id}"] .mxvol`); if (mv) mv.value = b.vol;
+  const md = document.querySelector(`#mixer .mxs[data-id="${b.id}"] .mxdb`); if (md) md.value = faderDb(b.vol);
+}
 // A bus is heard when nothing is soloed, or it, a group around it, or a track inside it is soloed.
-const soloPath = b => b.solo || ancestors(b).some(g => g.solo) || (b.kind === 'group' && descendants(b).some(t => t.solo));
+const soloPath = b => b.solo || ancestors(b).some(g => g.solo || (vcaOf(g) || {}).solo) || (vcaOf(b) || {}).solo || (b.kind === 'group' && descendants(b).some(t => t.solo || (vcaOf(t) || {}).solo));
 function applyMix(b) {
   if (b === S.master) { if (M.out) sm(M.out.gain, faderGain(b.vol)); return; }
   const r = RT.get(b.id); if (!r) return;
-  if (!autoActive(b, 'vol')) sm(r.fader.gain, faderGain(b.vol));
+  if (!autoActive(b, 'vol')) sm(r.fader.gain, faderGain(b.vol) * vcaGain(b));
   if (!autoActive(b, 'pan')) sm(r.pan.pan, b.pan);
   if (r.sends) r.sends.forEach((g, i) => { const k = sendKey(i); if (!autoActive(b, k)) sm(g.gain, sendOf(b, i)); });
-  const isTrack = S.tracks.includes(b), audible = !b.mute && !ancestors(b).some(g => g.mute) && (!isTrack || !anySolo() || soloPath(b));
+  const isTrack = S.tracks.includes(b), audible = !b.mute && !(vcaOf(b) || {}).mute && !ancestors(b).some(g => g.mute || (vcaOf(g) || {}).mute) && (!isTrack || !anySolo() || soloPath(b));
   sm(r.mute.gain, audible ? 1 : 0, 0.008); sm(r.preMute.gain, audible ? 1 : 0, 0.008);
   const off = Math.max(0, ...S.tracks.map(t => -(t.delayMs || 0))) / 1000; sm(r.dly.delayTime, clamp(((isTrack ? b.delayMs || 0 : 0) / 1000) + off + (b._pdc || 0), 0, 1.99), 0.02);
   if (r.mon) sm(r.mon.gain, monitorOn(b) ? 1 : 0, 0.01);
@@ -165,17 +186,54 @@ const OVERRIDES = new Set();
 const ovKey = (b, k) => b.id + '|' + k;
 const autoActive = (b, k) => !!(b.auto[k] && b.auto[k].length && !OVERRIDES.has(ovKey(b, k)));
 const AUTO_WRITE = new Map();
+/* Automation modes per channel, as in Pro Tools:
+   Read  - plays automation; with Automation Arm on, moving a control records it (the original behaviour, and the default)
+   Off   - ignores the channel's automation
+   Touch - records while you hold a control, then returns to what was written
+   Latch - records from the first touch and keeps writing the last value until playback stops
+   Write - records volume, pan and sends for the whole pass, then switches to Touch */
+const AUTO_MODES = ['off', 'read', 'touch', 'latch', 'write'];
+const amode = b => (b && AUTO_MODES.includes(b.amode) ? b.amode : 'read');
+const WRITERS = new Map();   // ovKey -> { b, key, mode, held }
+// Write v at the play position, replacing what was there since the last write; a held, unchanged value stays one flat line.
+function writeAuto(b, key, v) {
+  const now = nowPos(), w = AUTO_WRITE.get(ovKey(b, key)), pts = b.auto[key] || (b.auto[key] = []);
+  if (!w || now < w.last - 0.01 || now - w.last > 2) { if (!w) pushUndo('Record automation'); const prev = pts.length ? autoValue(pts, now) : currentParam(b, key); b.auto[key] = pts.filter(p => Math.abs(p.t - now) > 0.05); b.auto[key].push({ t: Math.max(0, now - 0.01), v: prev }); }
+  const arr0 = b.auto[key], from = w && now >= w.last ? w.last : now; const out = arr0.filter(p => p.t <= from + 1e-6 || p.t > now + 1e-6); out.push({ t: now, v }); out.sort((x, y) => x.t - y.t);
+  const i = out.findIndex(p => p.t === now && p.v === v); if (i >= 2 && out[i - 1].v === v && out[i - 2].v === v) out.splice(i - 1, 1);
+  b.auto[key] = out; AUTO_WRITE.set(ovKey(b, key), { last: now }); OVERRIDES.delete(ovKey(b, key)); markDirty();
+}
 // Called whenever a control changes. With Automation Arm on during playback it records; otherwise it overrides.
 function autoTouch(b, key, v) {
   if (!b || b._rack || !autoParams(b).some(p => p.key === key)) return;
-  if (T.playing && V.autoArm && !T.busy) {
-    const now = nowPos(), w = AUTO_WRITE.get(ovKey(b, key)), pts = b.auto[key] || (b.auto[key] = []);
-    if (!w || now < w.last - 0.01 || now - w.last > 2) { if (!w) pushUndo('Record automation'); const prev = pts.length ? autoValue(pts, now) : currentParam(b, key); b.auto[key] = pts.filter(p => Math.abs(p.t - now) > 0.05); b.auto[key].push({ t: Math.max(0, now - 0.01), v: prev }); }
-    const arr0 = b.auto[key], from = w && now >= w.last ? w.last : now; b.auto[key] = arr0.filter(p => p.t <= from + 1e-6 || p.t > now + 1e-6); b.auto[key].push({ t: now, v }); b.auto[key].sort((x, y) => x.t - y.t);
-    AUTO_WRITE.set(ovKey(b, key), { last: now }); OVERRIDES.delete(ovKey(b, key)); markDirty(); arr.draw(); return;
+  const mode = amode(b);
+  if (mode === 'off') return;
+  if (mode !== 'read') {   // touch, latch, write: record during playback; when stopped the move is just a move
+    if (T.playing && !T.busy) { writeAuto(b, key, v); const k = ovKey(b, key), w = WRITERS.get(k); WRITERS.set(k, { b, key, mode: w && w.mode === 'write' ? 'write' : mode, held: true }); arr.draw(); }
+    return;
   }
+  if (T.playing && V.autoArm && !T.busy) { writeAuto(b, key, v); arr.draw(); return; }
   if (b.auto[key] && b.auto[key].length && !OVERRIDES.has(ovKey(b, key))) { OVERRIDES.add(ovKey(b, key)); ui.transport(); arr.draw(); }
 }
+// While playing: latched, written and held controls keep writing their current value.
+function writeTick() {
+  if (!T.playing || T.busy || isOffline()) return;
+  WRITERS.forEach(w => { if (w.mode === 'touch' && !w.held) return; if (amode(w.b) === 'off' || amode(w.b) === 'read') return; writeAuto(w.b, w.key, currentParam(w.b, w.key)); });
+  if (WRITERS.size) arr.draw();
+}
+// Letting go of a control ends a Touch write: playback picks the written automation back up from here.
+document.addEventListener('pointerup', () => { WRITERS.forEach((w, k) => { w.held = false; if (w.mode === 'touch') { WRITERS.delete(k); AUTO_WRITE.delete(k); } }); }, true);
+function startWriters() {   // at play: Write-mode channels write volume, pan and every send for the whole pass
+  WRITERS.clear(); AUTO_WRITE.clear();
+  allBuses().forEach(b => { if (amode(b) !== 'write') return; ['vol', ...(b === S.master ? [] : ['pan']), ...(b.kind !== 'return' && b !== S.master && S.tracks.includes(b) ? S.returns.map((r, i) => sendKey(i)) : [])].forEach(key => WRITERS.set(ovKey(b, key), { b, key, mode: 'write', held: false })); });
+}
+function stopWriters() {   // after a Write pass the channel drops to Touch, so the next pass does not wipe it again
+  const wrote = new Set(); WRITERS.forEach(w => { if (w.mode === 'write') wrote.add(w.b); }); WRITERS.clear(); AUTO_WRITE.clear();
+  wrote.forEach(b => { b.amode = 'touch'; }); if (wrote.size) { toast(`Write pass done: ${[...wrote].map(b => b.name).join(', ')} switched to Touch.`, 3500); if (typeof mixer !== 'undefined' && V.view === 'mix') mixer.render(); ui.headers(); }
+}
+function setAutoMode(b, mode) { if (!AUTO_MODES.includes(mode)) return; pushUndo('Automation mode'); b.amode = mode; [...WRITERS.keys()].forEach(k => { if (k.startsWith(b.id + '|')) { WRITERS.delete(k); AUTO_WRITE.delete(k); } });
+  if (T.playing) { if (mode === 'write') ['vol', 'pan'].forEach(key => WRITERS.set(ovKey(b, key), { b, key, mode: 'write', held: false })); if (mode === 'off') { const r = b === S.master ? { fader: M.out } : RT.get(b.id); if (r) { ['fader', 'pan'].forEach(k => r[k] && (r[k].gain || r[k].pan) && (r[k].gain || r[k].pan).cancelScheduledValues(0)); applyMix(b); } } }
+  markDirty(); if (typeof mixer !== 'undefined' && V.view === 'mix') mixer.render(); ui.headers(); arr.draw(); }
 function reenableAutomation() { if (!OVERRIDES.size) return; OVERRIDES.clear(); AUTO_WRITE.clear(); ui.transport(); arr.draw(); if (T.playing) play(nowPos()); else releaseAutomation(); }
 function currentParam(b, key) {
   if (key === 'tempo') return bpmAt(nowPos());
@@ -189,14 +247,15 @@ function currentParam(b, key) {
 }
 // Apply automation for one window. AudioParams ramp to the window end; device parameters are set at window start.
 function applyAutomation(b, from, to, first) {
+  if (amode(b) === 'off') return;
   for (const key in b.auto) {
-    const pts = b.auto[key]; if (!pts || !pts.length || key === 'tempo' || OVERRIDES.has(ovKey(b, key)) || (V.autoArm && T.playing && AUTO_WRITE.has(ovKey(b, key)))) continue;
+    const pts = b.auto[key]; if (!pts || !pts.length || key === 'tempo' || OVERRIDES.has(ovKey(b, key)) || (V.autoArm && T.playing && AUTO_WRITE.has(ovKey(b, key))) || (T.playing && !T.render && WRITERS.has(ovKey(b, key)))) continue;
     if (T.render && T.render.only === b.id && (sendIndex(key) >= 0 || (T.render.prefader && (key === 'vol' || key === 'pan')))) continue;
     if (T.render && T.render.only && b === S.master && key === 'vol') continue;
     const r = b === S.master ? { fader: M.out } : RT.get(b.id); if (!r) continue;
     const vEnd = autoValue(pts, to), tEnd = timeAt(to);
     const ramp = (param, val) => { if (first) { param.cancelScheduledValues(0); param.setValueAtTime(val(autoValue(pts, from)), Math.max(0, timeAt(from))); } param.linearRampToValueAtTime(val(vEnd), Math.max(ctx.currentTime, tEnd)); };
-    if (key === 'vol') ramp(r.fader.gain, faderGain);
+    if (key === 'vol') { const vg = vcaGain(b); ramp(r.fader.gain, v => faderGain(v) * vg); }
     else if (key === 'pan' && r.pan) ramp(r.pan.pan, v => v);
     else if (sendIndex(key) >= 0) { const g = r.sends && r.sends[sendIndex(key)]; if (g) ramp(g.gain, v => v); }
     else {
@@ -325,6 +384,7 @@ function scheduleWindow(from, to) {
 }
 function tick(lookahead = 0.12) {
   if (!T.playing) return;
+  if (WRITERS.size) writeTick();
   if (T.autoStopAt != null && !isOffline() && posAt(ctx.currentTime) >= T.autoStopAt) { T.autoStopAt = null; setTimeout(() => { if (T.playing) stop(); }, 0); return; }   // punch out + post-roll
   let end = posAt(ctx.currentTime + lookahead), guard = 0;
   while (T.nextPos < end && guard++ < 4096) {
@@ -386,11 +446,12 @@ function play(from = V.insert) {
   T.autoStopAt = T.rec && S.punch && S.punch.out && !S.loop.on && S.loop.end > recFrom ? S.loop.end + (P.postRoll || 0) * SPB() : null;
   if (!count) startAudioAt(start, T.anchorTime);
   if (T.rec) startRecording(recFrom);
+  if (!isOffline()) startWriters();
   tick(); ui.transport();
 }
 function stop(silent) {
   if (isOffline()) return;
-  T.autoStopAt = null; if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
+  T.autoStopAt = null; if (!silent) { T.rec = false; stopWriters(); }   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
   clearMidiFxQueues(); T.playing = false; stopSources(now); DEV_RT.forEach(r => r.transport && r.transport(null));

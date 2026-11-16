@@ -29,7 +29,7 @@ const ui = {
             ${r.kind !== 'master' ? `<button class="hb act ${b.mute ? '' : 'on'}" data-h="mute" data-map="${b.id}|mute" title="Track activator">${num}</button>` : ''}
             ${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-h="solo" data-map="${b.id}|solo" title="Solo">S</button>${grp ? '' : `<button class="hb arm ${b.arm ? 'on' : ''}" data-h="arm" data-map="${b.id}|arm" title="Arm recording">●</button>`}` : ''}${isT && b.takes && b.takes.length ? `<button class="hb tk ${b.showTakes ? 'on' : ''}" data-h="takes" title="Show or hide take lanes">T${b.takes.length}</button>` : ''}${isT && b.frozen ? '<span class="frz" title="Frozen">❄</span>' : ''}
           </div>
-          ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
+          ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}${autoModeBtn(b, 'hb')}</div>`
           : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${INST_NAMES[b.inst.type]}</span>` : ''}
               <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" data-map="${b.id}|vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
           ${r.h >= 58 && !V.autoMode && V.showM && r.kind !== 'take' ? hdrChips(b, isT) : ''}
@@ -112,12 +112,13 @@ function bindHeaders() {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id);
     switch (h.dataset.h) {
       case 'chip': V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = 'devices'; ui.all(); return;
-      case 'mute': b.mute = !b.mute; break;
-      case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) S.tracks.forEach(t => (t.solo = false)); b.solo = !b.solo; break;
+      case 'mute': b.mute = !b.mute; linkFlag(b, 'mute'); break;
+      case 'solo': if (!(e.ctrlKey || e.metaKey) && !b.solo) { S.tracks.forEach(t => (t.solo = false)); (S.vcas || []).forEach(v => (v.solo = false)); } b.solo = !b.solo; linkFlag(b, 'solo'); break;
       case 'arm': { const on = !b.arm; if (!(e.ctrlKey || e.metaKey)) S.tracks.forEach(t => { if (t !== b && t.arm) { t.arm = false; applyMix(t); } }); await armTrack(b, on); break; }
       case 'mon': b.monitor = h.dataset.m; break;
       case 'fold': b.fold = !b.fold; break;
       case 'pre': pushUndo('Send position'); b.pre = !b.pre; rebuildAll(); break;
+      case 'amode': return autoModeMenu(e, b);
       case 'clearAuto': pushUndo('Clear automation'); delete b.auto[b.autoShow || 'vol']; releaseAutomation(); _tmKey = ''; break;
       case 'takes': b.showTakes = !b.showTakes; break;
       case 'compAll': { const lane = b.takes.find(l => l.id === hd.dataset.lane); const a = Math.min(...lane.clips.map(c => c.start)), z = Math.max(...lane.clips.map(c => c.start + c.len)); compRange(b, lane, a, z); break; }
@@ -133,7 +134,7 @@ function bindHeaders() {
   box.addEventListener('input', e => {
     const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (!h || !hd) return; const b = busById(hd.dataset.id), k = h.dataset.h;
     if (k === 'send') { const i = +h.dataset.si; setSend(b, i, +h.value); applyMix(b); autoTouch(b, sendKey(i), +h.value); markDirty(); return; }
-    if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { if (k === 'sendA' || k === 'sendB') setSend(b, sendIndex(k), +h.value); else b[k] = +h.value; autoTouch(b, k, +h.value); autoTouch(b, k, +h.value); applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
+    if (['vol', 'pan', 'sendA', 'sendB'].includes(k)) { const oldVol = b.vol; if (k === 'sendA' || k === 'sendB') setSend(b, sendIndex(k), +h.value); else b[k] = +h.value; if (k === 'vol') linkVol(b, oldVol); autoTouch(b, k, +h.value); autoTouch(b, k, +h.value); applyMix(b); if (b === S.master) rewireMaster(); const db = $(`[data-db="${b.id}"]`); if (db) db.textContent = faderDb(b.vol); markDirty(); showTip(e, k === 'vol' ? faderDb(b.vol) + ' dB' : k === 'pan' ? (Math.abs(b.pan) < 0.01 ? 'C' : Math.round(Math.abs(b.pan) * 50) + (b.pan < 0 ? 'L' : 'R')) : Math.round(b[k] * 100) + '%'); }
   });
   box.addEventListener('change', e => { const h0 = e.target.closest('[data-h]'), hd0 = e.target.closest('.hdr'); if (h0 && hd0 && ioChange(busById(hd0.dataset.id), h0)) return; });
   box.addEventListener('change', e => { hideTip(); const h = e.target.closest('[data-h]'), hd = e.target.closest('.hdr'); if (h && h.dataset.h === 'autoShow') { busById(hd.dataset.id).autoShow = h.value; ui.headers(); } if (h && h.dataset.h === 'laneKey') { busById(hd.dataset.id).lanes[+hd.dataset.li] = h.value; ui.headers(); } });
@@ -365,6 +366,11 @@ function rackify(card) {
 function fitRack() { const rack = $('#pane-dev .rack'); if (!rack) return; const cb = rack.querySelector('.card .cb'), h = cb ? cb.clientHeight : rack.clientHeight - 47; rack.style.setProperty('--prow', clamp(Math.floor((h - 36) / 69), 1, 8)); rack.style.setProperty('--cbh', h + 'px'); }
 
 const HDR_TAP = { id: null, t: 0, was: false };
+// Automation mode button (mixer strips and track headers in automation view) and its menu
+const AMODE_LABEL = { off: 'Off', read: 'Read', touch: 'Touch', latch: 'Latch', write: 'Write' };
+const AMODE_HELP = { off: 'ignores this channel\'s automation', read: 'plays automation; with Automation Arm on, moving a control records it', touch: 'records while you hold a control, then goes back to what was written', latch: 'records from the first touch and keeps the last value until you stop', write: 'records volume, pan and sends for the whole pass, then switches to Touch' };
+function autoModeBtn(b, cls = '') { const m = amode(b); return `<button class="amode ${cls} am-${m}" data-h="amode" data-act="amode" title="Automation: ${AMODE_LABEL[m]} - ${AMODE_HELP[m]}. Click to change.">${AMODE_LABEL[m]}</button>`; }
+function autoModeMenu(e, b) { const m = amode(b); popMenu(e, AUTO_MODES.map(k => ({ label: (k === m ? '✓  ' : '    ') + AMODE_LABEL[k] + '  ·  ' + AMODE_HELP[k], run: () => setAutoMode(b, k) }))); }
 const DEV_H = 290;
 function clipH() { return clamp(+lsGet('sb-detailH') || 320, 160, Math.max(160, innerHeight - 260)); }
 function sizeDetail() { const app = $('#app'), dev = V.detail !== 'clip', h = dev ? Math.min(DEV_H, Math.max(160, innerHeight - 260)) : clipH(), was = app.style.getPropertyValue('--detailH');

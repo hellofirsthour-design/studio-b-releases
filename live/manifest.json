@@ -1,8 +1,8 @@
 {
- "version": "0.2.55",
+ "version": "0.2.56",
  "shell": 4,
- "date": "2026-11-16T21:54:50.164Z",
- "notes": "Mixer: smaller fader caps",
+ "date": "2026-11-16T22:00:40.536Z",
+ "notes": "Mixer: slimmer fader caps with space before the meter",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 21144,
-   "sha256": "4f9c7b5710d53fdd31db964e68c2e0bc6e72dc059990e4c8a0131a6d4ce33da4"
+   "size": 21701,
+   "sha256": "6ab6372b05a22f85ed95556c2b998b8338ab44c2460b44b35ef9ceb81f3cc5ac"
   },
   {
    "path": "img/b-mark.svg",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "5e9933e4f598701c94b58b989aff56479784f31001932a7c2dd3ae77e1e7eba3"
+   "sha256": "e75d3479fabd763d44bb828f27f1df2fdd39f73497ef48976911cc2c001bc903"
   }
  ]
 }
