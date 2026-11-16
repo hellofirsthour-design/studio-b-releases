@@ -261,7 +261,7 @@ function eqEditor(body, d, r, changed) {
 }
 
 /* ============ instrument cards ============ */
-function instrumentCard(t) { const c = instrumentCard_(t); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
+function instrumentCard(t) { const c = instrumentCard_(t); if (c) soundBar(t, c); const b = c && c.querySelector('[data-ipre]'); if (b) b.onclick = e => presetMenu(e, 'inst:' + t.inst.type, () => t.inst, p => { pushUndo('Instrument preset'); applyInstPreset(t, p); }, 'instrument preset'); return c; }
 function applyInstPreset(t, p) {
   const keep = Object.fromEntries([...PRESET_SKIP].filter(k => k !== 'preset' && t.inst[k] !== undefined).map(k => [k, t.inst[k]]));
   const base = deep(newInst(t.inst.type)); Object.keys(t.inst).forEach(k => delete t.inst[k]); Object.assign(t.inst, base, p || {}, keep, { preset: p ? 'User' : t.inst.preset });
@@ -286,19 +286,22 @@ function instrumentCard_(t) {
   }
   if (t.inst.type === 'drums') {
     const c = cardShell('Kit', 'Drum rack', { wide: true, tools: '<button class="ic dtool" data-ipre title="Instrument presets" aria-label="Instrument presets">☰</button>' }); const body = $('.cb', c);
-    const grid = document.createElement('div'); grid.className = 'kit';
+    // like a drum rack: a small grid of pads (click to pick and hear one, drop a sample on any of them), and the picked pad's controls beside it
+    const sel = clamp(t._pad || 0, 0, t.inst.pads.length - 1), grid = document.createElement('div'); grid.className = 'kit';
     t.inst.pads.forEach((pad, pi) => {
-      const cell = document.createElement('div'); cell.className = 'kpad'; cell.style.setProperty('--tc', t.color);
-      cell.innerHTML = `<button class="padhit" data-pad="${t.id}:${pi}" aria-label="Play ${esc(pad.kind)}"><b>${pi + 1}</b><span>${esc(pad.sampleId ? (SAMPLES.get(pad.sampleId) || {}).name || 'Sample' : pad.kind)}</span></button><div class="kctl"></div>`;
-      $('.padhit', cell).onpointerdown = () => { if (ctx.state !== 'running') ctx.resume(); inst.noteOn(pi, ctx.currentTime, 0.9); };
-      const ctl = $('.kctl', cell);
-      ctl.appendChild(selectEl(DRUM_KINDS, pad.kind, v => { pad.kind = v; pad.sampleId = null; ui.detail(); markDirty(); }, 'Sound'));
-      [['tune', 'Tune', -24, 24, v => (v > 0 ? '+' : '') + v.toFixed(1)], ['decay', 'Decay', 0.2, 3, v => v.toFixed(2) + 'x'], ['level', 'Level', 0, 1.2, fPct], ['pan', 'Pan', -1, 1, v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R')]].forEach(([k, l, a, b, f]) => ctl.appendChild(knob({ label: l, value: pad[k], min: a, max: b, fmt: f, small: true, onInput: v => (pad[k] = v) })));
-      const ld = document.createElement('button'); ld.className = 'btn ghostb tiny'; ld.textContent = 'Load sample'; ld.onclick = () => pickSample(async id => { pad.sampleId = id; ui.detail(); markDirty(); }); ctl.appendChild(ld);
-      cell.addEventListener('dragover', e => e.preventDefault()); cell.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadSampleFile(f).then(id => { if (id) { pad.sampleId = id; ui.detail(); } }); });
-      grid.appendChild(cell);
+      const b = document.createElement('button'); b.className = 'padhit' + (pi === sel ? ' sel' : ''); b.dataset.pad = t.id + ':' + pi; b.style.setProperty('--tc', t.color); b.title = 'Click to pick and hear it. Drop a sample here to load it.';
+      b.innerHTML = `<b>${pi + 1}</b><span>${esc(pad.sampleId ? (SAMPLES.get(pad.sampleId) || {}).name || 'Sample' : pad.kind)}</span>`;
+      b.onpointerdown = () => { if (ctx.state !== 'running') ctx.resume(); inst.noteOn(pi, ctx.currentTime, 0.9); if (t._pad !== pi) { t._pad = pi; ui.detail(); } };
+      b.addEventListener('dragover', e => e.preventDefault()); b.addEventListener('drop', e => { e.preventDefault(); const sid = e.dataTransfer.getData('sb/sample'), f = e.dataTransfer.files[0]; const set = id => { if (id) { pushUndo('Load sample'); pad.sampleId = id; t._pad = pi; ui.detail(); markDirty(); } }; if (sid) set(sid); else if (f) loadSampleFile(f).then(set); });
+      grid.appendChild(b);
     });
-    body.appendChild(grid); return c;
+    const pad = t.inst.pads[sel], ctl = document.createElement('div'); ctl.className = 'kctl';
+    const hd = document.createElement('div'); hd.className = 'khead'; hd.innerHTML = `<span class="lab">Pad ${sel + 1}</span>`; hd.appendChild(selectEl(DRUM_KINDS, pad.kind, v => { pad.kind = v; pad.sampleId = null; ui.detail(); markDirty(); }, 'Sound')); ctl.appendChild(hd);
+    const kn = document.createElement('div'); kn.className = 'kknobs';
+    [['tune', 'Tune', -24, 24, v => (v > 0 ? '+' : '') + v.toFixed(1)], ['decay', 'Decay', 0.2, 3, v => v.toFixed(2) + 'x'], ['level', 'Level', 0, 1.2, fPct], ['pan', 'Pan', -1, 1, v => Math.abs(v) < 0.01 ? 'C' : Math.round(Math.abs(v) * 50) + (v < 0 ? 'L' : 'R')]].forEach(([k, l, a, b, f]) => kn.appendChild(knob({ label: l, value: pad[k], min: a, max: b, fmt: f, onInput: v => { pad[k] = v; markDirty(); } })));
+    ctl.appendChild(kn);
+    const ld = document.createElement('button'); ld.className = 'btn ghostb tiny'; ld.textContent = pad.sampleId ? 'Replace sample…' : 'Load sample…'; ld.onclick = () => pickSample(async id => { pad.sampleId = id; ui.detail(); markDirty(); }); ctl.appendChild(ld);
+    body.appendChild(grid); body.appendChild(ctl); return c;
   }
   return samplerCard(t, inst);
 }

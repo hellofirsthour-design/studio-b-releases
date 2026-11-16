@@ -1,8 +1,8 @@
 {
- "version": "0.2.48",
+ "version": "0.2.49",
  "shell": 4,
- "date": "2026-11-16T18:09:31.502Z",
- "notes": "New free pack: Keys, Clav & World (13 recorded instruments, CC0)",
+ "date": "2026-11-16T18:52:14.670Z",
+ "notes": "Guitars & Bass pack; recorded sounds no longer hidden behind synth names",
  "files": [
   {
    "path": "css/base.css",
@@ -171,13 +171,13 @@
   },
   {
    "path": "js/packs-data.js",
-   "size": 112949,
-   "sha256": "6e5fd1d0a09b644644d4869bea1696dc2551fa44698e54cd6240ad31771b89fc"
+   "size": 121583,
+   "sha256": "ca954002e7063664d7cc79f0b2cdfefb773c5ab1608b9237decc9b9baacec2a5"
   },
   {
    "path": "js/packs.js",
-   "size": 9699,
-   "sha256": "c22b4f1ccf5a946b6e6d225c8726d269b4f0fe11c1caf6b192170308e1a7c048"
+   "size": 10423,
+   "sha256": "da02f7b8013ad211399103fba10be4664c0c1b7a1fcef5f05df09c98dbd47b08"
   },
   {
    "path": "js/plugins.js",
@@ -201,8 +201,8 @@
   },
   {
    "path": "js/sounds.js",
-   "size": 43716,
-   "sha256": "4ef975456aaea34892a9a2fd6394a7f4e6ac7c3361915573e5f002986a31c0d3"
+   "size": 43721,
+   "sha256": "991cc48daaaa44f585b512d451e5e1be82f495b068478cb867d7eb220ed01aea"
   },
   {
    "path": "js/space.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "1cfb453fd8cab03bd7d0fa97b6b0333669b596c6492e4a3cb8952c6bc9e4db36"
+   "sha256": "278024b89a718c9ddefd0b2cd3ea18ab3e0aac11693f94da5c5587fe30b53dda"
   }
  ]
 }
