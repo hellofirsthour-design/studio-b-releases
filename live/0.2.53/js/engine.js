@@ -4,7 +4,7 @@ let S = null;               // project (saved)
 const RT = new Map();       // bus id -> runtime nodes
 const M = {};               // main bus runtime
 const T = { playing: false, anchorTime: 0, anchorPos: 0, nextPos: 0, rec: false, srcs: [], started: new Set(), recording: null, stopPos: 0, countUntil: null };
-const V = { insert: 0, pps: 6, scrollX: 0, scrollY: 0, selClips: new Set(), selTracks: new Set(), time: null, editClip: null, detail: 'clip', autoMode: false, follow: true, browser: true, grid: 0, snap: true, dirty: false };
+const V = { insert: 0, pps: 6, scrollX: 0, scrollY: 0, selClips: new Set(), selTracks: new Set(), time: null, editClip: null, detail: 'devices', autoMode: false, follow: true, browser: true, grid: 0, snap: true, dirty: false };
 const posAt = time => songPos(time - T.anchorTime + songSec(T.anchorPos));
 const timeAt = pos => T.anchorTime + songSec(pos) - songSec(T.anchorPos);
 const stepSec = () => 15 / bpmAt(nowPos());
@@ -64,6 +64,8 @@ function rewireMaster() { chain(M.in, S.master.devices, M.out); M.out.gain.value
 /* sends: any number of returns (up to 12). Sends A and B keep their old field names. */
 const sendOf = (b, i) => (b.sends && b.sends[i] != null ? b.sends[i] : i === 0 ? b.sendA || 0 : i === 1 ? b.sendB || 0 : 0);
 function setSend(b, i, v) { b.sends = b.sends || [b.sendA || 0, b.sendB || 0]; while (b.sends.length <= i) b.sends.push(0); b.sends[i] = v; if (i === 0) b.sendA = v; if (i === 1) b.sendB = v; }
+// Pre/post fader per send (Pro Tools style); when a send has no setting of its own it follows its return's Pre switch.
+const sendPre = (b, i) => (b.sendPre && b.sendPre[i] != null ? !!b.sendPre[i] : !!(S.returns[i] || {}).pre);
 const sendKey = i => (i === 0 ? 'sendA' : i === 1 ? 'sendB' : 'send:' + i);
 const sendIndex = k => (k === 'sendA' ? 0 : k === 'sendB' ? 1 : k.startsWith('send:') ? +k.slice(5) : -1);
 const RET_LETTERS = 'ABCDEFGHIJKL';
@@ -87,7 +89,7 @@ function buildBus(b, kind) {
   else if (b.kind === 'midi') { r.inst = makeInstrument(b); r.in = r.inst.out; }
   else { r.in = ctx.createGain(); r.mon = ctx.createGain(); r.mon.gain.value = 0; r.mon.connect(r.in); }
   if (kind !== 'return') {
-    r.sends = S.returns.map(ret => { const g = ctx.createGain(); g.gain.value = 0; (ret.pre ? r.preMute : r.mute).connect(g); const rr = RT.get(ret.id); if (rr) g.connect(rr.in); return g; });
+    r.sends = S.returns.map((ret, i) => { const g = ctx.createGain(); g.gain.value = 0; (sendPre(b, i) ? r.preMute : r.mute).connect(g); const rr = RT.get(ret.id); if (rr) g.connect(rr.in); return g; });
     r.sA = r.sends[0]; r.sB = r.sends[1];
   }
   r.frz = ctx.createGain(); r.frz.connect(r.pre);
@@ -163,17 +165,54 @@ const OVERRIDES = new Set();
 const ovKey = (b, k) => b.id + '|' + k;
 const autoActive = (b, k) => !!(b.auto[k] && b.auto[k].length && !OVERRIDES.has(ovKey(b, k)));
 const AUTO_WRITE = new Map();
+/* Automation modes per channel, as in Pro Tools:
+   Read  - plays automation; with Automation Arm on, moving a control records it (the original behaviour, and the default)
+   Off   - ignores the channel's automation
+   Touch - records while you hold a control, then returns to what was written
+   Latch - records from the first touch and keeps writing the last value until playback stops
+   Write - records volume, pan and sends for the whole pass, then switches to Touch */
+const AUTO_MODES = ['off', 'read', 'touch', 'latch', 'write'];
+const amode = b => (b && AUTO_MODES.includes(b.amode) ? b.amode : 'read');
+const WRITERS = new Map();   // ovKey -> { b, key, mode, held }
+// Write v at the play position, replacing what was there since the last write; a held, unchanged value stays one flat line.
+function writeAuto(b, key, v) {
+  const now = nowPos(), w = AUTO_WRITE.get(ovKey(b, key)), pts = b.auto[key] || (b.auto[key] = []);
+  if (!w || now < w.last - 0.01 || now - w.last > 2) { if (!w) pushUndo('Record automation'); const prev = pts.length ? autoValue(pts, now) : currentParam(b, key); b.auto[key] = pts.filter(p => Math.abs(p.t - now) > 0.05); b.auto[key].push({ t: Math.max(0, now - 0.01), v: prev }); }
+  const arr0 = b.auto[key], from = w && now >= w.last ? w.last : now; const out = arr0.filter(p => p.t <= from + 1e-6 || p.t > now + 1e-6); out.push({ t: now, v }); out.sort((x, y) => x.t - y.t);
+  const i = out.findIndex(p => p.t === now && p.v === v); if (i >= 2 && out[i - 1].v === v && out[i - 2].v === v) out.splice(i - 1, 1);
+  b.auto[key] = out; AUTO_WRITE.set(ovKey(b, key), { last: now }); OVERRIDES.delete(ovKey(b, key)); markDirty();
+}
 // Called whenever a control changes. With Automation Arm on during playback it records; otherwise it overrides.
 function autoTouch(b, key, v) {
   if (!b || b._rack || !autoParams(b).some(p => p.key === key)) return;
-  if (T.playing && V.autoArm && !T.busy) {
-    const now = nowPos(), w = AUTO_WRITE.get(ovKey(b, key)), pts = b.auto[key] || (b.auto[key] = []);
-    if (!w || now < w.last - 0.01 || now - w.last > 2) { if (!w) pushUndo('Record automation'); const prev = pts.length ? autoValue(pts, now) : currentParam(b, key); b.auto[key] = pts.filter(p => Math.abs(p.t - now) > 0.05); b.auto[key].push({ t: Math.max(0, now - 0.01), v: prev }); }
-    const arr0 = b.auto[key], from = w && now >= w.last ? w.last : now; b.auto[key] = arr0.filter(p => p.t <= from + 1e-6 || p.t > now + 1e-6); b.auto[key].push({ t: now, v }); b.auto[key].sort((x, y) => x.t - y.t);
-    AUTO_WRITE.set(ovKey(b, key), { last: now }); OVERRIDES.delete(ovKey(b, key)); markDirty(); arr.draw(); return;
+  const mode = amode(b);
+  if (mode === 'off') return;
+  if (mode !== 'read') {   // touch, latch, write: record during playback; when stopped the move is just a move
+    if (T.playing && !T.busy) { writeAuto(b, key, v); const k = ovKey(b, key), w = WRITERS.get(k); WRITERS.set(k, { b, key, mode: w && w.mode === 'write' ? 'write' : mode, held: true }); arr.draw(); }
+    return;
   }
+  if (T.playing && V.autoArm && !T.busy) { writeAuto(b, key, v); arr.draw(); return; }
   if (b.auto[key] && b.auto[key].length && !OVERRIDES.has(ovKey(b, key))) { OVERRIDES.add(ovKey(b, key)); ui.transport(); arr.draw(); }
 }
+// While playing: latched, written and held controls keep writing their current value.
+function writeTick() {
+  if (!T.playing || T.busy || isOffline()) return;
+  WRITERS.forEach(w => { if (w.mode === 'touch' && !w.held) return; if (amode(w.b) === 'off' || amode(w.b) === 'read') return; writeAuto(w.b, w.key, currentParam(w.b, w.key)); });
+  if (WRITERS.size) arr.draw();
+}
+// Letting go of a control ends a Touch write: playback picks the written automation back up from here.
+document.addEventListener('pointerup', () => { WRITERS.forEach((w, k) => { w.held = false; if (w.mode === 'touch') { WRITERS.delete(k); AUTO_WRITE.delete(k); } }); }, true);
+function startWriters() {   // at play: Write-mode channels write volume, pan and every send for the whole pass
+  WRITERS.clear(); AUTO_WRITE.clear();
+  allBuses().forEach(b => { if (amode(b) !== 'write') return; ['vol', ...(b === S.master ? [] : ['pan']), ...(b.kind !== 'return' && b !== S.master && S.tracks.includes(b) ? S.returns.map((r, i) => sendKey(i)) : [])].forEach(key => WRITERS.set(ovKey(b, key), { b, key, mode: 'write', held: false })); });
+}
+function stopWriters() {   // after a Write pass the channel drops to Touch, so the next pass does not wipe it again
+  const wrote = new Set(); WRITERS.forEach(w => { if (w.mode === 'write') wrote.add(w.b); }); WRITERS.clear(); AUTO_WRITE.clear();
+  wrote.forEach(b => { b.amode = 'touch'; }); if (wrote.size) { toast(`Write pass done: ${[...wrote].map(b => b.name).join(', ')} switched to Touch.`, 3500); if (typeof mixer !== 'undefined' && V.view === 'mix') mixer.render(); ui.headers(); }
+}
+function setAutoMode(b, mode) { if (!AUTO_MODES.includes(mode)) return; pushUndo('Automation mode'); b.amode = mode; [...WRITERS.keys()].forEach(k => { if (k.startsWith(b.id + '|')) { WRITERS.delete(k); AUTO_WRITE.delete(k); } });
+  if (T.playing) { if (mode === 'write') ['vol', 'pan'].forEach(key => WRITERS.set(ovKey(b, key), { b, key, mode: 'write', held: false })); if (mode === 'off') { const r = b === S.master ? { fader: M.out } : RT.get(b.id); if (r) { ['fader', 'pan'].forEach(k => r[k] && (r[k].gain || r[k].pan) && (r[k].gain || r[k].pan).cancelScheduledValues(0)); applyMix(b); } } }
+  markDirty(); if (typeof mixer !== 'undefined' && V.view === 'mix') mixer.render(); ui.headers(); arr.draw(); }
 function reenableAutomation() { if (!OVERRIDES.size) return; OVERRIDES.clear(); AUTO_WRITE.clear(); ui.transport(); arr.draw(); if (T.playing) play(nowPos()); else releaseAutomation(); }
 function currentParam(b, key) {
   if (key === 'tempo') return bpmAt(nowPos());
@@ -187,8 +226,9 @@ function currentParam(b, key) {
 }
 // Apply automation for one window. AudioParams ramp to the window end; device parameters are set at window start.
 function applyAutomation(b, from, to, first) {
+  if (amode(b) === 'off') return;
   for (const key in b.auto) {
-    const pts = b.auto[key]; if (!pts || !pts.length || key === 'tempo' || OVERRIDES.has(ovKey(b, key)) || (V.autoArm && T.playing && AUTO_WRITE.has(ovKey(b, key)))) continue;
+    const pts = b.auto[key]; if (!pts || !pts.length || key === 'tempo' || OVERRIDES.has(ovKey(b, key)) || (V.autoArm && T.playing && AUTO_WRITE.has(ovKey(b, key))) || (T.playing && !T.render && WRITERS.has(ovKey(b, key)))) continue;
     if (T.render && T.render.only === b.id && (sendIndex(key) >= 0 || (T.render.prefader && (key === 'vol' || key === 'pan')))) continue;
     if (T.render && T.render.only && b === S.master && key === 'vol') continue;
     const r = b === S.master ? { fader: M.out } : RT.get(b.id); if (!r) continue;
@@ -323,6 +363,8 @@ function scheduleWindow(from, to) {
 }
 function tick(lookahead = 0.12) {
   if (!T.playing) return;
+  if (WRITERS.size) writeTick();
+  if (T.autoStopAt != null && !isOffline() && posAt(ctx.currentTime) >= T.autoStopAt) { T.autoStopAt = null; setTimeout(() => { if (T.playing) stop(); }, 0); return; }   // punch out + post-roll
   let end = posAt(ctx.currentTime + lookahead), guard = 0;
   while (T.nextPos < end && guard++ < 4096) {
     const from = T.nextPos; let to = Math.min(end, Math.floor(from + 1e-9) + 1);
@@ -362,24 +404,33 @@ async function recordButton() {
   T.rec = true; if (T.playing) startRecording(nowPos()); else play(V.insert);
   ui.transport();
 }
+// Record options: count-in (clicks only), pre-roll (the song plays before the record point) and post-roll (it keeps playing after punch-out)
 function countInMenu(at) {
-  const cur = (S.prefs && S.prefs.countIn) || 0;
-  popMenu(at, [[0, 'No count-in'], [1, '1 bar'], [2, '2 bars'], [4, '4 bars']].map(([v, l]) => ({ label: (v === cur ? '✓  ' : '    ') + l, run: () => { S.prefs = S.prefs || {}; S.prefs.countIn = v; markDirty(); ui.transport(); } })));
+  const P = S.prefs || {}, opt = (key, v, l) => ({ label: (((P[key] || 0) === v) ? '✓  ' : '    ') + l, run: () => { S.prefs = S.prefs || {}; S.prefs[key] = v; markDirty(); ui.transport(); } });
+  popMenu(at, [opt('countIn', 0, 'No count-in'), opt('countIn', 1, 'Count-in 1 bar'), opt('countIn', 2, 'Count-in 2 bars'), opt('countIn', 4, 'Count-in 4 bars'), '-',
+    opt('preRoll', 0, 'No pre-roll'), opt('preRoll', 1, 'Pre-roll 1 bar'), opt('preRoll', 2, 'Pre-roll 2 bars'), '-',
+    opt('postRoll', 0, 'No post-roll'), opt('postRoll', 1, 'Post-roll 1 bar'), opt('postRoll', 2, 'Post-roll 2 bars')]);
 }
 function play(from = V.insert) {
   if (isOffline() || T.busy) return;
   if (ctx.state !== 'running') ctx.resume();
   if (T.playing) stop(true);
-  const count = T.rec && S.prefs && S.prefs.countIn ? S.prefs.countIn * SPB() : 0;
-  T.playing = true; T.anchorTime = ctx.currentTime + 0.06; T.anchorPos = from - count; T.nextPos = from - count; T.firstPos = from; T.started.clear();
-  T.countUntil = count ? from : null;
-  if (!count) startAudioAt(from, T.anchorTime);
-  if (T.rec) startRecording(from);
+  // Recording, as in Pro Tools: with Punch In on, recording starts at the punch point; pre-roll plays the song for a bar or two
+  // before it so you can get into the take; with Punch Out on (and the loop off) the song stops after the post-roll.
+  const P = S.prefs || {}, punchIn = T.rec && S.punch && S.punch.in && S.loop.end > S.loop.start;
+  const recFrom = punchIn ? S.loop.start : from, pre = T.rec ? Math.min(recFrom, (P.preRoll || 0) * SPB()) : 0, start = recFrom - pre;
+  const count = T.rec && P.countIn ? P.countIn * SPB() : 0;
+  T.playing = true; T.anchorTime = ctx.currentTime + 0.06; T.anchorPos = start - count; T.nextPos = start - count; T.firstPos = start; T.started.clear();
+  T.countUntil = count ? start : null;
+  T.autoStopAt = T.rec && S.punch && S.punch.out && !S.loop.on && S.loop.end > recFrom ? S.loop.end + (P.postRoll || 0) * SPB() : null;
+  if (!count) startAudioAt(start, T.anchorTime);
+  if (T.rec) startRecording(recFrom);
+  if (!isOffline()) startWriters();
   tick(); ui.transport();
 }
 function stop(silent) {
   if (isOffline()) return;
-  if (!silent) T.rec = false;   // Stop ends recording; the record button goes out (tracks stay armed)
+  T.autoStopAt = null; if (!silent) { T.rec = false; stopWriters(); }   // Stop ends recording; the record button goes out (tracks stay armed)
   const now = ctx.currentTime; T.stopPos = T.countUntil != null ? T.countUntil : posAt(now); T.countUntil = null;
   if (T.recording) finishRecording();
   clearMidiFxQueues(); T.playing = false; stopSources(now); DEV_RT.forEach(r => r.transport && r.transport(null));

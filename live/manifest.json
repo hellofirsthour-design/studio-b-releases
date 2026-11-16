@@ -1,8 +1,8 @@
 {
- "version": "0.2.52",
+ "version": "0.2.53",
  "shell": 4,
- "date": "2026-11-16T20:49:13.317Z",
- "notes": "Mixer: real fader caps, wider grooves and meters",
+ "date": "2026-11-16T21:04:53.392Z",
+ "notes": "Automation modes per channel (Off/Read/Touch/Latch/Write); fit fixes across the app",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 18378,
-   "sha256": "64b1b7898421c5275a62a9c789a5f2a3c52037a844df731a710c9f57da54b84a"
+   "size": 19544,
+   "sha256": "7e622d83c55238bd95599b1c8f9490a2b0f4bc9b7045b27585517796f012c14b"
   },
   {
    "path": "img/b-mark.svg",
@@ -91,8 +91,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 55857,
-   "sha256": "b4603c056bbd6c525d4356c496997b6e8fed8e56414e8c1bab5bb12877b15afe"
+   "size": 59722,
+   "sha256": "0961136bfded5b8f40904ba363a1e2651c055a2218e9f1a25e5144ffeb45e8cf"
   },
   {
    "path": "js/features.js",
@@ -156,8 +156,8 @@
   },
   {
    "path": "js/mixer.js",
-   "size": 16671,
-   "sha256": "61c1f1d16682c226fefb4a29d0c7aa19469a28db4a138af630ca0b99c0962128"
+   "size": 16775,
+   "sha256": "989f06cf2944307368308cea8d9082be57606e7cc3988c24e266cf1d19bf1be5"
   },
   {
    "path": "js/mods.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 50197,
-   "sha256": "a5885ae3ec70e47da0359403fe5b5b2bb82fb214f02fe4a06510be94d3a5cc96"
+   "size": 51283,
+   "sha256": "28d3925d3c681f7a0d9d1ede9f8addafe8dd650ed292acdb8f39abb072c69d84"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "98b8a20f3c21d94a421a70dd8cd479c9c9e4d1485394bb70a361861bf1e20f95"
+   "sha256": "55f8396c689a477db184cf193d590e7abe5fec24883fe8e2a55dc94d54e5bf6c"
   }
  ]
 }

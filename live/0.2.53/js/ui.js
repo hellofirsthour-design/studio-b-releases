@@ -8,7 +8,7 @@ const ui = {
     $('#metro').classList.toggle('on', !!S.metro); $('#loopBtn').classList.toggle('on', S.loop.on);
     $('#follow').classList.toggle('on', V.follow); $('#autoBtn').classList.toggle('on', V.autoMode); $$('[data-col]').forEach(x => x.classList.toggle('on', !!V[{ io: 'showIO', r: 'showR', m: 'showM', d: 'showD' }[x.dataset.col]])); $('#autoArm').classList.toggle('on', !!V.autoArm); $('#reAuto').classList.toggle('hot', OVERRIDES.size > 0); $('#reAuto').disabled = !OVERRIDES.size;
     $('#root').value = S.root; $('#scale').value = S.scale; $('#snapBtn').classList.toggle('on', V.snap);
-    $('#sig').value = SIG().join('/'); { const ci = (S.prefs && S.prefs.countIn) || 0; $('#countIn').classList.toggle('on', !!ci); $('#countIn .badge').textContent = ci ? String(ci) : ''; $('#countIn').title = ci ? `Count-in: ${ci} bar${ci > 1 ? 's' : ''} before recording. Click to change.` : 'Count-in before recording: off. Click to turn on.'; } S.punch = S.punch || {}; $('#punchIn').classList.toggle('on', !!S.punch.in); $('#punchOut').classList.toggle('on', !!S.punch.out);
+    $('#sig').value = SIG().join('/'); { const P = S.prefs || {}, ci = P.countIn || 0, pr = P.preRoll || 0, po = P.postRoll || 0, bars = n => n + ' bar' + (n > 1 ? 's' : ''); $('#countIn').classList.toggle('on', !!(ci || pr || po)); $('#countIn .badge').textContent = ci ? String(ci) : pr ? 'P' : ''; $('#countIn').title = `Record options. Count-in: ${ci ? bars(ci) : 'off'}. Pre-roll: ${pr ? bars(pr) : 'off'}. Post-roll: ${po ? bars(po) : 'off'}. Click to change.`; } S.punch = S.punch || {}; $('#punchIn').classList.toggle('on', !!S.punch.in); $('#punchOut').classList.toggle('on', !!S.punch.out);
     const nb = SIG()[0], beats = $('#beats'); if (beats.children.length !== Math.min(nb, 12)) beats.innerHTML = '<i></i>'.repeat(Math.min(nb, 12));
     $('#loopStart').textContent = barsBeats(S.loop.start); $('#loopLen').textContent = barsBeatsLen(S.loop.end - S.loop.start);
     $('#app').classList.toggle('nobrowser', !V.browser);
@@ -29,7 +29,7 @@ const ui = {
             ${r.kind !== 'master' ? `<button class="hb act ${b.mute ? '' : 'on'}" data-h="mute" data-map="${b.id}|mute" title="Track activator">${num}</button>` : ''}
             ${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-h="solo" data-map="${b.id}|solo" title="Solo">S</button>${grp ? '' : `<button class="hb arm ${b.arm ? 'on' : ''}" data-h="arm" data-map="${b.id}|arm" title="Arm recording">●</button>`}` : ''}${isT && b.takes && b.takes.length ? `<button class="hb tk ${b.showTakes ? 'on' : ''}" data-h="takes" title="Show or hide take lanes">T${b.takes.length}</button>` : ''}${isT && b.frozen ? '<span class="frz" title="Frozen">❄</span>' : ''}
           </div>
-          ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}</div>`
+          ${big ? (V.autoMode ? `<div class="hrow"><select class="dd hauto" data-h="autoShow" aria-label="Automation parameter">${params.map(p => `<option value="${p.key}" ${p.key === (b.autoShow || 'vol') ? 'selected' : ''}>${b.auto[p.key] && b.auto[p.key].length ? '● ' : ''}${esc(p.label)}</option>`).join('')}</select>${b.auto[b.autoShow || 'vol'] && b.auto[b.autoShow || 'vol'].length ? '<button class="hb" data-h="clearAuto" title="Delete this automation">✕</button>' : ''}${autoModeBtn(b, 'hb')}</div>`
           : `<div class="hrow">${isT && b.kind === 'audio' ? `<span class="mon seg">${['in', 'auto', 'off'].map(m => `<button data-h="mon" data-m="${m}" class="${b.monitor === m ? 'on' : ''}">${m === 'in' ? 'In' : m === 'auto' ? 'Auto' : 'Off'}</button>`).join('')}</span>` : grp ? `<span class="itype">Group · ${descendants(b).length}</span>` : isT ? `<span class="itype">${INST_NAMES[b.inst.type]}</span>` : ''}
               <input type="range" class="hvol" min="0" max="1" step="0.001" value="${b.vol}" data-h="vol" data-map="${b.id}|vol" aria-label="${esc(b.name)} volume"><span class="hdb" data-db="${b.id}">${faderDb(b.vol)}</span></div>`) : ''}
           ${r.h >= 58 && !V.autoMode && V.showM && r.kind !== 'take' ? hdrChips(b, isT) : ''}
@@ -118,6 +118,7 @@ function bindHeaders() {
       case 'mon': b.monitor = h.dataset.m; break;
       case 'fold': b.fold = !b.fold; break;
       case 'pre': pushUndo('Send position'); b.pre = !b.pre; rebuildAll(); break;
+      case 'amode': return autoModeMenu(e, b);
       case 'clearAuto': pushUndo('Clear automation'); delete b.auto[b.autoShow || 'vol']; releaseAutomation(); _tmKey = ''; break;
       case 'takes': b.showTakes = !b.showTakes; break;
       case 'compAll': { const lane = b.takes.find(l => l.id === hd.dataset.lane); const a = Math.min(...lane.clips.map(c => c.start)), z = Math.max(...lane.clips.map(c => c.start + c.len)); compRange(b, lane, a, z); break; }
@@ -365,6 +366,11 @@ function rackify(card) {
 function fitRack() { const rack = $('#pane-dev .rack'); if (!rack) return; const cb = rack.querySelector('.card .cb'), h = cb ? cb.clientHeight : rack.clientHeight - 47; rack.style.setProperty('--prow', clamp(Math.floor((h - 36) / 69), 1, 8)); rack.style.setProperty('--cbh', h + 'px'); }
 
 const HDR_TAP = { id: null, t: 0, was: false };
+// Automation mode button (mixer strips and track headers in automation view) and its menu
+const AMODE_LABEL = { off: 'Off', read: 'Read', touch: 'Touch', latch: 'Latch', write: 'Write' };
+const AMODE_HELP = { off: 'ignores this channel\'s automation', read: 'plays automation; with Automation Arm on, moving a control records it', touch: 'records while you hold a control, then goes back to what was written', latch: 'records from the first touch and keeps the last value until you stop', write: 'records volume, pan and sends for the whole pass, then switches to Touch' };
+function autoModeBtn(b, cls = '') { const m = amode(b); return `<button class="amode ${cls} am-${m}" data-h="amode" data-act="amode" title="Automation: ${AMODE_LABEL[m]} - ${AMODE_HELP[m]}. Click to change.">${AMODE_LABEL[m]}</button>`; }
+function autoModeMenu(e, b) { const m = amode(b); popMenu(e, AUTO_MODES.map(k => ({ label: (k === m ? '✓  ' : '    ') + AMODE_LABEL[k] + '  ·  ' + AMODE_HELP[k], run: () => setAutoMode(b, k) }))); }
 const DEV_H = 290;
 function clipH() { return clamp(+lsGet('sb-detailH') || 320, 160, Math.max(160, innerHeight - 260)); }
 function sizeDetail() { const app = $('#app'), dev = V.detail !== 'clip', h = dev ? Math.min(DEV_H, Math.max(160, innerHeight - 260)) : clipH(), was = app.style.getPropertyValue('--detailH');
