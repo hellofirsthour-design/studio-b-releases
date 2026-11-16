@@ -1,8 +1,8 @@
 {
- "version": "0.2.46",
+ "version": "0.2.47",
  "shell": 4,
- "date": "2026-11-16T17:50:27.558Z",
- "notes": "Sound bar in every instrument, hot-swap, wider EQ and rack cards",
+ "date": "2026-11-16T17:57:42.778Z",
+ "notes": "Separate Clip and Devices views: Devices fixed height, Clip resizable",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 13097,
-   "sha256": "e072a26d5b7e3961075bc97128f76ee4b03330f6ad110494a35b547ed5d7db63"
+   "size": 13298,
+   "sha256": "cff71b14237c6e550b0fb8c8baaa7a99c239c94ac1909dc71f9897de5c6ff76d"
   },
   {
    "path": "img/b-mark.svg",
@@ -141,8 +141,8 @@
   },
   {
    "path": "js/main.js",
-   "size": 35840,
-   "sha256": "c5af6d00ae5a9888f7b4a09426768ce15a677416b7e5445fc3d5495cca4720f7"
+   "size": 35884,
+   "sha256": "36989e7155abe5487963f077e111da8c027bfb567782f782d34aeb7f17366f7a"
   },
   {
    "path": "js/mapping.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 49292,
-   "sha256": "4cecb167d9200f10f2e0ce4a8b10ff0856ea2021fdd800852b1731fead7a32e8"
+   "size": 50076,
+   "sha256": "ed9f5b56c94aaae300250743eb93399a9ccd86011b356dbb8cf384ef8121909b"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "ecde4c2cf4aa8660928f1551d71f5551af7ebf878da4c1fa4abe1b0745e96199"
+   "sha256": "afe0ce6896938d9ec4c07cdbdf87511ca0764625bf8f376464e2076152621857"
   }
  ]
 }

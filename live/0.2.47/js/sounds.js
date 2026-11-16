@@ -180,11 +180,11 @@ const SOUND_TRIM = {"808 Clean": 1.85, "808 Long Glide": 1.85, "Sub Bass": 1.92,
 function soundInst(s) { const base = s.inst.type === 'synth' ? { ...SYNTH_DEFAULT } : s.inst.type === 'drums' ? {} : newInst(s.inst.type), o = { ...deep(base), ...deep(s.inst), preset: s.name }, tr = SOUND_TRIM[s.name] || 1; if (s.pack) o.zones = packZones(s);
   if (tr !== 1) { if (o.pads) o.pads.forEach(p => (p.level = +(p.level * tr).toFixed(3))); else if (o.gain != null) o.gain = +(o.gain * tr).toFixed(3); }
   return o; }
-function soundDevices(s) { return s.fx.filter(([k, p]) => DEVICES[k] && p).map(([k, p]) => newDevice(k, { ...DEVICES[k].def(), ...p })); }
+function soundDevices(s) { return s.fx.filter(([k, p]) => DEVICES[k] && p).map(([k, p]) => Object.assign(newDevice(k, { ...DEVICES[k].def(), ...p }), { fromSound: true })); }
 function addSound(name, onto) {
   const s = soundByName(name); if (!s) return;
   if (s.pack && !packReady(s)) { toast(`Loading ${s.name}…`, 1500); return packLoad(s).then(ok => ok && addSound(name, onto)); }
-  if (onto && onto.kind === 'midi') { pushUndo('Load sound'); removeBus(onto); onto.inst = soundInst(s); onto.devices = [...soundDevices(s), ...onto.devices.filter(d => d.type === 'plugin')]; onto.name = s.name; buildBus(onto, 'track'); routeOut(onto); V.selTracks = new Set([onto.id]); V.detail = 'devices'; ui.all(); return; }
+  if (onto && onto.kind === 'midi') { pushUndo('Load sound'); const was = onto.inst && onto.inst.preset; removeBus(onto); onto.inst = soundInst(s); onto.devices = [...soundDevices(s), ...onto.devices.filter(d => !d.fromSound)]; if (!onto.name || onto.name === was || /^(MIDI|Track|Synth|Drums|Kit|Instrument)( \d+)?$/i.test(onto.name)) onto.name = s.name; buildBus(onto, 'track'); routeOut(onto); V.selTracks = new Set([onto.id]); V.detail = 'devices'; ui.all(); return; }
   const t = addTrack('midi', s.inst.type === 'drums' ? 'drums' : 'synth'); removeBus(t); t.inst = soundInst(s); t.devices = soundDevices(s); t.name = s.name; buildBus(t, 'track'); routeOut(t);
   V.selTracks = new Set([t.id]); V.detail = 'devices'; ui.all();
 }
@@ -208,4 +208,54 @@ function stopSoundPreview() {
   if (!_snd) return; clearTimeout(_snd.until); const x = _snd; _snd = null;
   try { x.inst.allOff(LIVE_CTX.currentTime); } catch (e) { }
   setTimeout(() => { try { x.out.disconnect(); } catch (e) { } x.devs.forEach(d => { const r = DEV_RT.get(d.id); if (r) { r.dispose(); DEV_RT.delete(d.id); } }); if (x.inst.dispose) x.inst.dispose(); }, 600);
+}
+
+/* ---------- the sound bar: every instrument shows its sound, steps through the library, and swaps from the browser ---------- */
+const soundOf = t => soundByName(t.inst && t.inst.preset);
+function soundList(cat) { return SOUNDS.filter(s => s.cat === cat); }
+function stepSound(t, dir) {
+  const cur = soundOf(t), cat = cur ? cur.cat : t.inst.type === 'drums' ? 'Drum Kits' : SOUND_CATS[0], list = soundList(cat); if (!list.length) return;
+  const i = cur ? list.indexOf(cur) : -1, next = list[(i + dir + list.length) % list.length]; addSound(next.name, t);
+}
+function soundBar(t, card) {
+  if (!t.inst || t.inst.type === 'plugin') return;
+  const cur = soundOf(t), ch = card.querySelector('.ch'); if (!ch) return;
+  const bar = document.createElement('div'); bar.className = 'sbar';
+  bar.innerHTML = `<button class="sbcat" title="Sound categories">${esc(cur ? cur.cat : 'Sounds')} ▾</button><button class="sbstep" data-d="-1" title="Previous sound" aria-label="Previous sound">‹</button><button class="sbname" title="Pick a sound">${esc(cur ? cur.name : 'No sound loaded')}</button><button class="sbstep" data-d="1" title="Next sound" aria-label="Next sound">›</button><button class="sbswap" title="Hot-swap: show this sound in the browser, double-click another to replace it" aria-label="Hot-swap sound">⇄</button>`;
+  bar.querySelectorAll('.sbstep').forEach(b => b.onclick = e => { e.stopPropagation(); stepSound(t, +b.dataset.d); });
+  bar.querySelector('.sbcat').onclick = e => { e.stopPropagation(); soundPanel(t, e.currentTarget); };
+  bar.querySelector('.sbname').onclick = e => { e.stopPropagation(); soundPanel(t, e.currentTarget); };
+  bar.querySelector('.sbswap').onclick = e => { e.stopPropagation(); hotSwapSound(t); };
+  const sub = ch.querySelector('.csub'); if (sub) sub.after(bar); else ch.appendChild(bar);
+  card.classList.add('hasbar');
+}
+// A library panel like Logic's: categories down the left, the sounds in the picked one on the right. Clicking a sound loads it on the track
+// (the panel stays open so you can play and keep trying); the arrow keys step through the list.
+function soundPanel(t, anchor) {
+  let p = $('#sndpanel'); if (!p) { p = document.createElement('div'); p.id = 'sndpanel'; document.body.appendChild(p); }
+  const cur = soundOf(t); let cat = cur ? cur.cat : t.inst.type === 'drums' ? 'Drum Kits' : SOUND_CATS[0], q = '';
+  const draw = () => {
+    const now = soundOf(t), list = q ? SOUNDS.filter(s => (s.name + ' ' + s.tags + ' ' + s.cat).toLowerCase().includes(q)) : soundList(cat);
+    p.innerHTML = `<input class="spq" placeholder="Search sounds" value="${esc(q)}" aria-label="Search sounds"><div class="spcols"><div class="spcats">${SOUND_CATS.map(c => `<button data-cat="${esc(c)}" class="${!q && c === cat ? 'on' : ''}">${esc(c)}<span>${soundList(c).length}</span></button>`).join('')}</div><div class="spsnds">${list.map(s => `<button data-snd="${esc(s.name)}" class="${now && now.name === s.name ? 'on' : ''}">${esc(s.name)}</button>`).join('') || '<div class="faint">No sounds match.</div>'}</div></div>`;
+    const qi = $('.spq', p); qi.oninput = () => { q = qi.value.trim().toLowerCase(); const pos = qi.selectionStart; draw(); const n = $('.spq', p); n.focus(); n.setSelectionRange(pos, pos); };
+    qi.onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') close(); };
+    const on = $('.spsnds .on', p); if (on) on.scrollIntoView({ block: 'nearest' });
+  };
+  const close = () => { p.hidden = true; document.removeEventListener('pointerdown', off, true); document.removeEventListener('keydown', keys, true); };
+  const off = e => { if (!p.contains(e.target) && !e.target.closest('.sbar')) close(); };
+  const keys = e => { if (p.hidden) return; if (e.key === 'Escape') { close(); e.preventDefault(); e.stopPropagation(); }
+    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.target.closest('input:not(.spq), textarea')) { e.preventDefault(); e.stopPropagation(); const b = [...p.querySelectorAll('[data-snd]')], i = b.findIndex(x => x.classList.contains('on')), n = b[clamp(i + (e.key === 'ArrowDown' ? 1 : -1), 0, b.length - 1)]; if (n) pick(n.dataset.snd); } };
+  const pick = name => { const tr = S.tracks.find(x => x.id === t.id); if (!tr) return close(); t = tr; addSound(name, tr); draw(); };
+  p.onclick = e => { const c = e.target.closest('[data-cat]'), s = e.target.closest('[data-snd]'); if (c) { cat = c.dataset.cat; q = ''; draw(); } if (s) pick(s.dataset.snd); };
+  p.hidden = false; draw();
+  const r = anchor.getBoundingClientRect(), h = p.offsetHeight; p.style.left = clamp(r.left - 40, 8, innerWidth - p.offsetWidth - 8) + 'px'; p.style.top = (r.top - h - 6 > 8 ? r.top - h - 6 : clamp(r.bottom + 6, 8, innerHeight - h - 8)) + 'px';
+  document.removeEventListener('pointerdown', off, true); setTimeout(() => { document.addEventListener('pointerdown', off, true); document.addEventListener('keydown', keys, true); }, 0);
+}
+// Hot-swap, as in Ableton: the browser opens on this sound; double-clicking another sound replaces it on the same track.
+function hotSwapSound(t) {
+  const cur = soundOf(t), drums = cur ? cur.cat === 'Drum Kits' : t.inst.type === 'drums';
+  browser.swapFor = t.id; browser.sel = drums ? 'drums' : 'sounds'; browser.q = ''; if (cur && !drums) browser.expanded.add('snd:' + cur.cat);
+  if (!V.browser) { V.browser = true; ui.all(); } browser.render();
+  const row = cur && [...document.querySelectorAll('#blist [data-key]')].find(r => r.dataset.key === 'inst:sound:' + cur.name); if (row) { document.querySelectorAll('#blist .brow.sel').forEach(x => x.classList.remove('sel')); row.classList.add('sel'); row.scrollIntoView({ block: 'center' }); }
+  toast(`Hot-swap: double-click a sound to replace ${t.name}`, 2500);
 }

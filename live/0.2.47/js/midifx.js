@@ -125,5 +125,5 @@ function midiFxCard(t, f, i) {
 function addMidiFx(type, t) {
   t = t || S.tracks.find(x => V.selTracks.has(x.id) && x.kind === 'midi') || S.tracks.find(x => x.kind === 'midi'); if (!t) return toast('Insert a MIDI track first (Ctrl+Shift+T)');
   if (t.kind !== 'midi') return toast('MIDI effects go on MIDI tracks');
-  pushUndo('Add MIDI effect'); t.midifx = t.midifx || []; t.midifx.push(newMidiFx(type)); V.selTracks = new Set([t.id]); V.detail = V.detail === 'clip' ? 'both' : V.detail; ui.all();
+  pushUndo('Add MIDI effect'); t.midifx = t.midifx || []; t.midifx.push(newMidiFx(type)); V.selTracks = new Set([t.id]); V.detail = 'devices'; ui.all();
 }

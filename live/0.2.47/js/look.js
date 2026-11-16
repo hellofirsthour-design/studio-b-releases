@@ -58,3 +58,11 @@ async function statusInfo() {
 }
 setInterval(() => { if (typeof S !== 'undefined' && S) statusInfo(); }, 1000);
 setTimeout(() => { const el = $('#stHelp'); if (el && !el.innerHTML) el.innerHTML = '<span class="faint">Hover anything to see what it does.</span>'; }, 0);
+
+/* Escape closes the open menu, or the window on top (Writer, Settings, Export, a name box). Questions that need an answer (save changes, recover work) stay. */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const menu = $('#menu'); if (menu && !menu.hidden) { menu.hidden = true; e.preventDefault(); return; }
+  const open = [...document.querySelectorAll('.modal')].filter(m => !m.hidden && !['leave', 'recover'].includes(m.id)); if (!open.length) return;
+  const m = open[open.length - 1]; if (m.id === 'prefs' && typeof testTone === 'function') testTone(false); m.hidden = true; e.preventDefault(); e.stopPropagation();
+}, true);

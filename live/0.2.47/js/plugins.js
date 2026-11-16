@@ -74,7 +74,7 @@ function choosePlugin(e, instrument, then, near) {
 function addPlugin(ref, instrument, onto) {
   if (instrument) { pushUndo('Add plug-in instrument'); const t = onto && onto.kind === 'midi' ? onto : addTrack('midi', 'synth'); if (t.inst && t.inst.type === 'plugin') neFree('inst:' + t.id); removeBus(t); t.inst = { type: 'plugin', ref, name: ref.name }; t.name = onto ? t.name : ref.name; buildBus(t, 'track'); routeOut(t); V.selTracks = new Set([t.id]); V.detail = 'devices'; ui.all(); return; }
   const b = onto || busById([...V.selTracks][0]); if (!b) return toast('Select a track first');
-  pushUndo('Add plug-in'); b.devices.push(newDevice('plugin', { name: ref.name, format: ref.format, role: 'effect', ref })); rewire(b); V.detail = V.detail === 'clip' ? 'both' : V.detail; ui.detail();
+  pushUndo('Add plug-in'); b.devices.push(newDevice('plugin', { name: ref.name, format: ref.format, role: 'effect', ref })); rewire(b); V.detail = 'devices'; ui.detail();
 }
 // After opening an Ableton set: link plug-in placeholders to installed plug-ins with the same name.
 function linkPlaceholders() {
