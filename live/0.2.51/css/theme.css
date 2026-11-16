@@ -151,3 +151,46 @@ input[type=range]:hover::-webkit-slider-thumb{background:#fff}
 #sndpanel .spcats{border-right:1px solid #08090b;padding-right:6px}
 #pane-dev .cside:has(.rchain){width:max-content;max-width:none}
 #pane-dev .ccol:has(.rchain){width:max-content}
+/* Devices keep one fixed height; only the Clip view can be dragged taller or shorter */
+#app.devview:not(.nodetail) #split{cursor:default} #app.devview:not(.nodetail) #split:hover{background:#0a0b0d}
+
+/* ---------- Mixer, Pro Tools style: view bar, insert and send slots, number on top, name at the bottom ---------- */
+#mixer:not([hidden]){display:flex;flex-direction:column}
+.mxbar{display:flex;align-items:center;gap:4px;padding:6px 10px;border-bottom:1px solid #08090b;background:#131418;position:sticky;left:0;top:0;z-index:2}
+.mxbar .lab{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#8a8d96;margin-right:4px}
+.mxbar .faint{margin-left:auto;font-size:11px}
+.mxvt{font-size:11px;padding:3px 9px;border-radius:5px;color:#9a9da6;background:#0f1013;border:1px solid #08090b}
+.mxvt.on{color:var(--text,#eee);background:color-mix(in srgb,var(--accent) 22%,#0f1013)}
+.mxstrips{flex:1}
+.mxs{width:112px}
+.mxnum{display:flex;align-items:center;justify-content:center;gap:5px;font:600 11px var(--mono);color:#9a9da6;position:relative;padding-top:4px}
+.mxnum i{position:absolute;top:-6px;left:-6px;right:-6px;height:3px;background:var(--tc);border-radius:7px 7px 0 0}
+.mxsec{display:grid;gap:1px;background:#0c0d10;border:1px solid #08090b;border-radius:5px;padding:2px}
+.mxsl{font-size:8.5px;text-transform:uppercase;letter-spacing:.08em;color:#6e717a;padding:1px 3px}
+.mxins{display:flex;align-items:center;gap:4px;height:17px;padding:0 4px;border-radius:3px;font-size:10px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#1a1b20;color:#cfd2d9;border:0;cursor:pointer}
+.mxins b{font:600 9px var(--mono);color:#6e717a;width:8px;flex:none}
+.mxins i{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;box-shadow:0 0 4px var(--accent)}
+.mxins.off{color:#6e717a} .mxins.off i{background:#555;box-shadow:none}
+.mxins.empty{background:transparent;color:#55585f} .mxins.empty:hover{background:#1a1b20;color:#b4b7bf}
+.mxins.inst{background:color-mix(in srgb,var(--tc) 22%,#1a1b20);font-weight:600} .mxins.inst i{background:var(--tc);box-shadow:none}
+.mxins:hover{filter:brightness(1.15)}
+.mxsnd{display:grid;grid-template-columns:8px 1fr 14px;grid-template-rows:auto 5px;column-gap:4px;align-items:center;padding:1px 3px 2px;border-radius:3px;background:#1a1b20}
+.mxsnd b{font:600 9px var(--mono);color:#6e717a;grid-row:1/3}
+.mxsnd .sn{font-size:10px;color:#cfd2d9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mxsnd .sbr{grid-column:2;grid-row:2;height:5px;background:#0a0b0d;border-radius:3px;overflow:hidden;cursor:ew-resize;touch-action:none}
+.mxsnd .sbr i{display:block;height:100%;background:var(--tc)}
+.mxsnd .pp{grid-column:3;grid-row:1/3;font:600 8px var(--mono);color:#55585f;background:#0f1013;border:1px solid #08090b;border-radius:3px;height:14px;padding:0}
+.mxsnd .pp.on{color:#111;background:var(--accent)}
+.mxs .mxname{justify-content:center;font-size:11px;padding:3px 2px;background:#0f1013;border-radius:4px;border:1px solid #08090b}
+.mxs .mxknobs{min-height:0}
+/* narrow strips */
+.mxstrips.narrow .mxs{width:66px;padding:5px 3px 6px}
+.mxstrips.narrow .mxs.master{width:120px}
+.mxstrips.narrow .mxins{font-size:9px;padding:0 2px} .mxstrips.narrow .mxins b{display:none}
+.mxstrips.narrow .mxsnd{grid-template-columns:1fr 12px} .mxstrips.narrow .mxsnd b{display:none} .mxstrips.narrow .mxsnd .sn{font-size:9px} .mxstrips.narrow .mxsnd .sbr{grid-column:1} .mxstrips.narrow .mxsnd .pp{grid-column:2}
+.mxstrips.narrow .mxfader{grid-template-columns:0 24px 1fr} .mxstrips.narrow .mxscale{visibility:hidden}
+.mxstrips.narrow .mxread{grid-template-columns:1fr} .mxstrips.narrow .mxpeak{display:none}
+.mxstrips.narrow .mxrow .btn{font-size:9px;padding:2px 3px} .mxstrips.narrow .mxdly span{display:none}
+.mxstrips.narrow .mxio .seg button{padding:1px 3px;font-size:9px}
+.mxstrips.narrow .mxloud{font-size:9px}
+#mixer .mxstrips{min-height:0}

@@ -1,8 +1,8 @@
 {
- "version": "0.2.50",
+ "version": "0.2.51",
  "shell": 4,
- "date": "2026-11-16T20:02:31.341Z",
- "notes": "Wurlitzer pack; pre-roll, post-roll and auto-stop after punch-out; Devices by default",
+ "date": "2026-11-16T20:36:23.736Z",
+ "notes": "Pro Tools-style mix window",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 13298,
-   "sha256": "cff71b14237c6e550b0fb8c8baaa7a99c239c94ac1909dc71f9897de5c6ff76d"
+   "size": 17032,
+   "sha256": "857de369b46f0aee0342d5901d8f008a9e10e33181c06dd517d3d22020b6aa0b"
   },
   {
    "path": "img/b-mark.svg",
@@ -91,8 +91,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 55617,
-   "sha256": "ba22df99f6d3220503fec811a3c4a649cd2f4f8bcbbacfbcbe70c84b6564f6c3"
+   "size": 55857,
+   "sha256": "b4603c056bbd6c525d4356c496997b6e8fed8e56414e8c1bab5bb12877b15afe"
   },
   {
    "path": "js/features.js",
@@ -156,8 +156,8 @@
   },
   {
    "path": "js/mixer.js",
-   "size": 10708,
-   "sha256": "29ca8e35204dbad2ad634b54ce5626ababcdce2510c1cd235df2b2487c6b1e5c"
+   "size": 16612,
+   "sha256": "5f6660969a6d54695f4b73ebd9f4c766f81b0c32a087a69a9c124d89242359f9"
   },
   {
    "path": "js/mods.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "f99865d1dcac1c8aaf92958481283f6a2a0f8a3e55d410dccfe73dbec8ca6f23"
+   "sha256": "ec3293404fe52c1316f65f91c46e0bcd611441d16619646ed53ad5363d838d38"
   }
  ]
 }
