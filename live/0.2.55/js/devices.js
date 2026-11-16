@@ -1,5 +1,6 @@
 /* ============ audio effects ============ */
-const sm = (param, v, t = 0.015) => param.setTargetAtTime(v, ctx.currentTime, t);
+// Smoothly move a parameter. At the very start of an offline render it is set outright, so an export does not begin with a glide.
+const sm = (param, v, t = 0.015) => (ctx.currentTime === 0 && typeof isOffline === 'function' && isOffline() ? param.setValueAtTime(v, 0) : param.setTargetAtTime(v, ctx.currentTime, t));
 // Stop every source a device or instrument started and disconnect every node it owns, so a rebuilt graph leaves nothing running behind.
 const RELEASE_SKIP = new Set(['scSrc']);   // nodes a device only borrows (another track's output)
 function releaseNodes(o) { Object.entries(o).forEach(([k, v]) => { if (RELEASE_SKIP.has(k)) return; const list = Array.isArray(v) ? v : [v]; list.forEach(n => { if (n instanceof AudioScheduledSourceNode) { try { n.stop(); } catch (e) { } } if (n instanceof AudioNode) { try { n.disconnect(); } catch (e) { } if (n.port) { try { n.port.onmessage = null; } catch (e) { } } } else if (n && typeof n === 'object' && !Array.isArray(v) && n.constructor === Object && Object.values(n).some(x => x instanceof AudioNode)) releaseNodes(n); }); }); }

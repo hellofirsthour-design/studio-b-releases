@@ -1,8 +1,8 @@
 {
- "version": "0.2.54",
+ "version": "0.2.55",
  "shell": 4,
- "date": "2026-11-16T21:19:42.890Z",
- "notes": "Mix groups and VCA faders; exports start at the set fader level",
+ "date": "2026-11-16T21:54:50.164Z",
+ "notes": "Mixer: smaller fader caps",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 20371,
-   "sha256": "b3dcef6d7a5e0417b91f970000304b2bacd1719eddec196b4ba798e2b4ca7c2d"
+   "size": 21144,
+   "sha256": "4f9c7b5710d53fdd31db964e68c2e0bc6e72dc059990e4c8a0131a6d4ce33da4"
   },
   {
    "path": "img/b-mark.svg",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "f7185a022355e8dc81ab69eafa5519c268a1b5c2a4227195dcec689afbb1776a"
+   "sha256": "5e9933e4f598701c94b58b989aff56479784f31001932a7c2dd3ae77e1e7eba3"
   }
  ]
 }
