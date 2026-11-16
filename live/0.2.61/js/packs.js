@@ -112,6 +112,6 @@ async function downloadPack(id) {
 }
 function packItem(p) {
   const st = PACK_STATE.installed.get(p.id), busy = PACK_STATE.busy.get(p.id);
-  const meta = busy != null ? `Downloading ${Math.round(busy * 100)}%` : st ? `Installed · ${p.insts.length} instruments` : `Download · ${p.mb} MB`;
-  return { name: p.name, meta, act: 'pack', key: 'pack:' + p.id, icon: 'sounds', title: `${p.blurb}. ${st ? 'Installed: its instruments are in the folders below.' : 'Click to download.'} ${p.credit || 'Free and public domain (CC0).'}` };
+  const meta = busy != null ? `${Math.round(busy * 100)}%` : st ? '✓' : '↓';
+  return { name: p.name, meta, act: 'pack', key: 'pack:' + p.id, icon: 'sounds', title: `${p.blurb}. ${busy != null ? 'Downloading…' : st ? `Installed: ${p.insts.length} instruments, in the folders below.` : `Click to download (about ${p.mb} MB).`} ${p.credit || 'Free and public domain (CC0).'}` };
 }

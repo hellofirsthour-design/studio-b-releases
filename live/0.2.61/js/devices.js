@@ -132,6 +132,7 @@ class TapeDev extends Base {
   constructor(d) {
     super(d); this.wetDry();
     this.dl = ctx.createDelay(4); this.hp = ctx.createBiquadFilter(); this.hp.type = 'highpass'; this.lp = ctx.createBiquadFilter(); this.lp.type = 'lowpass';
+    this.hp.Q.value = this.lp.Q.value = -3.01;   // flat (Butterworth) filters in the loop: no resonant bump feeding back
     this.sat = ctx.createWaveShaper(); this.sat.curve = satCurve('Tape', 6); this.fb = ctx.createGain(); this.pre = ctx.createGain();
     this.pan = ctx.createStereoPanner();
     this.input.connect(this.pre); this.pre.connect(this.dl); this.dl.connect(this.hp); this.hp.connect(this.lp); this.lp.connect(this.sat);
@@ -143,8 +144,11 @@ class TapeDev extends Base {
   }
   time() { const p = this.d.p; return clamp(p.sync ? divSec(p.div) : p.ms / 1000, 0.01, 3.9); }
   set() {
-    const p = this.d.p; sm(this.dl.delayTime, this.time(), 0.05); sm(this.fb.gain, p.fb); sm(this.hp.frequency, p.lowcut); sm(this.lp.frequency, p.highcut);
-    const k = 'T' + p.sat; if (k !== this._k) { this.sat.curve = satCurve('Tape', p.sat); this._k = k; }
+    const p = this.d.p; sm(this.dl.delayTime, this.time(), 0.05); sm(this.hp.frequency, p.lowcut); sm(this.lp.frequency, p.highcut);
+    const k = 'T' + p.sat; if (k !== this._k) { this.sat.curve = satCurve('Tape', p.sat); this._k = k; const c = this.sat.curve, m = c.length >> 1; this._slope = Math.max(1, (c[m] - c[m - 1]) * (c.length - 1) / 2); }
+    // the saturation amplifies quiet signals (its slope at zero is above 1); take that out of the loop, so Feedback means what it says:
+    // below 100% the echoes always die away (the saturation still colours them), above 100% it runs away on purpose
+    sm(this.fb.gain, p.fb / (this._slope || 1));
     sm(this.pre.gain, dbToGain(-p.sat * 0.4)); sm(this.wowG.gain, p.wow * 0.004); sm(this.fltG.gain, p.flutter * 0.0006); sm(this.spG.gain, p.spread);
     this.mix(p.mix);
   }

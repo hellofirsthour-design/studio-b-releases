@@ -31,11 +31,11 @@ const roll = {
         <div class="row tight"><button class="btn ghostb" data-ct="dup">Duplicate loop</button><button class="btn ghostb" data-ct="half">Halve</button></div>
         <div class="fld"><span>Notes · ${this.sel.size ? this.sel.size + ' selected' : 'all ' + c.notes.length}</span></div>
         <details data-det="tf" ${this.det.tf ? 'open' : ''}><summary>Transform</summary><div class="tools">
-          <button data-tf="quant">Quantize</button><button data-tf="human">Humanize</button><button data-tf="legato">Legato</button><button data-tf="reverse">Reverse</button>
+          <button data-tf="quant" title="Shortcut: Q (click the notes area first)">Quantize</button><button data-tf="human" title="Shortcut: H (click the notes area first)">Humanize</button><button data-tf="legato" title="Shortcut: L (click the notes area first)">Legato</button><button data-tf="reverse" title="Shortcut: R (click the notes area first)">Reverse</button>
           <button data-tf="up1">+1 st</button><button data-tf="dn1">−1 st</button><button data-tf="up12">+Oct</button><button data-tf="dn12">−Oct</button>
-          <button data-tf="x2">×2 time</button><button data-tf="half2">÷2 time</button><button data-tf="chop">Chop at grid</button><button data-tf="join">Join</button>
-          <button data-tf="fit">Fit to scale</button><button data-tf="invert">Invert</button><button data-tf="vramp">Vel ramp</button><button data-tf="strum">Strum</button>
-          <label class="fld sm"><span>Chord</span><select id="chordType">${['triad', 'seventh', 'sus2', 'sus4', 'power', 'add9', 'stack 4ths'].map(x => `<option>${x}</option>`).join('')}</select></label><button data-tf="chord">Make chords</button>
+          <button data-tf="x2" title="Shortcut: * (click the notes area first)">×2 time</button><button data-tf="half2" title="Shortcut: / (click the notes area first)">÷2 time</button><button data-tf="chop" title="Shortcut: E (click the notes area first)">Chop at grid</button><button data-tf="join" title="Shortcut: J (click the notes area first)">Join</button>
+          <button data-tf="fit" title="Shortcut: F (click the notes area first)">Fit to scale</button><button data-tf="invert" title="Shortcut: I (click the notes area first)">Invert</button><button data-tf="vramp">Vel ramp</button><button data-tf="strum" title="Shortcut: S (click the notes area first)">Strum</button>
+          <label class="fld sm"><span>Chord</span><select id="chordType">${['triad', 'seventh', 'sus2', 'sus4', 'power', 'add9', 'stack 4ths'].map(x => `<option>${x}</option>`).join('')}</select></label><button data-tf="chord" title="Shortcut: C (click the notes area first)">Make chords</button>
           <label class="fld sm"><span>Arp</span><select id="arpStyle">${['up', 'down', 'up-down', 'random', 'converge'].map(x => `<option>${x}</option>`).join('')}</select></label><label class="fld sm"><span>Rate</span><select id="arpRate">${GRIDS.map(([l, v]) => `<option value="${v}" ${v === 1 ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button data-tf="arp">Arpeggiate</button>
         </div></details>
         <details data-det="gn" ${this.det.gn ? 'open' : ''}><summary>Generate</summary><div class="tools">
@@ -54,7 +54,7 @@ const roll = {
           ${isPitched(t) ? `<button class="tog ${this.fold ? 'on' : ''}" id="rFold">Fold to scale</button>` : ''}
           <div class="seg"><button data-lane="vel" class="${this.lane === 'vel' ? 'on' : ''}">Velocity</button><button data-lane="chance" class="${this.lane === 'chance' ? 'on' : ''}">Chance</button><button data-lane="vr" class="${this.lane === 'vr' ? 'on' : ''}" title="Velocity range: a random spread each time the note plays">Vel range</button><button data-lane="rel" class="${this.lane === 'rel' ? 'on' : ''}" title="Release velocity">Release</button><button data-lane="pb" class="${this.lane === 'pb' ? 'on' : ''}" title="Per-note pitch bend (MPE). Draw over a note; double-click to clear it.">Pitch</button></div>
           <button class="tog ${this.preview !== false ? 'on' : ''}" id="rPrev" title="Play notes as you add or move them">Preview</button>
-          <span class="spacer"></span><span class="muted hint">Double-click to add · drag edges to resize · Alt-drag copies · Del removes · Ctrl+wheel zooms</span>
+          <span class="spacer"></span><span class="muted hint">Double-click to add or remove · B draw/select · +/− zoom · Alt+↑↓ velocity · Del removes</span>
         </div>
         <div class="rollcv"><canvas id="roll" tabindex="0" aria-label="Piano roll"></canvas></div>
       </div></div>`;
@@ -106,6 +106,8 @@ const roll = {
     let drag = null;
     cv.onpointerdown = e => {
       cv.focus(); const g = this.geo(), rc = cv.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top;
+      // our own double-click: a pointerdown's click count is always 0 in Chromium, so time the two presses ourselves
+      const tNow = performance.now(), L0 = this._lastDown, dbl = !!(L0 && tNow - L0.t < 420 && Math.abs(x - L0.x) < 6 && Math.abs(y - L0.y) < 6); this._lastDown = dbl ? null : { t: tNow, x, y };
       if (y < g.rulerH) { this.scrubbing = true; return; }
       if (x < g.keysW && y < g.h - g.laneH) { const p = g.rows[this.yr(g, y)]; if (p != null) audition(this.track, p); return; }
       if (y > g.h - g.laneH) { pushUndo(); drag = { lane: true }; this.laneSet(g, x, y); cv.setPointerCapture(e.pointerId); return; }
@@ -118,7 +120,7 @@ const roll = {
         drag = { resize: true, notes: [n], orig: [{ ...n }], x0: x, paint: this.track.inst.type === 'drums' }; cv.setPointerCapture(e.pointerId); this.draw_(); return;
       }
       if (hit) {
-        if (e.detail === 2) { pushUndo(); this.clip.notes.splice(this.clip.notes.indexOf(hit.n), 1); this.sel.delete(hit.n); this.draw_(); return; }
+        if (dbl) { pushUndo(); this.clip.notes.splice(this.clip.notes.indexOf(hit.n), 1); this.sel.delete(hit.n); this.draw_(); return; }
         if (e.shiftKey || e.ctrlKey || e.metaKey) { this.sel.has(hit.n) ? this.sel.delete(hit.n) : this.sel.add(hit.n); this.draw_(); return; }
         if (!this.sel.has(hit.n)) { this.sel.clear(); this.sel.add(hit.n); }
         pushUndo();
@@ -128,7 +130,7 @@ const roll = {
         if (!hit.edge) audition(this.track, hit.n.p, hit.n.l);
         cv.setPointerCapture(e.pointerId); this.draw_(); return;
       }
-      if (e.detail === 2 && p != null) { pushUndo(); const n = { p, s: this.snapS(s, true), l: this.lastLen || this.grid, v: 0.8, c: 1 }; if (n.s < g.len) { this.clip.notes.push(n); this.sel.clear(); this.sel.add(n); audition(this.track, p, n.l); } this.draw_(); return; }
+      if (dbl && p != null) { pushUndo(); const n = { p, s: this.snapS(s, true), l: this.lastLen || this.grid, v: 0.8, c: 1 }; if (n.s < g.len) { this.clip.notes.push(n); this.sel.clear(); this.sel.add(n); audition(this.track, p, n.l); } this.draw_(); return; }
       if (!e.shiftKey) this.sel.clear();
       drag = { box: true, x0: x, y0: y, x1: x, y1: y, base: new Set(this.sel) }; this.box = drag; cv.setPointerCapture(e.pointerId); this.draw_();
     };
@@ -314,6 +316,14 @@ function generate(k) {
   c.notes.push(...out);
   roll.sel = new Set(out); roll.scrollY = null; roll.mount(); markDirty();
 }
+// Zoom the clip editor around the playhead if it is in view, else around the middle
+function rollZoom(k) {
+  if (!roll.cv) return; const g = roll.geo(), cx = roll.cv.clientWidth, mid = (g.keysW + cx) / 2, s = roll.xs(g, mid);
+  roll.zoom = clamp(roll.zoom * k, 1, 16); const g2 = roll.geo(); roll.scrollX = Math.max(0, roll.scrollX + roll.sx(g2, s) - mid); roll.draw_();
+}
+const gridName = g => ({ 0.25: '1/64', 0.5: '1/32', 1: '1/16', 2: '1/8', 4: '1/4', 8: '1/2', 16: '1 bar' })[g] || g;
+// Clicking anywhere outside the clip editor hands the keyboard (and +/- zoom) back to the arrangement
+document.addEventListener('pointerdown', e => { if (roll.cv && document.activeElement === roll.cv && !e.target.closest('#roll, #pane-clip')) roll.cv.blur(); }, true);
 function rollKey(e) {
   if (!roll.clip || !roll.cv || document.activeElement !== roll.cv) return false;
   { const live = clipById(V.editClip); if (live && live !== roll.clip) { roll.mount(); return true; } }
@@ -332,7 +342,22 @@ function rollKey(e) {
     });
     if (ns.length === 1) audition(roll.track, ns[0].p, 0.5); roll.draw_(); return true;
   }
-  if (!mod && e.key.toLowerCase() === 'q') { transform('quant'); return true; }
-  if (!mod && e.key.toLowerCase() === 'b') { roll.draw = !roll.draw; roll.mount(); $('#roll').focus(); return true; }
+  if (e.key === 'Escape' && ns.length) { roll.sel.clear(); roll.draw_(); return true; }
+  // velocity of the selected notes
+  if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && ns.length) { pushUndo(); ns.forEach(n => (n.v = clamp(Math.round(((n.v || 0.8) + (e.key === 'ArrowUp' ? 0.05 : -0.05)) * 100) / 100, 0.01, 1))); roll.draw_(); toast('Velocity ' + Math.round(ns[0].v * 127)); return true; }
+  // zoom the clip editor only (the arrangement keeps its zoom)
+  if (!mod && (e.key === '+' || e.key === '=' || e.key === '-')) { rollZoom(e.key === '-' ? 1 / 1.25 : 1.25); return true; }
+  if (mod && (e.key === '1' || e.key === '2')) { const steps = [0.25, 0.5, 1, 2, 4, 8, 16], i = steps.indexOf(roll.grid); roll.grid = steps[clamp((i < 0 ? 2 : i) + (e.key === '1' ? -1 : 1), 0, steps.length - 1)]; const gs = $('#rGrid'); if (gs) gs.value = roll.grid; roll.draw_(); toast('Grid ' + gridName(roll.grid)); return true; }
+  if (mod && e.key === '4') { roll.snap = !roll.snap; roll.mount(); $('#roll').focus(); toast(roll.snap ? 'Snap on' : 'Snap off'); return true; }
+  if (mod && e.key.toLowerCase() === 'u') { transform('quant'); return true; }
+  if (mod && e.key.toLowerCase() === 'e') { transform('chop'); return true; }
+  if (mod && e.key.toLowerCase() === 'j') { transform('join'); return true; }
+  if (mod || e.altKey) return false;
+  const KEYS = { q: 'quant', h: 'human', l: 'legato', r: 'reverse', j: 'join', e: 'chop', i: 'invert', f: 'fit', c: 'chord', s: 'strum', '*': 'x2', '/': 'half2' };
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (typeof KB !== 'undefined' && KB.on && (KEYMAP[k] != null || 'zxcv'.includes(k))) return false;   // the computer MIDI keyboard plays these letters
+  if (KEYS[k]) { transform(KEYS[k]); roll.draw_(); return true; }
+  if (k === 'b') { roll.draw = !roll.draw; roll.mount(); $('#roll').focus(); toast(roll.draw ? 'Draw mode' : 'Select mode'); return true; }
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey && ns.length) return true;
   return false;
 }

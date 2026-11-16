@@ -6,7 +6,7 @@ const SOUND_CATS = ['Bass & 808', 'Keys & Piano', 'Organ', 'Bells & Mallets', 'P
 const VERB = (mix = 0.22, decay = 2.4, extra = {}) => ['verb', { mix, decay, ...extra }];
 const CHAR = {
   Vintage: [['sat', { style: 'Tape', drive: 7, tone: -0.25, mix: 0.8 }], ['chorus', { rate: 0.35, depth: 0.35, mix: 0.3 }]],
-  'Lo-fi': [['filter', { type: 'lowpass', cutoff: 3600, res: 0.9 }], ['patina', { magnitude: 0.75, noise: 0.22, wobble: 0.55, distort: 0.15, magnetic: 0.45, dropouts: 0.2, tone: -0.3 }], ['tape', { div: '1/4', fb: 0.25, wow: 0.7, flutter: 0.5, highcut: 3000, mix: 0.12 }]],
+  'Lo-fi': [['filter', { type: 'lowpass', cutoff: 3600, res: 0.9 }], ['patina', { magnitude: 0.75, noise: 0.22, wobble: 0.55, distort: 0.15, magnetic: 0.45, dropouts: 0.2, tone: -0.3 }]],   // no delay: lo-fi is character (tone, wobble, noise, tape), not an echo
 };
 function snd(cat, name, inst, fx = [], tags = '', chars = []) {
   SOUNDS.push({ cat, name, inst, fx, tags });

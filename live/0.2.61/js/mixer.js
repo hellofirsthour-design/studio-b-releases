@@ -11,6 +11,7 @@ const mixer = {
       + `<div class="mxstrips ${v.narrow ? 'narrow' : ''}">${strips.map(([b, kind]) => b === 'gap' ? '<div class="mxgap"></div>' : (kind === 'vca' ? this.vcaStrip(b) : this.strip(b, kind))).join('')}</div>`;
     $$('[data-vt]', box).forEach(x => x.onclick = () => { const vv = this.view(); vv[x.dataset.vt] = !vv[x.dataset.vt]; lsSet('sb-mxview', JSON.stringify(vv)); this.render(); });
     $$('.mxs', box).forEach(el => (el.dataset.vca ? this.bindVca(el) : this.bindStrip(el)));
+    this.fit(); requestAnimationFrame(() => this.fit());
     $$('[data-mgp]', box).forEach(x => { const g = (S.mixGroups || []).find(q => q.id === x.dataset.mgp); if (!g) return;
       x.onclick = () => { g.on = g.on === false; markDirty(); this.render(); };
       x.oncontextmenu = e => { e.preventDefault(); popMenu(e, [{ label: g.on === false ? 'Resume group' : 'Suspend group', run: () => { g.on = g.on === false; markDirty(); this.render(); } }, { label: 'Rename…', run: () => askText('Mix group name', g.name, n => { pushUndo('Rename'); g.name = n; markDirty(); this.render(); }) }, { colors: c => { pushUndo(); g.color = c; markDirty(); this.render(); } }, '-',
@@ -53,7 +54,7 @@ const mixer = {
         <input type="range" class="mxvol" min="0" max="1" step="0.001" value="${b.vol}" aria-label="${esc(b.name)} volume">
         <div class="mxmeter" data-mm="${b.id}"><div class="mxch"><i class="lvl"></i><i class="pk"></i></div><div class="mxch"><i class="lvl"></i><i class="pk"></i></div><b class="mxclip"></b></div>
       </div>
-      <div class="mxread"><input class="mxdb" value="${faderDb(b.vol)}" aria-label="Volume in dB"><button class="mxpeak" data-pk="${b.id}" title="Highest peak. Click to reset.">-inf</button></div>
+      <div class="mxread"><input class="mxdb" value="${faderDb(b.vol)}" aria-label="Volume in dB"><button class="mxpeak" data-pk="${b.id}" title="Highest peak since you last clicked. Red means it went over 0 dB (clipping). Click to reset all clip lights.">-inf</button></div>
       <div class="mxbtns">${kind !== 'master' ? `<button class="hb act ${b.mute ? '' : 'on'}" data-act="mute">${num}</button>` : ''}${isT ? `<button class="hb solo ${b.solo ? 'on' : ''}" data-act="solo">S</button><button class="hb arm ${b.arm ? 'on' : ''}" data-act="arm">●</button>` : ''}</div>
       ${kind !== 'master' ? this.groupChips(b, kind) : ''}
       <div class="mxname" title="Double-click to rename"><i></i><span>${esc(b.name)}</span></div>
@@ -125,7 +126,7 @@ const mixer = {
         if (e.altKey) { pushUndo('Bypass'); d.on = !d.on; rewire(b); markDirty(); this.render(); return; }
         V.selTracks = new Set([b.id]); setDetailShown(true); V.detail = 'devices'; ui.detail(); this.render(); return; }
       if (a.dataset.pre != null) { const i = +a.dataset.pre; pushUndo('Send position'); b.sendPre = b.sendPre || []; b.sendPre[i] = !sendPre(b, i); rebuildAll(); markDirty(); this.render(); return; }
-      if (a.dataset.pk) { this.peaks.delete(b.id); METER.forEach(m => (m.clip = false)); return; }
+      if (a.dataset.pk) { clearClips(); return; }
       if (a.dataset.mon) { b.monitor = a.dataset.mon; applyMix(b); this.render(); ui.headers(); return; }
       if (a.dataset.dev) { const d = b.devices[+a.dataset.dev]; if (e.altKey) { d.on = !d.on; rewire(b); this.render(); markDirty(); return; } V.selTracks = new Set([b.id]); V.detail = 'devices'; ui.detail(); this.render(); return; }
       const act = a.dataset.act;
@@ -155,15 +156,22 @@ const mixer = {
     $('.mxname', el).ondblclick = () => askText('Name', b.name, v => { pushUndo('Rename'); b.name = v; this.render(); ui.headers(); });
     el.addEventListener('contextmenu', e => { if (!S.tracks.includes(b)) return; e.preventDefault(); popMenu(e, [{ label: 'Duplicate track', run: () => { duplicateTrack(b); this.render(); } }, { colors: c => { pushUndo(); b.color = c; ui.all(); this.render(); } }, '-', { label: 'Delete track', danger: true, run: () => { deleteTrack(b); this.render(); } }]); });
   },
+  // The mixer fits the window's height (it only scrolls sideways): the fader takes what is left, and if a strip still does not
+  // fit, it tightens step by step - smaller slots, then only the used insert slots plus one, then no section titles or delay box.
+  fit() {
+    const box = $('#mixer .mxstrips'); if (!box || $('#mixer').hidden) return;
+    const over = () => [...box.querySelectorAll('.mxs')].some(x => x.scrollHeight > x.clientHeight + 1 || (x.querySelector('.mxfader') || { clientHeight: 999 }).clientHeight < 150);   // tighten before the fader gets short
+    box.classList.remove('c1', 'c2', 'c3'); for (const c of ['c1', 'c2', 'c3']) { if (!over()) break; box.classList.add(c); }
+  },
   // called every animation frame while the mixer is visible
   frame(now) {
     const box = $('#mixer'); if (!box || box.hidden) return;
     allBuses().forEach(b => {
       const r = b === S.master ? M : RT.get(b.id); const el = box.querySelector(`[data-mm="${b.id}"]`); if (!r || !el || !r.anL) return;
-      const chans = el.querySelectorAll('.mxch'); const L = meter(b.id + ':L', chans[0], r.anL, now), R = meter(b.id + ':R', chans[1], r.anR, now);
+      const chans = el.querySelectorAll('.mxch'), pid = b === S.master ? 'master' : b.id, inp = b.arm && b.kind === 'audio' ? inputAnalyser(b) : null; const L = meter(b.id + ':L', chans[0], inp || r.anL, now), R = meter(b.id + ':R', chans[1], inp || r.anR, now);
       el.querySelector('.mxclip').classList.toggle('on', L.clip || R.clip);
-      const peakDb = Math.max(L.lastDb, R.lastDb), cur = this.peaks.get(b.id); if (peakDb > -90 && (cur == null || peakDb > cur)) this.peaks.set(b.id, peakDb);
-      const pk = box.querySelector(`[data-pk="${b.id}"]`), v = this.peaks.get(b.id); if (pk) { pk.textContent = v == null ? '-inf' : v.toFixed(1); pk.classList.toggle('hot', v != null && v > -0.3); }
+      const peakDb = Math.max(L.lastDb, R.lastDb), cur = this.peaks.get(b.id); L.lastDb = R.lastDb = -120; if (peakDb > -90 && (cur == null || peakDb > cur)) this.peaks.set(b.id, peakDb);
+      const pk = box.querySelector(`[data-pk="${b.id}"]`), v = this.peaks.get(b.id); if (pk) { pk.textContent = v == null ? '-inf' : v.toFixed(1); pk.classList.toggle('hot', v != null && v > 0); }
       if (T.playing && b.auto.vol && b.auto.vol.length) { const f = box.querySelector(`.mxs[data-id="${b.id}"] .mxvol`); if (f && document.activeElement !== f) f.value = autoValue(b.auto.vol, nowPos()); }
     });
     const ld = M.loudData; if (ld) { const f = v => (isFinite(v) ? v.toFixed(1) : '–'); const q = k => box.querySelector(`[data-l="${k}"]`); if (q('m')) { q('m').textContent = f(ld.m); q('s').textContent = f(ld.s); q('i').textContent = f(ld.i); q('p').textContent = ld.peak > 0 ? gainToDb(ld.peak).toFixed(1) : '–'; q('p').classList.toggle('hot', ld.peak >= 0.989); } }

@@ -1,8 +1,8 @@
 {
- "version": "0.2.60",
+ "version": "0.2.61",
  "shell": 4,
- "date": "2026-11-16T23:46:11.781Z",
- "notes": "Tail test: one process per batch, results saved before closing",
+ "date": "2026-11-16T23:54:29.410Z",
+ "notes": "Patina: no DC offset in silence; noise gate ignores DC and very low levels",
  "files": [
   {
    "path": "css/base.css",
@@ -81,8 +81,8 @@
   },
   {
    "path": "js/effects2.js",
-   "size": 20988,
-   "sha256": "eb529c205d4ad88d13d3eb2fde13be229b223daa37fc2fe0ea33a76a96a70b37"
+   "size": 21422,
+   "sha256": "b2bc10f87262e05dba6a9242efab6ffc1b2128591a13a39b99472bf7949f0523"
   },
   {
    "path": "js/engine-worker.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "704244887085e1fe68daa162b4fe0ad32e8f86faa7f0978af0ee9e637d224d45"
+   "sha256": "6df3d45b618f0551ad72e5b7cd025bad168697154b89a5194037295548ff2cec"
   }
  ]
 }
