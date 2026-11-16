@@ -1,8 +1,8 @@
 {
- "version": "0.2.53",
+ "version": "0.2.54",
  "shell": 4,
- "date": "2026-11-16T21:04:53.392Z",
- "notes": "Automation modes per channel (Off/Read/Touch/Latch/Write); fit fixes across the app",
+ "date": "2026-11-16T21:19:42.890Z",
+ "notes": "Mix groups and VCA faders; exports start at the set fader level",
  "files": [
   {
    "path": "css/base.css",
@@ -16,8 +16,8 @@
   },
   {
    "path": "css/theme.css",
-   "size": 19544,
-   "sha256": "7e622d83c55238bd95599b1c8f9490a2b0f4bc9b7045b27585517796f012c14b"
+   "size": 20371,
+   "sha256": "b3dcef6d7a5e0417b91f970000304b2bacd1719eddec196b4ba798e2b4ca7c2d"
   },
   {
    "path": "img/b-mark.svg",
@@ -66,8 +66,8 @@
   },
   {
    "path": "js/devices.js",
-   "size": 32086,
-   "sha256": "5d36b260fe0e44efa853fe0fb0761450d68d4b09fe7be317169ccd96cb441ac3"
+   "size": 32322,
+   "sha256": "ec5178990bb297bd8cb2ed0c6e097b26f93e7de9684f5285c7a95bca2e2d1dbc"
   },
   {
    "path": "js/dsp.js",
@@ -91,8 +91,8 @@
   },
   {
    "path": "js/engine.js",
-   "size": 59722,
-   "sha256": "0961136bfded5b8f40904ba363a1e2651c055a2218e9f1a25e5144ffeb45e8cf"
+   "size": 61975,
+   "sha256": "bbe2881b26b0502b576011880c97a53258346d542b80abeec04d5146107b79c2"
   },
   {
    "path": "js/features.js",
@@ -156,13 +156,13 @@
   },
   {
    "path": "js/mixer.js",
-   "size": 16775,
-   "sha256": "989f06cf2944307368308cea8d9082be57606e7cc3988c24e266cf1d19bf1be5"
+   "size": 24287,
+   "sha256": "a12ec96cc642d5f6a4c9a7431bd82e9ae03ad65d11aef250c6890baf069f4272"
   },
   {
    "path": "js/mods.js",
-   "size": 8293,
-   "sha256": "cbbf2442af2d9c4ee3c5f43904b824f20c6dd81975e607854099a2f22e327e28"
+   "size": 8306,
+   "sha256": "c84953eeda21ef4d5fff7457b61b04a0c3eb62265bf6940dbbc87b9b53b7dbed"
   },
   {
    "path": "js/native.js",
@@ -221,8 +221,8 @@
   },
   {
    "path": "js/ui.js",
-   "size": 51283,
-   "sha256": "28d3925d3c681f7a0d9d1ede9f8addafe8dd650ed292acdb8f39abb072c69d84"
+   "size": 51435,
+   "sha256": "f469186ec9b9804481c21fbede5334329d3a7c51be0838d7a50472a92e7b61ef"
   },
   {
    "path": "js/warp.js",
@@ -252,7 +252,7 @@
   {
    "path": "version.json",
    "size": 38,
-   "sha256": "55f8396c689a477db184cf193d590e7abe5fec24883fe8e2a55dc94d54e5bf6c"
+   "sha256": "f7185a022355e8dc81ab69eafa5519c268a1b5c2a4227195dcec689afbb1776a"
   }
  ]
 }

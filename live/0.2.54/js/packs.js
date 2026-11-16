@@ -113,5 +113,5 @@ async function downloadPack(id) {
 function packItem(p) {
   const st = PACK_STATE.installed.get(p.id), busy = PACK_STATE.busy.get(p.id);
   const meta = busy != null ? `Downloading ${Math.round(busy * 100)}%` : st ? `Installed · ${p.insts.length} instruments` : `Download · ${p.mb} MB`;
-  return { name: p.name, meta, act: 'pack', key: 'pack:' + p.id, icon: 'sounds', title: `${p.blurb}. ${st ? 'Installed: its instruments are in the folders below.' : 'Click to download. Free and public domain (CC0), from Versilian Studios.'}` };
+  return { name: p.name, meta, act: 'pack', key: 'pack:' + p.id, icon: 'sounds', title: `${p.blurb}. ${st ? 'Installed: its instruments are in the folders below.' : 'Click to download.'} ${p.credit || 'Free and public domain (CC0).'}` };
 }

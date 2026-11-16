@@ -38,7 +38,7 @@ function devScreen(body, d, r) {
 /* ---------- help and status bar ---------- */
 const HELP = { // a little more than the tooltip for the controls people reach for most
   play: 'Play from the insert marker. Space plays and stops.', rec: 'Record: starts the song recording into armed tracks, after the count-in if one is set. Stop ends it.',
-  countIn: 'Count-in before recording: none, 1, 2 or 4 bars.', writerBtn: 'Writer: chords, melody, bass and beats written as MIDI clips you can edit.', loopBtn: 'Loop the bracketed range. L toggles it.',
+  countIn: 'Record options: count-in (clicks before recording), pre-roll (the song plays a bar or two before the record point) and post-roll (it keeps playing after punch-out, then stops).', writerBtn: 'Writer: chords, melody, bass and beats written as MIDI clips you can edit.', loopBtn: 'Loop the bracketed range. L toggles it.',
 };
 function helpText(el) {
   const h = el && el.closest && el.closest('[data-help],[title],[aria-label]'); if (!h) return null;
